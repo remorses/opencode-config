@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "theme": "opencode",
+  "layout": "stretch",
+  "tui": { "scroll_speed": 8 },
+  "lsp": {
+    "typescript": { "disabled": true },
+    "eslint": { "disabled": true },
+    "gopls": { "disabled": true },
+    "ruby-lsp": { "disabled": true },
+    "pyright": { "disabled": true },
+    "elixir-ls": { "disabled": true },
+    "zls": { "disabled": true },
+    "csharp": { "disabled": true },
+    "vue": { "disabled": true },
+    "rust": { "disabled": true },
+    "clangd": { "disabled": true },
+    "svelte": { "disabled": true }
+  },
+  "formatter": {
+    "prettier": { "disabled": true },
+    "biome": { "disabled": true },
+    "gofmt": { "disabled": false },
+    "mix": { "disabled": false },
+    "zig": { "disabled": false },
+    "clang-format": { "disabled": false },
+    "ktlint": { "disabled": false },
+    "ruff": { "disabled": false },
+    "rubocop": { "disabled": false },
+    "standardrb": { "disabled": false },
+    "htmlbeautifier": { "disabled": false }
+  },
+
+  "autoupdate": true
+}
