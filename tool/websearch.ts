@@ -7,7 +7,7 @@ const google = createGoogleGenerativeAI({
 });
 
 export default tool({
-  description: "Search for something on the internet using Google",
+  description: "Search for something on the internet using Google. This tool can be used in parallel with many independent descriptions parameters.",
   args: {
     description: tool.schema
       .string()
