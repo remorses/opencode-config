@@ -78,6 +78,8 @@ export const ChatFinishedPlugin: Plugin = async ({
   $,
 
 }) => {
+  const sessionsWithErrors = new Set<string>();
+
   async function handleSessionIdle(sessionId?: string) {
     if (!sessionId) {
       return;
@@ -93,7 +95,11 @@ export const ChatFinishedPlugin: Plugin = async ({
 
     const folder = getProjectFolder(project);
     const formattedTitle = formatTitle(session.title);
-    const message = `${folder} ${formattedTitle} finished`.trim();
+
+    const message = sessionsWithErrors.has(sessionId)
+      ? `errored ${folder} ${formattedTitle}`.trim()
+      : `finisehd ${folder} ${formattedTitle}`.trim();
+
     if (!message) {
       return;
     }
@@ -114,6 +120,12 @@ export const ChatFinishedPlugin: Plugin = async ({
 
   return {
     async event({ event,  }) {
+      if (event.type === "session.error") {
+        if (event.properties.sessionID) {
+          sessionsWithErrors.add(event.properties.sessionID);
+        }
+        return;
+      }
 
       if (event.type !== "session.idle") {
         return;
