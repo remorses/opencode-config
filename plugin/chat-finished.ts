@@ -76,13 +76,17 @@ export const ChatFinishedPlugin: Plugin = async ({
   project,
   client,
   $,
-  env,
+
 }) => {
   async function handleSessionIdle(sessionId?: string) {
     if (!sessionId) {
       return;
     }
-    const session = await client.session.get({ path: { id: sessionId } });
+
+    const env = process.env
+    const { data: session } = await client.session.get({
+      path: { id: sessionId },
+    });
     if (!session) {
       return;
     }
@@ -109,7 +113,8 @@ export const ChatFinishedPlugin: Plugin = async ({
   }
 
   return {
-    async event({ event }) {
+    async event({ event,  }) {
+
       if (event.type !== "session.idle") {
         return;
       }
