@@ -72,12 +72,7 @@ async function synthesizeAndPlay({
   `;
 }
 
-export const ChatFinishedPlugin: Plugin = async ({
-  project,
-  client,
-  $,
-
-}) => {
+export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
   const sessionsWithErrors = new Set<string>();
 
   async function handleSessionIdle(sessionId?: string) {
@@ -85,7 +80,7 @@ export const ChatFinishedPlugin: Plugin = async ({
       return;
     }
 
-    const env = process.env
+    const env = process.env;
     const { data: session } = await client.session.get({
       path: { id: sessionId },
     });
@@ -104,6 +99,15 @@ export const ChatFinishedPlugin: Plugin = async ({
       return;
     }
 
+    // Check if Screen Studio is open
+    const screenStudioRunning = await $`pgrep -x "Screen Studio"`
+      .then(() => true)
+      .catch(() => false);
+    
+    if (screenStudioRunning) {
+      return; // Skip sound playback if Screen Studio is open
+    }
+
     const apiKey = env?.CARTESIA_API_KEY || env?.CARTESIA || env?.CARTESIA_KEY;
     if (!apiKey) {
       await $`say ${message}`;
@@ -119,10 +123,18 @@ export const ChatFinishedPlugin: Plugin = async ({
   }
 
   return {
-    async event({ event,  }) {
+    async event({ event }) {
       if (event.type === "session.error") {
         if (event.properties.sessionID) {
           sessionsWithErrors.add(event.properties.sessionID);
+        }
+        return;
+      }
+
+      if (event.type === "session.updated") {
+        const sessionId = event.properties.info.id;
+        if (sessionId) {
+          sessionsWithErrors.delete(sessionId);
         }
         return;
       }
