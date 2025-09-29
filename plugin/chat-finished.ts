@@ -101,6 +101,7 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
 
     // Check if Screen Studio is open
     const screenStudioRunning = await $`pgrep -x "Screen Studio"`
+      .quiet()
       .then(() => true)
       .catch(() => false);
 
@@ -110,14 +111,14 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
 
     const apiKey = env?.CARTESIA_API_KEY || env?.CARTESIA || env?.CARTESIA_KEY;
     if (!apiKey) {
-      await $`say ${message}`;
+      await $`say ${message}`.quiet();
       return;
     }
 
     try {
       await synthesizeAndPlay({ transcript: message, apiKey, exec: $ });
     } catch (error) {
-      await $`say ${message}`;
+      await $`say ${message}`.quiet();
     }
   }
 
