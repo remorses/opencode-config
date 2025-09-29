@@ -103,7 +103,7 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
     const screenStudioRunning = await $`pgrep -x "Screen Studio"`
       .then(() => true)
       .catch(() => false);
-    
+
     if (screenStudioRunning) {
       return; // Skip sound playback if Screen Studio is open
     }
@@ -117,7 +117,6 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
     try {
       await synthesizeAndPlay({ transcript: message, apiKey, exec: $ });
     } catch (error) {
-      console.error(error);
       await $`say ${message}`;
     }
   }
