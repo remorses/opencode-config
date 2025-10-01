@@ -73,7 +73,7 @@ async function synthesizeAndPlay({
 }
 
 export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
-  const sessionsWithErrors = new Set<string>();
+  const sessionsWithErrors = new Map<string, { ignore: boolean }>();
 
   async function handleSessionIdle(sessionId?: string) {
     if (!sessionId) {
@@ -90,6 +90,11 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
 
     const folder = getProjectFolder(project);
     const formattedTitle = formatTitle(session.title);
+
+    const errorInfo = sessionsWithErrors.get(sessionId);
+    if (errorInfo?.ignore) {
+      return;
+    }
 
     const message = sessionsWithErrors.has(sessionId)
       ? `errored ${folder} ${formattedTitle}`.trim()
@@ -126,7 +131,13 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
     async event({ event }) {
       if (event.type === "session.error") {
         if (event.properties.sessionID) {
-          sessionsWithErrors.add(event.properties.sessionID);
+          const isAbortError = event.properties.error?.name === 'MessageAbortedError';
+          sessionsWithErrors.set(event.properties.sessionID, {
+            ignore: isAbortError
+          });
+          if (isAbortError) {
+            return;
+          }
         }
         return;
       }
