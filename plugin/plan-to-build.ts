@@ -49,7 +49,7 @@ export const PlanToBuildPlugin: Plugin = async ({ client }) => {
           parts: [
             {
               type: "text",
-              text: "is your plan for an implementation? if yes, implement it. i the plan finished? if not complete it, thinking of what else needs to be thought out with all steps and details that will be passed to the implementer agent.",
+              text: "is your plan for an implementation? if yes, implement it. could the plan be implemented in a more elegant and simpler way? if yes update it. is the plan finished? if not complete it, thinking of what else needs to be thought out with all steps and details that will be passed to the implementer agent.",
             },
           ],
         },
