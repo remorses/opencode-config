@@ -20,15 +20,21 @@
   "formatter": {
     "prettier": { "disabled": true },
     "biome": { "disabled": true },
-    "gofmt": { "disabled": false },
-    "mix": { "disabled": false },
-    "zig": { "disabled": false },
-    "clang-format": { "disabled": false },
-    "ktlint": { "disabled": false },
-    "ruff": { "disabled": false },
-    "rubocop": { "disabled": false },
-    "standardrb": { "disabled": false },
-    "htmlbeautifier": { "disabled": false }
+    "gofmt": { "disabled": true },
+    "mix": { "disabled": true },
+    "zig": { "disabled": true },
+    "clang-format": { "disabled": true },
+    "ktlint": { "disabled": true },
+    "ruff": { "disabled": true },
+    "rubocop": { "disabled": true },
+    "standardrb": { "disabled": true },
+    "htmlbeautifier": { "disabled": true }
+  },
+
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow"
   },
 
   "autoupdate": true
