@@ -55,7 +55,6 @@ export const PlanToBuildPlugin: Plugin = async ({ client }) => {
         },
       });
     } catch (error) {
-      console.error(`Failed to continue session ${sessionId}:`, error);
       // Remove from processed set so it could be retried if needed
       processedSessions.delete(sessionId);
     }
