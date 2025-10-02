@@ -1,3 +1,8 @@
+// GPT-5 is very good at exploring a code base and creating plans but very bad at actually writing readable code
+// Sonnet and Opus are the opposite: very bad at architecture but good at implementing readable and nice code
+// this plugin automatically implements plan agent messages using Opus so that you can always use GPT5 Codex in plan mode and have Opus implement the plan autoamtically
+
+
 import type { Plugin } from "@opencode-ai/plugin";
 
 export const PlanToBuildPlugin: Plugin = async ({ client }) => {
