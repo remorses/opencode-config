@@ -2,8 +2,11 @@
 // Sonnet and Opus are the opposite: very bad at architecture but good at implementing readable and nice code
 // this plugin automatically implements plan agent messages using Opus so that you can always use GPT5 Codex in plan mode and have Opus implement the plan autoamtically
 
-
 import type { Plugin } from "@opencode-ai/plugin";
+
+const BUILD_PROMPT = `
+is your plan for an implementation? if yes, implement it. Follow the plan closely. Write simple and readable code.
+`;
 
 export const PlanToBuildPlugin: Plugin = async ({ client }) => {
   const sessionsWithErrors = new Set<string>();
@@ -65,7 +68,7 @@ export const PlanToBuildPlugin: Plugin = async ({ client }) => {
           parts: [
             {
               type: "text",
-              text: "is your plan for an implementation? if yes, implement it. could the plan be implemented in a more elegant and simpler way? if yes update it. is the plan finished? if not complete it, thinking of what else needs to be thought out with all steps and details that will be passed to the implementer agent.",
+              text: BUILD_PROMPT,
             },
           ],
         },
