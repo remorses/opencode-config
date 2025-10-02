@@ -79,16 +79,32 @@ async function synthesizeAndPlay({
 export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
   const sessionsWithErrors = new Map<string, { ignore: boolean }>();
 
+  async function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   async function handleSessionIdle(sessionId?: string) {
     if (!sessionId) {
       return;
     }
 
+    // Wait 2 seconds before processing
+    await sleep(2000);
+
     const env = process.env;
+    
+    // Re-fetch session to check if it's back in progress
     const { data: session } = await client.session.get({
       path: { id: sessionId },
     });
     if (!session) {
+      return;
+    }
+    
+    // Check if session is in progress state
+    // @ts-ignore - state field may not be in type definitions yet
+    if (session.state?.status === "progress" && session.state?.progress?.status === "running") {
+      // Session is back in progress, skip notification
       return;
     }
 
@@ -102,7 +118,7 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
 
     const message = sessionsWithErrors.has(sessionId)
       ? `errored ${folder} ${formattedTitle}`.trim()
-      : `finisehd ${folder} ${formattedTitle}`.trim();
+      : `finished ${folder} ${formattedTitle}`.trim();
 
     if (!message) {
       return;
