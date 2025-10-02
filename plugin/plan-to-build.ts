@@ -26,8 +26,10 @@ export const PlanToBuildPlugin: Plugin = async ({ client }) => {
       }
 
       // Check if any message used the "plan" agent
-      const hasPlanAgent = messages.some((msg: any) => {
-        return msg.agent === "plan" || (msg.model && msg.agent === "plan");
+      const hasPlanAgent = messages.some((msg) => {
+        return msg.parts?.some((part) => {
+          return part.type === "agent" && part.name === "plan";
+        });
       });
 
       if (!hasPlanAgent) {

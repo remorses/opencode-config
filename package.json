@@ -13,7 +13,9 @@
   "dependencies": {
     "@ai-sdk/google": "^2.0.14",
     "@opencode-ai/plugin": "^0.10.1",
-    "ai": "^5.0.47"
+    "@tsconfig/bun": "^1.0.8",
+    "ai": "^5.0.47",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/node": "^24.5.2"
