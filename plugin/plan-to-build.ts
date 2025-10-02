@@ -25,14 +25,16 @@ export const PlanToBuildPlugin: Plugin = async ({ client }) => {
         return;
       }
 
-      // Check if any message used the "plan" agent
-      const hasPlanAgent = messages.some((msg) => {
-        return msg.parts?.some((part) => {
-          return part.type === "agent" && part.name === "plan";
-        });
-      });
+      // Check if the last assistant message was in plan mode
+      const lastAssistantMessage = messages.findLast(
+        (msg) => msg?.info.role === "assistant",
+      )?.info;
 
-      if (!hasPlanAgent) {
+      if (
+        !lastAssistantMessage ||
+        lastAssistantMessage.role !== "assistant" ||
+        lastAssistantMessage.mode !== "plan"
+      ) {
         return;
       }
 
