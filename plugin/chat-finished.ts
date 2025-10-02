@@ -20,6 +20,10 @@ function formatTitle(title?: string): string {
   if (!title) {
     return "session";
   }
+  // If title has no spaces, it's likely a session ID, not a real title
+  if (!title.includes(" ")) {
+    return "session";
+  }
   const words = title.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) {
     return "session";
