@@ -7,18 +7,15 @@ import type { Plugin } from "@opencode-ai/plugin";
 
 export const PlanToBuildPlugin: Plugin = async ({ client }) => {
   const sessionsWithErrors = new Set<string>();
-  const processedSessions = new Set<string>();
+  const handledMessageIds = new Set<string>();
 
   async function handlePlanSessionComplete(sessionId: string) {
-    // Skip if we've already processed this session
-    if (processedSessions.has(sessionId)) {
-      return;
-    }
-
     // Skip if session had errors
     if (sessionsWithErrors.has(sessionId)) {
       return;
     }
+
+    let lastPlanMessageId: string | undefined;
 
     try {
       // Get session messages to check if it was a plan session
@@ -43,8 +40,18 @@ export const PlanToBuildPlugin: Plugin = async ({ client }) => {
         return;
       }
 
-      // Mark as processed to avoid duplicate submissions
-      processedSessions.add(sessionId);
+      lastPlanMessageId = lastAssistantMessage.id;
+
+      if (!lastPlanMessageId) {
+        return;
+      }
+
+      // Skip if we've already handled this plan message
+      if (handledMessageIds.has(lastPlanMessageId)) {
+        return;
+      }
+
+      handledMessageIds.add(lastPlanMessageId);
 
       // Submit a new message to continue with build mode using Claude Opus 4.1
       await client.session.prompt({
@@ -64,8 +71,10 @@ export const PlanToBuildPlugin: Plugin = async ({ client }) => {
         },
       });
     } catch (error) {
-      // Remove from processed set so it could be retried if needed
-      processedSessions.delete(sessionId);
+      // Remove from handled set so it could be retried if needed
+      if (lastPlanMessageId) {
+        handledMessageIds.delete(lastPlanMessageId);
+      }
     }
   }
 
