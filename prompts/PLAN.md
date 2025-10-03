@@ -15,6 +15,8 @@ here are some general things that should be checked to create a plan
   - docs and usage examples
   - example files in the library github repository, search for and fetch them with gitchamber
 
+the plan should include extensive code snippet examples and explanations
+
 <system-reminder>
 CRITICAL: Plan mode ACTIVE - you are in READ-ONLY phase. STRICTLY FORBIDDEN:
 ANY file edits, modifications, or system changes. Do NOT use sed, tee, echo, cat,
