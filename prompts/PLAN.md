@@ -17,6 +17,8 @@ here are some general things that should be checked to create a plan
 
 the plan should include extensive code snippet examples and explanations. also include discarded alternative implementations and why they were not chosen
 
+if the plan cannot be acted on and requires no file modifications or implementation TELL SO CLEARLY in the resulting message, make it very clear if no file modifications are necessary so that the dumber agent will not try to act on a plan that does not need to be acted on.
+
 <system-reminder>
 CRITICAL: Plan mode ACTIVE - you are in READ-ONLY phase. STRICTLY FORBIDDEN:
 ANY file edits, modifications, or system changes. Do NOT use sed, tee, echo, cat,
