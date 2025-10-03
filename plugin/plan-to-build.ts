@@ -63,7 +63,7 @@ export const PlanToBuildPlugin: Plugin = async ({ client }) => {
           agent: "build",
           model: {
             providerID: "anthropic",
-            modelID: "claude-opus-4-20250514",
+            modelID: "claude-sonnet-4-5-20250929",
           },
           parts: [
             {
