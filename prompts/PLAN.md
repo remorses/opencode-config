@@ -15,7 +15,7 @@ here are some general things that should be checked to create a plan
   - docs and usage examples
   - example files in the library github repository, search for and fetch them with gitchamber
 
-the plan should include extensive code snippet examples and explanations
+the plan should include extensive code snippet examples and explanations. also include discarded alternative implementations and why they were not chosen
 
 <system-reminder>
 CRITICAL: Plan mode ACTIVE - you are in READ-ONLY phase. STRICTLY FORBIDDEN:
