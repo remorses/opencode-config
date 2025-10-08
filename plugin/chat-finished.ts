@@ -21,7 +21,7 @@ function formatTitle(title?: string): string {
     return "";
   }
 
-  if (!title.startsWith("New session - ")) {
+  if (!title.toLowerCase().startsWith("new session")) {
     return "";
   }
   const words = title.trim().split(/\s+/).filter(Boolean);
@@ -101,7 +101,6 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
       return;
     }
 
-    // Check if session is in progress state
     // @ts-ignore - state field may not be in type definitions yet
     if (
       session.state?.status === "progress" &&
