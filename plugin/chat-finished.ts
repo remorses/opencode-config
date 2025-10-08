@@ -18,15 +18,15 @@ function getProjectFolder(project?: {
 
 function formatTitle(title?: string): string {
   if (!title) {
-    return "session";
+    return "";
   }
-  // If title has no spaces, it's likely a session ID, not a real title
-  if (!title.includes(" ")) {
-    return "session";
+
+  if (!title.startsWith("New session - ")) {
+    return "";
   }
   const words = title.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) {
-    return "session";
+    return "";
   }
   return words.slice(0, MAX_TITLE_WORDS).join(" ");
 }
@@ -80,7 +80,7 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
   const sessionsWithErrors = new Map<string, { ignore: boolean }>();
 
   async function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async function handleSessionIdle(sessionId?: string) {
@@ -92,7 +92,7 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
     await sleep(2000);
 
     const env = process.env;
-    
+
     // Re-fetch session to check if it's back in progress
     const { data: session } = await client.session.get({
       path: { id: sessionId },
@@ -100,10 +100,13 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
     if (!session) {
       return;
     }
-    
+
     // Check if session is in progress state
     // @ts-ignore - state field may not be in type definitions yet
-    if (session.state?.status === "progress" && session.state?.progress?.status === "running") {
+    if (
+      session.state?.status === "progress" &&
+      session.state?.progress?.status === "running"
+    ) {
       // Session is back in progress, skip notification
       return;
     }
@@ -151,9 +154,10 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
     async event({ event }) {
       if (event.type === "session.error") {
         if (event.properties.sessionID) {
-          const isAbortError = event.properties.error?.name === 'MessageAbortedError';
+          const isAbortError =
+            event.properties.error?.name === "MessageAbortedError";
           sessionsWithErrors.set(event.properties.sessionID, {
-            ignore: isAbortError
+            ignore: isAbortError,
           });
           if (isAbortError) {
             return;
