@@ -21,7 +21,7 @@ function formatTitle(title?: string): string {
     return "";
   }
 
-  if (!title.toLowerCase().startsWith("new session")) {
+  if (title.trim().toLowerCase().startsWith("new session")) {
     return "";
   }
   const words = title.trim().split(/\s+/).filter(Boolean);
