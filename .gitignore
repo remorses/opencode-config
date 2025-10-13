@@ -1,2 +1,4 @@
 node_modules
-*.db
+package.json
+bun.lock
+.gitignore

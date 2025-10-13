@@ -1,23 +1,5 @@
 {
-  "name": "tool",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "remorses",
-  "license": "ISC",
-  "packageManager": "pnpm@10.14.0",
   "dependencies": {
-    "@ai-sdk/google": "^2.0.17",
-    "@opencode-ai/plugin": "^0.10.4",
-    "@tsconfig/bun": "^1.0.8",
-    "ai": "^5.0.60",
-    "typescript": "^5.9.3"
-  },
-  "devDependencies": {
-    "@types/node": "^24.7.0"
+    "@opencode-ai/plugin": "0.15.0"
   }
 }
