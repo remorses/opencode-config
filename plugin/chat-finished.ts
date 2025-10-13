@@ -101,9 +101,10 @@ export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
       return;
     }
 
-    // @ts-ignore - state field may not be in type definitions yet
     if (
+      // @ts-ignore - state field may not be in type definitions yet
       session.state?.status === "progress" &&
+      // @ts-ignore - state field may not be in type definitions yet
       session.state?.progress?.status === "running"
     ) {
       // Session is back in progress, skip notification
