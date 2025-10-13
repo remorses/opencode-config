@@ -8,3 +8,4 @@ agent: build
 - Commit with appropriate commit message
 - run npm publish, in the appropriate package folder
 - If publish fails for tsc errors or other issues, try to resolve them and run it again
+- push your changes to github
