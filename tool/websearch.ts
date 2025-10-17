@@ -7,12 +7,12 @@ const google = createGoogleGenerativeAI({
 });
 
 export default tool({
-  description: "Search for something on the internet using Google. This tool can be used in parallel with many independent descriptions parameters.",
+  description: "Search for something on the internet using Google. This tool can be used in parallel with many independent description parameters",
   args: {
     description: tool.schema
       .string()
       .describe(
-        "A detailed description of what should be searched for. Tell what is the goal of the query, what this search query should accomplish and what data should be gathered. The best possible search results are GitHub repositories, so include specifics and goals in the description to guide the search towards relevant repositories or code examples when possible.",
+        "A detailed description of what should be searched for. Using good english and comprehensive. Tell what is the goal of the query, what this search query should accomplish and what data should be gathered. The best possible search results are GitHub repositories, so include specifics and goals in the description to guide the search towards relevant repositories or code examples when possible.",
       ),
   },
   async execute(args) {
