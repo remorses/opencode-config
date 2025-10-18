@@ -2,7 +2,7 @@
   "$schema": "https://opencode.ai/config.json",
   "theme": "opencode",
   "layout": "stretch",
-  "tui": { "scroll_speed": 10 },
+  "tui": { "scroll_speed": 8 },
   "lsp": {
     "typescript": { "disabled": true },
     "eslint": { "disabled": true },
