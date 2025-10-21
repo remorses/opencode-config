@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "@opencode-ai/plugin": "0.0.0-opentui-202510161946"
+    "@opencode-ai/plugin": "0.15.10"
   }
 }

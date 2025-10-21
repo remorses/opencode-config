@@ -22,6 +22,7 @@ export default tool({
       tools: {
         google_search: google.tools.googleSearch({}),
       },
+      stopWhen: () => false,
       prompt: `
       Search the web for the following in-depth query: ${JSON.stringify(args.query)}.
 
@@ -34,6 +35,8 @@ export default tool({
       The search results will be used by a coding agent, so provide example usage implementation for code if relevant.
 
       If you find github repository urls in the results, include them in the summary
+
+      Do not try to make up content in your reponse. Quote directly the content you found and add examples. Do not try to explain the query yourself. Just report all the found sources and quote them if they are releant. Find as many sources as possible to answer the question.
 
 
       `,
