@@ -32,6 +32,12 @@
       }
     }
   },
+  "mcp": {
+    "kapture": {
+      "type": "local",
+      "command": ["bunx", "kapture-mcp@latest", "bridge"]
+    }
+  },
 
   "formatter": {
     "prettier": { "disabled": true },
