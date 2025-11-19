@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
 import { generateText } from "ai";
 
 const google = createGoogleGenerativeAI({
@@ -24,7 +24,7 @@ export default tool({
           thinkingConfig: {
             thinkingLevel: "low",
           },
-        },
+        } satisfies GoogleGenerativeAIProviderOptions,
       },
       abortSignal: abort,
       tools: {
