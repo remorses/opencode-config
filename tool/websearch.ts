@@ -18,7 +18,14 @@ export default tool({
   },
   async execute(args, { abort }) {
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: google("gemini-3-pro-preview"),
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingLevel: "low",
+          },
+        },
+      },
       abortSignal: abort,
       tools: {
         google_search: google.tools.googleSearch({}),
