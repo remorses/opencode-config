@@ -73,6 +73,10 @@
   },
 
   "autoupdate": true,
+  "experimental": {
+
+    "disable_paste_summary": true
+  },
   "agent": {
     "plan": {
       "mode": "primary",
