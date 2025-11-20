@@ -3,6 +3,9 @@ import path from "node:path";
 
 const MAX_TITLE_WORDS = 5;
 
+// @ts-ignore
+globalThis.AI_SDK_LOG_WARNINGS = false
+
 function getProjectFolder(project?: {
   directory?: string;
   worktree?: string;
@@ -13,7 +16,10 @@ function getProjectFolder(project?: {
   if (project?.worktree) {
     return path.basename(project.worktree);
   }
+
   return "project";
+
+
 }
 
 function formatTitle(title?: string): string {
