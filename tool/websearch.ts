@@ -18,7 +18,7 @@ export default tool({
   },
   async execute(args, { abort }) {
     const { text } = await generateText({
-      model: google("gemini-3-pro-preview"),
+      model: google("gemini-2.5-flash"),
       providerOptions: {
         google: {
           thinkingConfig: {

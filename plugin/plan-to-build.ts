@@ -8,7 +8,7 @@ const BUILD_PROMPT = `
 is your plan for an implementation? if yes, implement it. Follow the plan closely. Write simple and readable code.
 `;
 
-export const PlanToBuildPlugin: Plugin = async ({ client }) => {
+ const PlanToBuildPlugin: Plugin = async ({ client }) => {
   const sessionsWithErrors = new Set<string>();
   const handledMessageIds = new Set<string>();
 
