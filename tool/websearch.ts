@@ -46,8 +46,9 @@ export default tool({
 
       Do not try to make up content in your reponse. Quote directly the content you found and add examples. Do not try to explain the query yourself. Just report all the found sources and quote them if they are releant. Find as many sources as possible to answer the question.
 
-
       At the end of the result write "if this search result was not exhaustive enought or did not provide a good enough repsponse update the query and do a new websearch. do multiple websearch tool calls in parallel with different strategies to search if possible"
+
+      Reading .d.ts files is preferable over websearch if possible. Only do websearch if the local .d.ts are not enough
       `,
     });
 
