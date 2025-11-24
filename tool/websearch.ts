@@ -21,9 +21,9 @@ export default tool({
       model: google("gemini-2.5-flash"),
       providerOptions: {
         google: {
-          thinkingConfig: {
-            thinkingLevel: "low",
-          },
+          // thinkingConfig: {
+          //   thinkingLevel: "low",
+          // },
         } satisfies GoogleGenerativeAIProviderOptions,
       },
       abortSignal: abort,
