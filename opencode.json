@@ -19,6 +19,17 @@
     "svelte": { "disabled": true }
   },
   "provider": {
+    "opencode": {
+      "models": {
+        "glm-4.6": {
+          "options": {
+            "reasoning": {
+              "enabled": true
+            }
+          }
+        }
+      }
+    },
     "anthropic": {
       "name": "Anthropic",
       "models": {
