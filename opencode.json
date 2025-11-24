@@ -26,7 +26,23 @@
           "options": {
             "thinking": {
               "type": "enabled",
-              "budgetTokens": 16000
+              // "budgetTokens": 16000
+            }
+          }
+        },
+        "claude-opus-4-1": {
+          "options": {
+            "thinking": {
+              "type": "enabled",
+              // "budgetTokens": 16000
+            }
+          }
+        },
+        "claude-opus-4-0": {
+          "options": {
+            "thinking": {
+              "type": "enabled",
+              // "budgetTokens": 16000
             }
           }
         }
@@ -45,7 +61,10 @@
     // }
     "playwriter": {
       "type": "local",
-      "command": ["tsx", "/Users/morse/Documents/GitHub/playwriter/playwriter/src/mcp.ts"]
+      "command": [
+        "tsx",
+        "/Users/morse/Documents/GitHub/playwriter/playwriter/src/mcp.ts"
+      ]
     }
     // "browsermcp": {
     //   "type": "local",
@@ -70,14 +89,13 @@
   "permission": {
     "edit": "allow",
     "bash": "allow",
-    "webfetch": "allow",
+    "webfetch": "allow"
     // "doom_loop": "allow",
     // "external_directory": "allow"
   },
 
   "autoupdate": true,
   "experimental": {
-
     "disable_paste_summary": true
   },
   "agent": {
