@@ -33,11 +33,19 @@
     "anthropic": {
       "name": "Anthropic",
       "models": {
-        "claude-sonnet-4-5-20250929": {
+        "claude-sonnet-4-5": {
           "options": {
             "thinking": {
               "type": "enabled",
               "budgetTokens": 16000
+            }
+          }
+        },
+        "claude-opus-4-5": {
+          "options": {
+            "thinking": {
+              "type": "enabled",
+              "budgetTokens": 8000
             }
           }
         },
@@ -61,7 +69,7 @@
       }
     }
   },
-  "plugin": ["opencode-gemini-auth"],
+  // "plugin": ["opencode-gemini-auth"],
   "mcp": {
     // "kapture": {
     //   "type": "local",
