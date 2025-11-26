@@ -3,6 +3,7 @@
   "theme": "opencode",
   "layout": "stretch",
   "small_model": "anthropic/claude-3-haiku-20240307",
+  "model": "anthropic/claude-opus-4-5",
   "tui": { "scroll_speed": 4, "scroll_acceleration": { "enabled": true } },
   "lsp": {
     "typescript": { "disabled": true },
@@ -18,7 +19,7 @@
     "clangd": { "disabled": true },
     "svelte": { "disabled": true }
   },
-  "model": "anthropic/claude-opus-4.5",
+
   "provider": {
     "opencode": {
       "models": {
