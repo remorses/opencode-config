@@ -6,7 +6,7 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
-export default tool({
+const search = tool({
   description:
     "Search for a query on the internet using Google. This tool can be used in parallel with many independent description parameters",
   args: {
@@ -55,3 +55,5 @@ export default tool({
     return text;
   },
 });
+
+// export default tool
