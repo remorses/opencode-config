@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin";
 import type { Permission } from "@opencode-ai/sdk";
-import { getProjectFolder, speak } from "./utils/tts";
+import { getProjectFolder, speak, VOICES } from "./utils/tts";
 
 function formatPermissionMessage(permission: Permission, folder: string): string {
   const { type, title } = permission;
@@ -49,7 +49,7 @@ export const PermissionTtsPlugin: Plugin = async ({ project, $ }) => {
     const folder = getProjectFolder(project);
     const message = formatPermissionMessage(permission, folder);
 
-    await speak({ message, $ });
+    await speak({ message, $, voice: VOICES.permission });
   }
 
   return {

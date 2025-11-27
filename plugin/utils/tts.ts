@@ -3,6 +3,16 @@ import path from "node:path";
 
 type BunShell = PluginInput["$"];
 
+// Cartesia voice IDs
+export const VOICES = {
+  // Default voice for chat notifications
+  default: "7cb7e4c0-079a-4646-be33-e4447a1dfcde",
+  // Female voice for permission requests (from Cartesia examples)
+  permission: "a0e99841-438c-4a64-b679-ae501e7d6091",
+} as const;
+
+export type VoiceId = (typeof VOICES)[keyof typeof VOICES] | string;
+
 export function getProjectFolder(project?: {
   directory?: string;
   worktree?: string;
@@ -32,14 +42,16 @@ export async function synthesizeAndPlay({
   transcript,
   apiKey,
   $,
+  voice = VOICES.default,
   outputPath = "/tmp/opencode-tts.wav",
 }: {
   transcript: string;
   apiKey: string;
   $: BunShell;
+  voice?: VoiceId;
   outputPath?: string;
 }) {
-  const voiceId = "7cb7e4c0-079a-4646-be33-e4447a1dfcde";
+  const voiceId = voice;
   const payload = JSON.stringify({
     model_id: "sonic-turbo",
     transcript,
@@ -71,9 +83,11 @@ export async function synthesizeAndPlay({
 export async function speak({
   message,
   $,
+  voice = VOICES.default,
 }: {
   message: string;
   $: BunShell;
+  voice?: VoiceId;
 }): Promise<void> {
   const screenStudioRunning = await isScreenStudioRunning($);
   if (screenStudioRunning) {
@@ -87,7 +101,7 @@ export async function speak({
   }
 
   try {
-    await synthesizeAndPlay({ transcript: message, apiKey, $ });
+    await synthesizeAndPlay({ transcript: message, apiKey, $, voice });
   } catch {
     await $`say ${message}`.quiet();
   }
