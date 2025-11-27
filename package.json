@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "@ai-sdk/google": "^2.0.38",
-    "@opencode-ai/plugin": "1.0.115",
+    "@opencode-ai/plugin": "1.0.119",
     "ai": "^5.0.95"
   }
 }
