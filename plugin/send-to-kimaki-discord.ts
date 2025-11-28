@@ -39,6 +39,10 @@ export const KimakiDiscordPlugin: Plugin = async ({
         return
       }
 
+      await client.tui.showToast({
+        body: { message: 'Creating Discord thread...', variant: 'info' },
+      })
+
       try {
         const result =
           await $`npx -y kimaki send-to-discord ${sessionID} -d ${directory}`.text()
@@ -53,11 +57,15 @@ export const KimakiDiscordPlugin: Plugin = async ({
           },
         })
       } catch (error: any) {
-        const stderr = error.stderr?.toString() || error.message || String(error)
+        const message =
+          error.stderr?.toString().trim() ||
+          error.stdout?.toString().trim() ||
+          error.message ||
+          String(error)
 
         await client.tui.showToast({
           body: {
-            message: `Failed: ${stderr.slice(0, 100)}`,
+            message: `Failed: ${message.slice(0, 100)}`,
             variant: 'error',
           },
         })
