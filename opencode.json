@@ -15,6 +15,7 @@
     "zls": { "disabled": true },
     "csharp": { "disabled": true },
     "vue": { "disabled": true },
+    "yaml": { "disabled": true },
     "rust": { "disabled": true },
     "clangd": { "disabled": true },
     "svelte": { "disabled": true }
