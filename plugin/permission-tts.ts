@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin";
 import type { Permission } from "@opencode-ai/sdk";
-import { getProjectFolder, speak, VOICES } from "./utils/tts";
+import { getProjectFolder, speak, VOICES, OUTPUT_PATHS } from "./utils/tts";
 
 function formatPermissionMessage(permission: Permission, folder: string): string {
   const { type, title } = permission;
@@ -33,12 +33,20 @@ function formatPermissionMessage(permission: Permission, folder: string): string
 
 export const PermissionTtsPlugin: Plugin = async ({ project, $ }) => {
   const announcedPermissions = new Set<string>();
+  const pendingPermissions = new Set<string>();
+
+  async function stopPlayback() {
+    // Kill any running afplay or say processes for permission audio
+    await $`pkill -f "afplay ${OUTPUT_PATHS.permission}" || true`.quiet();
+    await $`pkill -f "say permission" || true`.quiet();
+  }
 
   async function announcePermission(permission: Permission) {
     if (announcedPermissions.has(permission.id)) {
       return;
     }
     announcedPermissions.add(permission.id);
+    pendingPermissions.add(permission.id);
 
     // Clean up old permissions (keep last 100)
     if (announcedPermissions.size > 100) {
@@ -49,13 +57,24 @@ export const PermissionTtsPlugin: Plugin = async ({ project, $ }) => {
     const folder = getProjectFolder(project);
     const message = formatPermissionMessage(permission, folder);
 
-    await speak({ message, $, voice: VOICES.permission });
+    // Don't await - let it play in background so we can interrupt it
+    speak({ message, $, voice: VOICES.permission, outputPath: OUTPUT_PATHS.permission }).finally(() => {
+      pendingPermissions.delete(permission.id);
+    });
   }
 
   return {
     async event({ event }) {
       if (event.type === "permission.updated") {
         await announcePermission(event.properties);
+        return;
+      }
+
+      if (event.type === "permission.replied") {
+        // Stop playback when user responds to permission
+        pendingPermissions.delete(event.properties.permissionID);
+        await stopPlayback();
+        return;
       }
     },
   };

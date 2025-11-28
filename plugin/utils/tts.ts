@@ -80,14 +80,21 @@ export async function synthesizeAndPlay({
   await $`afplay ${outputPath}`.quiet();
 }
 
+export const OUTPUT_PATHS = {
+  default: "/tmp/opencode-tts.wav",
+  permission: "/tmp/opencode-permission.wav",
+} as const;
+
 export async function speak({
   message,
   $,
   voice = VOICES.default,
+  outputPath = OUTPUT_PATHS.default,
 }: {
   message: string;
   $: BunShell;
   voice?: VoiceId;
+  outputPath?: string;
 }): Promise<void> {
   const screenStudioRunning = await isScreenStudioRunning($);
   if (screenStudioRunning) {
@@ -101,7 +108,7 @@ export async function speak({
   }
 
   try {
-    await synthesizeAndPlay({ transcript: message, apiKey, $, voice });
+    await synthesizeAndPlay({ transcript: message, apiKey, $, voice, outputPath });
   } catch {
     await $`say ${message}`.quiet();
   }
