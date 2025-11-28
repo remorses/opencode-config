@@ -6,16 +6,6 @@
  * Installation:
  *   kimaki install-plugin
  *
- * Then add the command to your ~/.config/opencode/opencode.jsonc:
- *   {
- *     "command": {
- *       "send-to-kimaki-discord": {
- *         "description": "Send current session to Kimaki Discord",
- *         "template": "Session is being sent to Discord..."
- *       }
- *     }
- *   }
- *
  * Use in OpenCode TUI:
  *   /send-to-kimaki-discord
  */
@@ -23,6 +13,7 @@
 import type { Plugin } from '@opencode-ai/plugin'
 
 export const KimakiDiscordPlugin: Plugin = async ({
+  client,
   $,
   directory,
 }) => {
@@ -42,21 +33,34 @@ export const KimakiDiscordPlugin: Plugin = async ({
       }
 
       if (!sessionID) {
-        console.error('[Kimaki] No session ID available')
+        await client.tui.showToast({
+          body: { message: 'No session ID available', variant: 'error' },
+        })
         return
       }
-
-      console.log(`[Kimaki] Sending session ${sessionID} to Discord...`)
 
       try {
         const result =
           await $`npx -y kimaki send-to-discord ${sessionID} -d ${directory}`.text()
-        console.log(`[Kimaki] ${result}`)
+
+        const urlMatch = result.match(/https:\/\/discord\.com\/channels\/\S+/)
+        const url = urlMatch ? urlMatch[0] : null
+
+        await client.tui.showToast({
+          body: {
+            message: url ? `Sent to Discord: ${url}` : 'Session sent to Discord',
+            variant: 'success',
+          },
+        })
       } catch (error: any) {
-        console.error(
-          `[Kimaki] Failed to send to Discord:`,
-          error.message || error,
-        )
+        const stderr = error.stderr?.toString() || error.message || String(error)
+
+        await client.tui.showToast({
+          body: {
+            message: `Failed: ${stderr.slice(0, 100)}`,
+            variant: 'error',
+          },
+        })
       }
     },
   }
