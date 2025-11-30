@@ -56,4 +56,4 @@ const search = tool({
   },
 });
 
-export default tool
+export default search
