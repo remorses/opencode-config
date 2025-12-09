@@ -16,9 +16,11 @@ const search = tool({
         "A detailed description of what should be searched for. DO NOT add search terms directly. instead use a long phrase that describes what you are searching for. Using good english and comprehensive. Tell what is the goal of the query, what this search query should accomplish and what data should be gathered.",
       ),
   },
+
   async execute(args, { abort }) {
     const { text } = await generateText({
       model: google("gemini-2.5-flash"),
+
       providerOptions: {
         google: {
           // thinkingConfig: {
