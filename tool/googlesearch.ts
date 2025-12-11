@@ -13,7 +13,7 @@ const search = tool({
     query: tool.schema
       .string()
       .describe(
-        "A detailed description of what should be searched for. DO NOT add search terms directly. instead use a long phrase that describes what you are searching for. Using good english and comprehensive. Tell what is the goal of the query, what this search query should accomplish and what data should be gathered.",
+        "",
       ),
   },
 
@@ -34,6 +34,10 @@ const search = tool({
       },
       stopWhen: () => false,
       prompt: `
+
+      For the query: A detailed description of what should be searched for. use a long descriptive phrase that describes what you are searching for. Using good english and comprehensive. Tell what is the goal of the query, what this search query should accomplish and what data should be gathered.
+
+
       Search the web for the following in-depth query: ${JSON.stringify(args.query)}.
 
       This search query was submitted by a coding agent, with the purpose of searching the web to find out how to accomplish something via code or terminal commands.
