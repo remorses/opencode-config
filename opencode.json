@@ -5,21 +5,7 @@
   "small_model": "anthropic/claude-3-haiku-20240307",
   "model": "anthropic/claude-opus-4-5",
   "tui": { "scroll_speed": 4, "scroll_acceleration": { "enabled": true } },
-  "lsp": {
-    "typescript": { "disabled": true },
-    "eslint": { "disabled": true },
-    "gopls": { "disabled": true },
-    "ruby-lsp": { "disabled": true },
-    "pyright": { "disabled": true },
-    "elixir-ls": { "disabled": true },
-    "zls": { "disabled": true },
-    "csharp": { "disabled": true },
-    "vue": { "disabled": true },
-    "yaml": { "disabled": true },
-    "rust": { "disabled": true },
-    "clangd": { "disabled": true },
-    "svelte": { "disabled": true }
-  },
+  "lsp": false,
 
   "provider": {
     "opencode": {
@@ -37,12 +23,12 @@
       "name": "Anthropic",
       "models": {
         "claude-sonnet-4-5": {
-          "options": {
-            "thinking": {
-              "type": "enabled",
-              "budgetTokens": 16000
-            }
-          }
+          // "options": {
+          //   "thinking": {
+          //     "type": "enabled",
+          //     "budgetTokens": 16000
+          //   }
+          // }
         },
         "claude-opus-4-5": {
           "options": {
@@ -72,7 +58,7 @@
       }
     }
   },
-  "plugin": ["@franlol/opencode-md-table-formatter@0.0.3"],
+  "plugin": ["@tarquinen/opencode-dcp@1.0.0"],
   "mcp": {
     // "kapture": {
     //   "type": "local",
@@ -102,20 +88,8 @@
     // },
   },
 
-  "formatter": {
-    "prettier": { "disabled": true },
-    "biome": { "disabled": true },
-    "gofmt": { "disabled": true },
-    "mix": { "disabled": true },
-    "zig": { "disabled": true },
-    "clang-format": { "disabled": true },
-    "ktlint": { "disabled": true },
-    "ruff": { "disabled": true },
-    "rubocop": { "disabled": true },
-    "standardrb": { "disabled": true },
-    "htmlbeautifier": { "disabled": true }
-  },
 
+  "formatter": false,
   "permission": {
     "edit": "allow",
     "bash": "allow",
