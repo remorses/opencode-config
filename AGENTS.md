@@ -5,3 +5,11 @@ never commit anything unless asked by the user precisely
 always use kebab case for new filenames. never use uppercase letters in filenames
 
 NEVER use mocks in tests
+
+if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. if there is not any don't use headings in the body (it looks like AI slop)
+
+after creating a pr always watch for ci to complete successfully using command like
+
+```bash
+gh pr checks --watch --fail-fast
+```
