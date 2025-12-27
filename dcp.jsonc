@@ -11,7 +11,7 @@
   "strategies": {
     // Remove duplicate tool calls (same tool with same arguments)
     "deduplication": {
-      "enabled": true,
+      "enabled": false,
       // Additional tools to protect from pruning
       "protectedTools": []
     },
