@@ -2,6 +2,8 @@ to list, search and read files on github use gitchamber. before using it ALWAYS 
 
 never commit anything unless asked by the user precisely
 
+NEVER rewrite git history. NEVER call git reset. prefer merge over rebase or squash
+
 always use kebab case for new filenames. never use uppercase letters in filenames
 
 NEVER use mocks in tests
