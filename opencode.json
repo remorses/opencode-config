@@ -72,7 +72,10 @@
       "command": [
         "tsx",
         "/Users/morse/Documents/GitHub/playwriter/playwriter/src/cli.ts"
-      ]
+      ],
+      "environment": {
+        "PLAYWRITER_LOG_FILE_PATH": "/Users/morse/.config/opencode/playwriter.log"
+      }
     }
 
   },
