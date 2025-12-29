@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin";
 import { tool } from "@opencode-ai/plugin";
 
 const PRUNED_OUTPUT_REPLACEMENT =
-  "[Output removed to save context - information no longer needed]";
+  "[Output removed to save context - call again if needed]";
 
 export const PrunePlugin: Plugin = async ({ client }) => {
 
