@@ -64,6 +64,7 @@ export const PermissionTtsPlugin: Plugin = async ({ project, $ }) => {
   }
 
   return {
+
     async event({ event }) {
       if (event.type === "permission.updated") {
         await announcePermission(event.properties);

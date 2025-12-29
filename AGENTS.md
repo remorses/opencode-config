@@ -4,13 +4,25 @@ never commit anything unless asked by the user precisely
 
 NEVER rewrite git history. NEVER call git reset. prefer merge over rebase or squash
 
+when creating a new branch, always check if you're in a fork (origin and upstream remotes are different). if so, switch to upstream's default branch first:
+
+```bash
+# check if upstream exists and differs from origin
+git remote -v
+
+# if in a fork, get default branch name and switch to it
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
+git fetch upstream
+git checkout upstream/$DEFAULT_BRANCH
+```
+
 always use kebab case for new filenames. never use uppercase letters in filenames
 
 NEVER use mocks in tests
 
 if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. if there is not any don't use headings in the body (it looks like AI slop)
 
-after creating a pr always watch for ci to complete successfully using command like
+after creating a pr always print the pr url to the user, then watch for ci to complete successfully using command like
 
 ```bash
 gh pr checks --watch --fail-fast
@@ -35,3 +47,12 @@ NEVER use git to revert files to previous state if you did not create those file
 
 
 .toMatchInlineSnapshot is the preferred way to write tests. leave them empty the first time, update them with -u. check git diff for the test file every time you update them with -u
+
+## planning
+
+when planning a task, first read all files relevant to the plan:
+- the main files you'll be modifying
+- files they import (dependencies)
+- files that import them (importees/dependents)
+
+this gives you the full picture of the codebase before writing the plan. after gathering context, use the prune tool to cleanup read tool calls that ended up not being needed, saving context usage for the actual implementation
