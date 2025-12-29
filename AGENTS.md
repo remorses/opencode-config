@@ -56,3 +56,5 @@ when planning a task, first read all files relevant to the plan:
 - files that import them (importees/dependents)
 
 this gives you the full picture of the codebase before writing the plan. after gathering context, use the prune tool to cleanup read tool calls that ended up not being needed, saving context usage for the actual implementation
+
+read all files you need! do not try to save context window by not reading files. instead DO read them and then prune them later if not relevant.
