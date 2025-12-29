@@ -36,10 +36,7 @@ export const PrunePlugin: Plugin = async ({ client }) => {
           filters: tool.schema.array(
             tool.schema.object({
               tool: tool.schema.string(),
-              params: tool.schema.record(
-                tool.schema.string(),
-                tool.schema.any(),
-              ),
+              params: tool.schema.record(tool.schema.string(), tool.schema.any()).describe("Subset of params to match exactly 1 tool call"),
             }),
           ),
         },
