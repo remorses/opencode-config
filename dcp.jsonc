@@ -4,38 +4,51 @@
   // Enable debug logging to ~/.config/opencode/logs/dcp/
   "debug": false,
   // Show toast notifications when a new version is available
-  "showUpdateToasts": true,
-  // Summary display: "off", "minimal", or "detailed"
-  "pruningSummary": "detailed",
-  // Strategies for pruning tokens from chat history
+  "showUpdateToasts": false,
+  // Notification display: "off", "minimal", or "detailed"
+  "pruneNotification": "off",
+  // Protect from pruning for <turns> message turns
+  "turnProtection": {
+    "enabled": true,
+    "turns": 1
+  },
+  // LLM-driven context pruning tools
+  "tools": {
+    "settings": {
+      "nudgeEnabled": false,
+      "nudgeFrequency": 10,
+      "protectedTools": []
+    },
+    "discard": {
+      "enabled": true
+    },
+    "extract": {
+      "enabled": true,
+      "showDistillation": false
+    }
+  },
+  // Automatic pruning strategies
   "strategies": {
     // Remove duplicate tool calls (same tool with same arguments)
     "deduplication": {
-      "enabled": false,
-      // Additional tools to protect from pruning
+      "enabled": true,
       "protectedTools": []
     },
-    // Exposes a prune tool to your LLM to call when it determines pruning is necessary
-    "pruneTool": {
+    // Prune write tool inputs when the file has been subsequently read
+    "supersedeWrites": {
+      "enabled": true
+    },
+    // Prune tool inputs for errored tools after X turns
+    "purgeErrors": {
       "enabled": true,
-      // Additional tools to protect from pruning
-      "protectedTools": [],
-      // Nudge the LLM to use the prune tool (every <frequency> tool results)
-      "nudge": {
-        "enabled": false,
-        "frequency": 10
-      }
+      "turns": 4,
+      "protectedTools": []
     },
     // (Legacy) Run an LLM to analyze what tool calls are no longer relevant on idle
     "onIdle": {
       "enabled": false,
-      // Override model for analysis (format: "provider/model")
-      // "model": "anthropic/claude-haiku-4-5",
-      // Show toast notifications when model selection fails
       "showModelErrorToasts": true,
-      // When true, fallback models are not permitted
       "strictModelSelection": false,
-      // Additional tools to protect from pruning
       "protectedTools": []
     }
   }

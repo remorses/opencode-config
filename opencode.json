@@ -58,7 +58,7 @@
       }
     }
   },
-  // "plugin": ["@tarquinen/opencode-dcp@1.0.3"],
+  // "plugin": ["@tarquinen/opencode-dcp@1.1.2"],
   "mcp": {
 
     // "playwriter-npm-snapshot": {
@@ -74,7 +74,9 @@
         "/Users/morse/Documents/GitHub/playwriter/playwriter/src/cli.ts"
       ],
       "environment": {
-        "PLAYWRITER_LOG_FILE_PATH": "/Users/morse/.config/opencode/playwriter.log"
+        "PLAYWRITER_LOG_FILE_PATH": "/Users/morse/.config/opencode/playwriter.log",
+        "PLAYWRITER_NODE_ENV": "development",
+        "PLAYWRITER_AUTO_ENABLE": "1"
       }
     }
 
@@ -82,6 +84,7 @@
 
 
   "formatter": false,
+
   "permission": {
     "edit": "allow",
     "bash": "allow",
