@@ -66,3 +66,11 @@ before updating agents instructions files always double check that they are not 
 ## tasks
 
 when using task tool always be as detailed as possible on what you want: list goal of task, overall goal of session, requirements for task, tips for subagent, overall scope of project and why task is being used.
+
+## docs .md files
+
+if user asks you to create .md files with findings always put them in a docs folder and not at root level or in src
+
+## background processes
+
+for running dev servers and other long running commands use tmux background sessions with names
