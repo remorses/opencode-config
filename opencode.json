@@ -58,7 +58,7 @@
       }
     }
   },
-  // "plugin": ["@tarquinen/opencode-dcp@1.1.2"],
+  "plugin": ["/Users/morse/kimaki/mappamundi/opencode/src/index.ts"],
   "mcp": {
 
     // "playwriter-npm-snapshot": {

@@ -1,3 +1,7 @@
+
+// Custom tool for web search using Gemini with Google Search grounding.
+// Returns in-depth research summaries with code examples.
+
 import { tool } from "@opencode-ai/plugin";
 import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
 import { generateText } from "ai";

@@ -1,3 +1,7 @@
+
+// TTS utility functions using Cartesia API or macOS say command.
+// Provides speak(), synthesizeAndPlay(), and voice configuration.
+
 import type { PluginInput } from "@opencode-ai/plugin";
 import path from "node:path";
 

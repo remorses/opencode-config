@@ -1,3 +1,7 @@
+
+// Plugin that prunes tool call outputs from context to save tokens.
+// Marks specified tool calls as pruned so their outputs are replaced with placeholders.
+
 import type { Plugin } from "@opencode-ai/plugin";
 import { tool } from "@opencode-ai/plugin";
 

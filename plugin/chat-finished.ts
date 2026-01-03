@@ -1,3 +1,7 @@
+
+// Plugin that announces when chat sessions complete or error via TTS.
+// Waits 2s before speaking to avoid interrupting resumed sessions.
+
 import type { Plugin } from "@opencode-ai/plugin";
 import { getProjectFolder, speak } from "./utils/tts";
 

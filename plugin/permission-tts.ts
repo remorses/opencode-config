@@ -1,3 +1,7 @@
+
+// Plugin that announces permission requests via text-to-speech.
+// Speaks when permissions are needed and stops when user responds.
+
 import type { Plugin } from "@opencode-ai/plugin";
 import type { Permission } from "@opencode-ai/sdk";
 import { getProjectFolder, speak, VOICES, OUTPUT_PATHS } from "./utils/tts";
