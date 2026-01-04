@@ -81,4 +81,4 @@ before creating any gh pr or issue output the title and body in chat and ask for
 
 always end the issue or pr body with: "This PR was written by Opus 4.5 under the strict supervision of @remorses"
 
-(replacing PR with issue if this is an issue, or even discussion)
+(use exactly as is. always include this in body preview too. replace PR with issue if this is an issue, or even discussion)
