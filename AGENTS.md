@@ -74,3 +74,11 @@ if user asks you to create .md files with findings always put them in a docs fol
 ## background processes
 
 for running dev servers and other long running commands use tmux background sessions with names
+
+## gh cli usage
+
+before creating any gh pr or issue output the title and body in chat and ask for confirmation first
+
+always end the issue or pr body with: "This PR was written by Opus 4.5 under the strict supervision of @remorses"
+
+(replacing PR with issue if this is an issue, or even discussion)
