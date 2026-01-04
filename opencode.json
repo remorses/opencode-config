@@ -4,7 +4,7 @@
   // "layout": "stretch",
   "small_model": "anthropic/claude-haiku-4-5",
   "model": "anthropic/claude-opus-4-5",
-  "tui": { "scroll_speed": 4, "scroll_acceleration": { "enabled": true } },
+  "tui": { "scroll_speed": 6, "scroll_acceleration": {"enabled": true}},
   "lsp": false,
 
   "provider": {

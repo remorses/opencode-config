@@ -79,6 +79,12 @@ for running dev servers and other long running commands use tmux background sess
 
 before creating any gh pr or issue output the title and body in chat and ask for confirmation first
 
-always end the issue or pr body with: "This PR was written by Opus 4.5 under the strict supervision of @remorses"
+always end the issue or pr body with: "*This PR/issue/comment was written by Opus 4.5 under the supervision of @remorses*"
 
-(use exactly as is. always include this in body preview too. replace PR with issue if this is an issue, or even discussion)
+(use the right word: PR for PRs, issue for issues, .... always include this in body preview too. use italics)
+
+## updating PRs and issues
+
+always update existing PRs, issues, or comments instead of recreating them. use `gh pr edit` or `gh issue edit` to update title/body.
+
+never close a PR or issue without explicit user confirmation. if something needs to change, update it instead of closing and recreating.
