@@ -60,6 +60,7 @@
   },
   "plugin": [
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
+    "@tarquinen/opencode-dcp",
     "opencode-google-antigravity-auth"
   ],
   "mcp": {

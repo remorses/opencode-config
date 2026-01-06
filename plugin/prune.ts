@@ -1,4 +1,3 @@
-
 // Plugin that prunes tool call outputs from context to save tokens.
 // Marks specified tool calls as pruned so their outputs are replaced with placeholders.
 
@@ -7,7 +6,7 @@ import { tool } from "@opencode-ai/plugin";
 
 const PRUNED = "[Output removed - call again if needed]";
 
-export const PrunePlugin: Plugin = async ({ client }) => {
+const PrunePlugin: Plugin = async ({ client }) => {
   const prunedIds = new Map<string, Set<string>>();
 
   return {
@@ -40,7 +39,9 @@ export const PrunePlugin: Plugin = async ({ client }) => {
           filters: tool.schema.array(
             tool.schema.object({
               tool: tool.schema.string(),
-              params: tool.schema.record(tool.schema.string(), tool.schema.any()).describe("Subset of params to match exactly 1 tool call"),
+              params: tool.schema
+                .record(tool.schema.string(), tool.schema.any())
+                .describe("Subset of params to match exactly 1 tool call"),
             }),
           ),
         },

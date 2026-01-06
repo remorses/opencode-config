@@ -9,47 +9,41 @@
   "pruneNotification": "off",
   // Protect from pruning for <turns> message turns
   "turnProtection": {
-    "enabled": true,
-    "turns": 1
+    "enabled": false,
+    "turns": 1,
   },
   // LLM-driven context pruning tools
   "tools": {
     "settings": {
       "nudgeEnabled": false,
       "nudgeFrequency": 10,
-      "protectedTools": []
+      "protectedTools": [],
     },
     "discard": {
-      "enabled": true
+      "enabled": true,
     },
     "extract": {
       "enabled": true,
-      "showDistillation": false
-    }
+      "showDistillation": false,
+    },
   },
   // Automatic pruning strategies
   "strategies": {
     // Remove duplicate tool calls (same tool with same arguments)
     "deduplication": {
       "enabled": true,
-      "protectedTools": []
+      "protectedTools": [],
     },
     // Prune write tool inputs when the file has been subsequently read
     "supersedeWrites": {
-      "enabled": true
+      "enabled": true,
     },
     // Prune tool inputs for errored tools after X turns
     "purgeErrors": {
       "enabled": true,
       "turns": 4,
-      "protectedTools": []
+      "protectedTools": [],
     },
-    // (Legacy) Run an LLM to analyze what tool calls are no longer relevant on idle
-    "onIdle": {
-      "enabled": false,
-      "showModelErrorToasts": true,
-      "strictModelSelection": false,
-      "protectedTools": []
-    }
-  }
+
+  },
 }

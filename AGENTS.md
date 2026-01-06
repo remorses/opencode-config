@@ -2,6 +2,8 @@ to list, search and read files on github use gitchamber. before using it ALWAYS 
 
 never commit anything unless asked by the user precisely
 
+NEVER run rm -rf on ANY folder outside of project directory! NEVER even run things like rm -rf ~/.bun/install/cache
+
 NEVER rewrite git history. NEVER call git reset. prefer merge over rebase or squash
 
 when creating a new branch, always check if you're in a fork (origin and upstream remotes are different). if so, switch to upstream's default branch first:
