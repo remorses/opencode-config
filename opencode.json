@@ -4,7 +4,7 @@
   // "layout": "stretch",
   "small_model": "anthropic/claude-haiku-4-5",
   "model": "anthropic/claude-opus-4-5",
-  "tui": { "scroll_speed": 6, "scroll_acceleration": {"enabled": true}},
+  "tui": { "scroll_speed": 6, "scroll_acceleration": { "enabled": true } },
   "lsp": false,
 
   "provider": {
@@ -58,9 +58,11 @@
       }
     }
   },
-  "plugin": ["/Users/morse/kimaki/mappamundi/opencode/src/index.ts"],
+  "plugin": [
+    "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
+    "opencode-google-antigravity-auth"
+  ],
   "mcp": {
-
     // "playwriter-npm-snapshot": {
     //   "type": "local",
     //   "enabled": true,
@@ -79,9 +81,7 @@
         "PLAYWRITER_AUTO_ENABLE": "1"
       }
     }
-
   },
-
 
   "formatter": false,
 
@@ -95,7 +95,6 @@
 
   "autoupdate": true,
   "experimental": {
-
     "disable_paste_summary": true
   },
   "agent": {

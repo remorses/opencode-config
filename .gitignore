@@ -2,3 +2,4 @@ node_modules
 package.json
 bun.lock
 *.log
+antigravity-accounts.json
