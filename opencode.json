@@ -90,6 +90,7 @@
   "permission": {
     "edit": "allow",
     "bash": "allow",
+    "external_directory": "allow",
     "webfetch": "allow"
     // "doom_loop": "allow",
     // "external_directory": "allow"

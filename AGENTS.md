@@ -85,4 +85,6 @@ before creating any gh pr or issue output the title and body in chat and ask for
 
 always update existing PRs, issues, or comments instead of recreating them. use `gh pr edit` or `gh issue edit` to update title/body.
 
+when checking if there is already a pr for current branch always check upstream first
+
 never close a PR or issue without explicit user confirmation. if something needs to change, update it instead of closing and recreating.
