@@ -95,4 +95,4 @@ if some particular planning architecture/bug debugging session/code implementati
 
 you can add it at the top of the file in a comment if there is no specific portion of the code where the comment fits
 
-if you want to add some knowledge about the overall codebase write it in a docs .md file and reference it in AGENTS.md (first checking if there is a *_AGENTS.md that is specific about this project that is not generated)
+if you want to add some knowledge about the overall codebase write it in a ./docs/ .md file with title & description frontmatter and reference it in AGENTS.md (first checking if there is a *_AGENTS.md that is specific about this project that is not generated)
