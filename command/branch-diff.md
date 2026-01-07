@@ -33,19 +33,43 @@ git fetch ${BASE_REF%%/*} && git log --oneline $BASE_REF...HEAD
 git diff $BASE_REF...HEAD --color=always -U20
 ```
 
-## Handling Truncated Output
-
-If the diff output is truncated, paginate using `tail -n +N` to skip already-seen lines:
+always exclude noisy files, use pathspec excludes. Add patterns as needed based on the project:
 
 ```bash
-git diff $BASE_REF...HEAD --color=always -U20 | tail -n +500
+git diff $BASE_REF...HEAD --color=always -U20 -- \
+  ':!*.lock' \
+  ':!package-lock.json' \
+  ':!pnpm-lock.yaml'
 ```
 
-Replace `500` with the line number where output was truncated. Repeat with increasing values until the full diff is seen:
+### Common files to exclude
+
+**Lock files:**
+- `*.lock`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`
+
+**Generated code (committed but auto-generated):**
+- `*/generated/*`, `*.generated.ts`, `*.gen.ts`, `*.gen.go`
+- OpenAPI/Swagger generated clients
+- Protobuf generated files: `*.pb.go`, `*_pb.ts`
+
+**Snapshots (if reviewing logic, not snapshot updates):**
+- `*.snap`, `__snapshots__/*`
+
+only do this if you already know about files to exclude from your existing context
+
+## Paginating Large Diffs
+
+For large diffs, paginate using `sed` to view specific line ranges with no overlap:
 
 ```bash
-git diff $BASE_REF...HEAD --color=always -U20 | tail -n +1000
-git diff $BASE_REF...HEAD --color=always -U20 | tail -n +1500
+# Page 1: lines 1-500
+git diff $BASE_REF...HEAD --color=always -U20 -- ':!*.lock' | sed -n '1,500p'
+
+# Page 2: lines 501-1000
+git diff $BASE_REF...HEAD --color=always -U20 -- ':!*.lock' | sed -n '501,1000p'
+
+# Page 3: lines 1001-1500
+git diff $BASE_REF...HEAD --color=always -U20 -- ':!*.lock' | sed -n '1001,1500p'
 ```
 
-Continue until you see the end of the diff.
+Continue incrementing by 500 until output is empty.
