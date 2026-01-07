@@ -27,7 +27,20 @@ Set `BASE_REF` to the output (e.g., `upstream/main`).
 git fetch ${BASE_REF%%/*} && git log --oneline $BASE_REF...HEAD
 ```
 
-## Step 3: View Full Diff
+## Step 3: View Diff Stats
+
+Run `--stat` first to get an overview of changes per file:
+
+```bash
+git diff $BASE_REF...HEAD --stat
+```
+
+This shows files changed and lines added/removed. Use this to:
+- Identify noisy files to exclude (lock files, generated code with 1000s of lines)
+- Determine if pagination is needed (large total line count)
+- Get a quick overview before diving into the full diff
+
+## Step 4: View Full Diff
 
 ```bash
 git diff $BASE_REF...HEAD --color=always -U20
