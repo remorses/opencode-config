@@ -88,3 +88,11 @@ always update existing PRs, issues, or comments instead of recreating them. use 
 when checking if there is already a pr for current branch always check upstream first
 
 never close a PR or issue without explicit user confirmation. if something needs to change, update it instead of closing and recreating.
+
+## compounding engineering
+
+if some particular planning architecture/bug debugging session/code implementation required a lot of effort or back and forth always add the learned knowledge, lessons & tips in comments in the relevant code: explain shortcuts or preferences to never make the same mistakes again. 
+
+you can add it at the top of the file in a comment if there is no specific portion of the code where the comment fits
+
+if you want to add some knowledge about the overall codebase write it in a docs .md file and reference it in AGENTS.md (first checking if there is a *_AGENTS.md that is specific about this project that is not generated)
