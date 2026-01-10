@@ -1,4 +1,4 @@
-to list, search and read files on github use gitchamber. before using it ALWAYS do `curl -fs gitchamber.com` to see its usage instructions.
+to list, search and read files on github you can use gitchamber. before using it ALWAYS do `curl -fs gitchamber.com` to see its usage instructions. you can also download repos locally inside ./tmp to read them.
 
 never commit anything unless asked by the user precisely
 
