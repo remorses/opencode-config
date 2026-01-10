@@ -96,7 +96,7 @@
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
     // "@tarquinen/opencode-dcp",
     // "opencode-anthropic-auth@0.0.7",
-    "opencode-google-antigravity-auth",
+    "opencode-google-antigravity-auth"
     // "opencode-openai-codex-auth"
   ],
   "mcp": {
@@ -125,6 +125,13 @@
   "permission": {
     "edit": "allow",
     "bash": "allow",
+    "external_directory": {
+      "*": "ask",
+      "/tmp": "allow",
+      "/tmp/*": "allow",
+      "env:$TMPDIR": "allow",
+      "env:$TMPDIR/*": "allow"
+    },
     // "external_directory": "allow",
     "webfetch": "allow"
     // "doom_loop": "allow",
