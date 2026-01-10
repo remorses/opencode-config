@@ -1,6 +1,8 @@
 {
   // Enable or disable the plugin
+  "$schema": "https://raw.githubusercontent.com/remorses/opencode-dynamic-context-pruning/schema/lib/schema.json",
   "enabled": true,
+
   // Enable debug logging to ~/.config/opencode/logs/dcp/
   "debug": false,
   // Show toast notifications when a new version is available
@@ -20,10 +22,11 @@
       "protectedTools": [],
     },
     "discard": {
-      "enabled": true,
+      "enabled": false,
+
     },
     "extract": {
-      "enabled": true,
+      "enabled": false,
       "showDistillation": false,
     },
   },

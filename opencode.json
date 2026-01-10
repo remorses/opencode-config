@@ -3,8 +3,10 @@
   "theme": "opencode",
 
   // "layout": "stretch",
-  "small_model": "anthropic/claude-haiku-4-5",
-  "model": "anthropic/claude-opus-4-5",
+  // "small_model": "claudecode/haiku",
+  // "model": "google/gemini-3-flash-preview",
+  // "model": "claudecode/opus",
+  "model": "openai/gpt-5.2-codex",
   "tui": { "scroll_speed": 6, "scroll_acceleration": { "enabled": true } },
   "lsp": false,
 
@@ -20,6 +22,37 @@
         }
       }
     },
+
+    // "claudecode": {
+    //   "npm": "file:///Users/morse/Documents/GitHub/ai-sdk-provider-claude-code/src/claude-code-provider.ts",
+
+    //   "name": "Claude Code SDK",
+    //   "options": {
+
+    //     // "baseURL": "https://api.myprovider.com/v1",
+    //     // "apiKey": "{env:ANTHROPIC_API_KEY}",
+    //     // "headers": {
+    //     //   "Authorization": "Bearer custom-token"
+    //     // }
+    //   },
+    //   "models": {
+    //     "opus": {
+    //       "name": "Claude Code Opus",
+    //       "limit": {
+    //         "context": 200000,
+    //         "output": 65536
+    //       }
+    //     },
+    //     "haiku": {
+    //       "name": "Claude Code Haiku",
+    //       "limit": {
+    //         "context": 200000,
+    //         "output": 65536
+    //       }
+    //     },
+    //   }
+    // },
+
     "anthropic": {
       "name": "Anthropic",
       "models": {
@@ -61,8 +94,10 @@
   },
   "plugin": [
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
-    "@tarquinen/opencode-dcp",
-    "opencode-google-antigravity-auth"
+    // "@tarquinen/opencode-dcp",
+    // "opencode-anthropic-auth@0.0.7",
+    "opencode-google-antigravity-auth",
+    // "opencode-openai-codex-auth"
   ],
   "mcp": {
     // "playwriter-npm-snapshot": {
@@ -90,13 +125,12 @@
   "permission": {
     "edit": "allow",
     "bash": "allow",
-    "external_directory": "allow",
+    // "external_directory": "allow",
     "webfetch": "allow"
     // "doom_loop": "allow",
     // "external_directory": "allow"
   },
 
-  "autoupdate": false,
   "experimental": {
     "disable_paste_summary": true
   },
@@ -111,6 +145,5 @@
         "bash": "allow"
       }
     }
-  },
-
+  }
 }
