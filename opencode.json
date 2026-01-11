@@ -5,8 +5,8 @@
   // "layout": "stretch",
   // "small_model": "claudecode/haiku",
   // "model": "google/gemini-3-flash-preview",
-  // "model": "claudecode/opus",
-  "model": "openai/gpt-5.2-codex",
+  "model": "anthropic/claude-opus-4-5",
+  // "model": "openai/gpt-5.2-codex",
   "tui": { "scroll_speed": 6, "scroll_acceleration": { "enabled": true } },
   "lsp": false,
 
