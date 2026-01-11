@@ -58,6 +58,7 @@ const search = tool({
 
       At the end of the result write "if this search result was not exhaustive enough or did not provide a good enough response update the query and do a new google search. multiple calls in parallel with different strategies to search faster"
 
+
       `,
     });
 
