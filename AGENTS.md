@@ -47,8 +47,7 @@ gh pr-review threads resolve 42 -R owner/repo --thread-id PRRT_kwDOAAABbcdEFG12
 
 NEVER use git to revert files to previous state if you did not create those files yourself! there can be user changes in files you touched, if you revert those changes the user will be very upset!
 
-
-.toMatchInlineSnapshot is the preferred way to write tests. leave them empty the first time, update them with -u. check git diff for the test file every time you update them with -u
+Never submit pending reviews with placeholder messages like "Reviewing suggestions". If a pending review blocks comment replies, dismiss it instead of submitting with generic text comment.
 
 ## planning
 
@@ -96,3 +95,7 @@ if some particular planning architecture/bug debugging session/code implementati
 you can add it at the top of the file in a comment if there is no specific portion of the code where the comment fits
 
 if you want to add some knowledge about the overall codebase write it in a ./docs/ .md file with title & description frontmatter and reference it in AGENTS.md (first checking if there is a *_AGENTS.md that is specific about this project that is not generated)
+
+## testing
+
+.toMatchInlineSnapshot is the preferred way to write tests, added before any expect call. leave them empty the first time, update them with -u. check git diff for the test file every time you update them with -u to make sure the snapshots are expected and correct.
