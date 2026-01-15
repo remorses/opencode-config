@@ -2,6 +2,11 @@
   "$schema": "https://opencode.ai/config.json",
   "theme": "opencode",
 
+  "mode": {
+    "build": {
+      "prompt": "You are Claude Code, Anthropic's official CLI for Claude."
+    }
+  },
   // "layout": "stretch",
   // "small_model": "claudecode/haiku",
   // "model": "google/gemini-3-flash-preview",
@@ -94,7 +99,8 @@
   },
   "plugin": [
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
-    // "@tarquinen/opencode-dcp",
+    "file:///Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
+    "@tarquinen/opencode-dcp",
     // "opencode-anthropic-auth@0.0.7",
     "opencode-google-antigravity-auth"
     // "opencode-openai-codex-auth"
@@ -129,6 +135,8 @@
       "*": "ask",
       "/tmp": "allow",
       "/tmp/*": "allow",
+      "/private/tmp": "allow",
+      "/private/tmp/*": "allow",
       "env:$TMPDIR": "allow",
       "env:$TMPDIR/*": "allow"
     },
