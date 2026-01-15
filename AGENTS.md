@@ -1,4 +1,3 @@
-to list, search and read files on github you can use gitchamber. before using it ALWAYS do `curl -fs gitchamber.com` to see its usage instructions. you can also download repos locally inside ./tmp to read them.
 
 never commit anything unless asked by the user precisely
 
@@ -99,3 +98,18 @@ if you want to add some knowledge about the overall codebase write it in a ./doc
 ## testing
 
 .toMatchInlineSnapshot is the preferred way to write tests, added before any expect call. leave them empty the first time, update them with -u. check git diff for the test file every time you update them with -u to make sure the snapshots are expected and correct.
+
+# opensrc
+
+to read source code of npm packages or repos you can do:
+
+```sh
+bunx opensrc npmpackagename
+opensrc github:owner/repo
+opensrc owner/repo@v1.0.0
+opensrc owner/repo#main
+```
+
+this will download them in a local ./opensrc folder
+
+this is preferable over manually cloning repos in tmp or using gitchamber
