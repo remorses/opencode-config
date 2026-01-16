@@ -113,3 +113,13 @@ opensrc owner/repo#main
 this will download them in a local ./opensrc folder
 
 this is preferable over manually cloning repos in tmp or using gitchamber
+
+# git worktrees
+
+when user asks you to create new worktree for the session do this
+
+```sh
+git worktree add ../{reponame}-{branchname} -b {branchname} upstream/main
+```
+
+sometimes upstream/main is different, check what is the default branch first, could be not main
