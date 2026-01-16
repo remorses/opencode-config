@@ -1,4 +1,3 @@
-
 // Plugin that announces when chat sessions complete or error via TTS.
 // Waits 2s before speaking to avoid interrupting resumed sessions.
 
@@ -25,7 +24,7 @@ function formatTitle(title?: string): string {
   return words.slice(0, MAX_TITLE_WORDS).join(" ");
 }
 
-export const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
+const ChatFinishedPlugin: Plugin = async ({ project, client, $ }) => {
   const sessionsWithErrors = new Map<string, { ignore: boolean }>();
 
   async function sleep(ms: number): Promise<void> {
