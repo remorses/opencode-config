@@ -1,7 +1,10 @@
-
 never commit anything unless asked by the user precisely
 
 NEVER run rm -rf on ANY folder outside of project directory! NEVER even run things like rm -rf ~/.bun/install/cache
+
+always use kebab case for new filenames. never use uppercase letters in filenames
+
+## git
 
 NEVER rewrite git history. NEVER call git reset. prefer merge over rebase or squash
 
@@ -17,11 +20,11 @@ git fetch upstream
 git checkout upstream/$DEFAULT_BRANCH
 ```
 
-always use kebab case for new filenames. never use uppercase letters in filenames
+## github
 
-NEVER use mocks in tests
+before creating any gh pr or issue output the title and body in chat and ask for confirmation first
 
-if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. if there is not any don't use headings in the body (it looks like AI slop)
+if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. if there is not any don't use headings in the body (it looks like AI slop). never use markdown headings in PR unless that is the PR template and standard practice
 
 after creating a pr always print the pr url to the user, then watch for ci to complete successfully using command like
 
@@ -48,9 +51,18 @@ NEVER use git to revert files to previous state if you did not create those file
 
 Never submit pending reviews with placeholder messages like "Reviewing suggestions". If a pending review blocks comment replies, dismiss it instead of submitting with generic text comment.
 
+## updating PRs and issues
+
+always update existing PRs, issues, or comments instead of recreating them. use `gh pr edit` or `gh issue edit` to update title/body.
+
+when checking if there is already a pr for current branch always check upstream first
+
+never close a PR or issue without explicit user confirmation. if something needs to change, update it instead of closing and recreating.
+
 ## planning
 
 when planning a task, first read all files relevant to the plan:
+
 - the main files you'll be modifying
 - files they import (dependencies)
 - files that import them (importees/dependents)
@@ -75,29 +87,19 @@ if user asks you to create .md files with findings always put them in a docs fol
 
 for running dev servers and other long running commands use tmux background sessions with names
 
-## gh cli usage
-
-before creating any gh pr or issue output the title and body in chat and ask for confirmation first
-
-## updating PRs and issues
-
-always update existing PRs, issues, or comments instead of recreating them. use `gh pr edit` or `gh issue edit` to update title/body.
-
-when checking if there is already a pr for current branch always check upstream first
-
-never close a PR or issue without explicit user confirmation. if something needs to change, update it instead of closing and recreating.
-
 ## compounding engineering
 
-if some particular planning architecture/bug debugging session/code implementation required a lot of effort or back and forth always add the learned knowledge, lessons & tips in comments in the relevant code: explain shortcuts or preferences to never make the same mistakes again. 
+if some particular planning architecture/bug debugging session/code implementation required a lot of effort or back and forth always add the learned knowledge, lessons & tips in comments in the relevant code: explain shortcuts or preferences to never make the same mistakes again.
 
 you can add it at the top of the file in a comment if there is no specific portion of the code where the comment fits
 
-if you want to add some knowledge about the overall codebase write it in a ./docs/ .md file with title & description frontmatter and reference it in AGENTS.md (first checking if there is a *_AGENTS.md that is specific about this project that is not generated)
+if you want to add some knowledge about the overall codebase write it in a ./docs/ .md file with title & description frontmatter and reference it in AGENTS.md (first checking if there is a \*\_AGENTS.md that is specific about this project that is not generated)
 
 ## testing
 
 .toMatchInlineSnapshot is the preferred way to write tests, added before any expect call. leave them empty the first time, update them with -u. check git diff for the test file every time you update them with -u to make sure the snapshots are expected and correct.
+
+NEVER use mocks in tests. NEVER mock modules.
 
 # opensrc
 
