@@ -20,6 +20,8 @@ git fetch upstream
 git checkout upstream/$DEFAULT_BRANCH
 ```
 
+never amend commits or rewrite git history
+
 ## github
 
 before creating any gh pr or issue output the title and body in chat and ask for confirmation first
