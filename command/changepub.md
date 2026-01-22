@@ -12,3 +12,5 @@ agent: build
 - If publish fails for tsc errors or other issues, try to resolve them and run it again
 - push your changes to github, with tags too
 - create a release on github with gh cli for the tag. set it as latest. use changelog body for the release content.
+
+IMPORTANT! use pnpm publish if there is a pnpm lock file. use bun publish if there is a bun lockfile. do not blidnly use npm! only as a last resort. otherwise workspace references in package.json will remain and break the published package
