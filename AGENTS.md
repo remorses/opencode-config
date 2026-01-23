@@ -4,6 +4,8 @@ NEVER run rm -rf on ANY folder outside of project directory! NEVER even run thin
 
 always use kebab case for new filenames. never use uppercase letters in filenames
 
+ALWAYS use the right package manager for ts repos. you can see the right one based on lock files like bun.lock. for example bun publish instead of npm publish.
+
 ## git
 
 NEVER rewrite git history. NEVER call git reset. prefer merge over rebase or squash
