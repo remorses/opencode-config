@@ -106,24 +106,18 @@
     // "opencode-openai-codex-auth"
   ],
   "mcp": {
-    // "playwriter-npm-snapshot": {
+    // "playwriter": {
     //   "type": "local",
-    //   "enabled": true,
-    //   "command": ["npx", "playwriter@latest"]
-    // },
-
-    "playwriter": {
-      "type": "local",
-      "command": [
-        "tsx",
-        "/Users/morse/Documents/GitHub/playwriter/playwriter/src/cli.ts"
-      ],
-      "environment": {
-        "PLAYWRITER_LOG_FILE_PATH": "/Users/morse/.config/opencode/playwriter.log",
-        "PLAYWRITER_NODE_ENV": "development",
-        "PLAYWRITER_AUTO_ENABLE": "1"
-      }
-    }
+    //   "command": [
+    //     "tsx",
+    //     "/Users/morse/Documents/GitHub/playwriter/playwriter/src/cli.ts"
+    //   ],
+    //   "environment": {
+    //     "PLAYWRITER_LOG_FILE_PATH": "/Users/morse/.config/opencode/playwriter.log",
+    //     "PLAYWRITER_NODE_ENV": "development",
+    //     "PLAYWRITER_AUTO_ENABLE": "1"
+    //   }
+    // }
   },
 
   "formatter": false,
