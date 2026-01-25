@@ -6,6 +6,10 @@ always use kebab case for new filenames. never use uppercase letters in filename
 
 ALWAYS use the right package manager for ts repos. you can see the right one based on lock files like bun.lock. for example bun publish instead of npm publish.
 
+## playwriter
+
+ALWAYS use locally installed playwriter without npx or bunx. this way we will use the locally running playwriter instead which can have required fixes and other improvements. 
+
 ## git
 
 NEVER rewrite git history. NEVER call git reset. prefer merge over rebase or squash
