@@ -2,7 +2,11 @@
   "dependencies": {
     "@ai-sdk/google": "^2.0.38",
     "@ai-sdk/google-vertex": "^4.0.11",
-    "@opencode-ai/plugin": "1.1.34",
+    "@opencode-ai/plugin": "1.1.36",
     "ai": "^5.0.95"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "^1.0.10",
+    "typescript": "^5.9.3"
   }
 }
