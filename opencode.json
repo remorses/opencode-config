@@ -129,6 +129,8 @@
       "*": "ask",
       "/tmp": "allow",
       "/tmp/*": "allow",
+      "/private/var/folders/8w/*": "allow",
+      "/private/var/folders/8w": "allow",
       "/private/tmp": "allow",
       "/private/tmp/*": "allow",
       "env:$TMPDIR": "allow",
