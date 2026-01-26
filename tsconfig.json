@@ -3,5 +3,5 @@
   "extends": "@tsconfig/bun/tsconfig.json",
 
   "compilerOptions": {},
-  "include": ["plugin"]
+  "include": ["plugins"]
 }
