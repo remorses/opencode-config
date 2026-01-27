@@ -8,6 +8,14 @@ ALWAYS use the right package manager for ts repos. you can see the right one bas
 
 if you need to create scripts always prefer typescript over bash or js. never create new files in js unless strictly required.
 
+## planning
+
+when user asks you to plan he wants you to read all relevant files and create a concrete plan with steps: sections where you describe what files you would update and what tests you would add to validate the new changes.
+
+NEVER output a plan where you "plan" to read files or plan to explore the codebase. the goal of a plan is to do these things before starting the implementation part. you have to explore the codebase, read files, validate assumptions BEFORE showing the user the plan in chat. 
+
+if there are multiple ways to implement the changes show an high level summary of each approach before showing the full plan.
+
 ## playwriter
 
 ALWAYS use locally installed playwriter without npx or bunx. this way we will use the locally running playwriter instead which can have required fixes and other improvements. 
