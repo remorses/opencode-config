@@ -142,11 +142,11 @@
   },
   "agent": {
     "explore": {
-      // "model": "provider/model-id"
+      "model": "anthropic/claude-sonnet-4-5",
     },
     "plan": {
       "mode": "primary",
-      "model": "anthropic/claude-sonnet-4-5",
+      "model": "openai/gpt-5-codex",
       "prompt": "{file:./prompts/PLAN.md}",
 
       "permission": {
