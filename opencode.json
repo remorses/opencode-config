@@ -2,7 +2,6 @@
   "$schema": "https://opencode.ai/config.json",
   "theme": "opencode",
 
-
   // "layout": "stretch",
   // "small_model": "claudecode/haiku",
   // "model": "google/gemini-3-flash-preview",
@@ -142,9 +141,12 @@
     "disable_paste_summary": true
   },
   "agent": {
+    "explore": {
+      // "model": "provider/model-id"
+    },
     "plan": {
       "mode": "primary",
-      "model": "openai/gpt-5-codex",
+      "model": "anthropic/claude-sonnet-4-5",
       "prompt": "{file:./prompts/PLAN.md}",
 
       "permission": {
