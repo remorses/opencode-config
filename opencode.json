@@ -5,11 +5,19 @@
   // "layout": "stretch",
   // "small_model": "claudecode/haiku",
   // "model": "google/gemini-3-flash-preview",
-  "model": "anthropic/claude-opus-4-5",
+  // "model": "anthropic/claude-opus-4-5",
   // "model": "openai/gpt-5.2-codex",
   "tui": { "scroll_speed": 6, "scroll_acceleration": { "enabled": true } },
   "lsp": false,
 
+  // "mode": {
+  //   "build": {
+  //     "prompt": "You are Claude Code, Anthropic's official CLI for Claude."
+  //   },
+  //   "plan": {
+  //     "prompt": "You are Claude Code, Anthropic's official CLI for Claude."
+  //   }
+  // },
   "provider": {
     "opencode": {
       "models": {
@@ -94,8 +102,11 @@
   },
   "plugin": [
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
-    "file:///Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
+    "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
     "@tarquinen/opencode-dcp",
+    // TODO
+    // "/Users/morse/kimaki/opencode-openai-codex-auth/index.ts",
+    // "oc-chatgpt-multi-auth@latest",
     // "opencode-anthropic-auth@0.0.7",
     "opencode-google-antigravity-auth"
     // "opencode-openai-codex-auth"
@@ -142,7 +153,7 @@
   },
   "agent": {
     "explore": {
-      "model": "anthropic/claude-sonnet-4-5",
+      "model": "anthropic/claude-sonnet-4-5"
     },
     "plan": {
       "mode": "primary",
