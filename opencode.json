@@ -105,7 +105,7 @@
     "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
     "@tarquinen/opencode-dcp",
     // TODO
-    // "/Users/morse/kimaki/opencode-openai-codex-auth/index.ts",
+    "/Users/morse/kimaki/codex-multi-auth/index.ts",
     // "oc-chatgpt-multi-auth@latest",
     // "opencode-anthropic-auth@0.0.7",
     "opencode-google-antigravity-auth"
