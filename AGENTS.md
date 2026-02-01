@@ -8,6 +8,7 @@ ALWAYS use the right package manager for ts repos. you can see the right one bas
 
 if you need to create scripts always prefer typescript over bash or js. never create new files in js unless strictly required.
 
+
 ## planning
 
 when user asks you to plan he wants you to read all relevant files and create a concrete plan with steps: sections where you describe what files you would update and what tests you would add to validate the new changes.
@@ -22,7 +23,7 @@ ALWAYS use locally installed playwriter without npx or bunx. this way we will us
 
 ## git
 
-NEVER rewrite git history. NEVER call git reset. prefer merge over rebase or squash
+NEVER rewrite git history. NEVER amend commits unless asked. NEVER restore or revert unless specifically asked. NEVER call git reset. prefer merge over rebase or squash
 
 when creating a new branch, always check if you're in a fork (origin and upstream remotes are different). if so, switch to upstream's default branch first:
 
