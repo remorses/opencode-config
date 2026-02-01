@@ -142,8 +142,8 @@
       "env:$TMPDIR": "allow",
       "env:$TMPDIR/*": "allow"
     },
-    // "external_directory": "allow",
     "webfetch": "allow"
+    // "external_directory": "allow",
     // "doom_loop": "allow",
     // "external_directory": "allow"
   },
