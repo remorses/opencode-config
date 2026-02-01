@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin";
-import fs from 'fs'
+import crypto from "crypto";
 
 export const BranchInjector: Plugin = async ({ $ }) => {
   // Track last known branch per session
@@ -26,14 +26,17 @@ export const BranchInjector: Plugin = async ({ $ }) => {
         ? `[Branch changed: ${lastBranch} → ${branch}]`
         : `[Current branch: ${branch}]`;
 
-      // Find last text part and append
-      const lastTextPart = [...output.parts]
-        .reverse()
-        .find((p) => p.type === "text");
-
-      if (lastTextPart && lastTextPart.type === "text") {
-        lastTextPart.text += `\n\n${info}`;
-      }
+      // Add as synthetic part (hidden from TUI, sent to model)
+      const first = output.parts[0];
+      if (!first) return;
+      output.parts.push({
+        id: crypto.randomUUID(),
+        sessionID: first.sessionID,
+        messageID: first.messageID,
+        type: "text",
+        text: info,
+        synthetic: true,
+      });
     },
 
     // Clean up on session delete
