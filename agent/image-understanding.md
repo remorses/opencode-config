@@ -2,8 +2,6 @@
 description: Understand images, use this agent to pass image urls or paths and get back a description of the image. Use detailed prompt for what you want to know
 mode: subagent
 model: anthropic/claude-sonnet-4-5
-permission:
-  plan_enter: allow
 ---
 
 You excel at analyzing and understanding images
