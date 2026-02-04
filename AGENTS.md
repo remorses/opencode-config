@@ -154,3 +154,7 @@ git worktree add ../{reponame}-{branchname} -b {branchname} upstream/main
 ```
 
 sometimes upstream/main is different, check what is the default branch first, could be not main
+
+## kimaki
+
+for kimaki.xyz commands always use global kimaki instead of npx kimaki, it will use the local version of kimaki cli with latest changes
