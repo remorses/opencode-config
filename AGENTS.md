@@ -39,6 +39,24 @@ git checkout upstream/$DEFAULT_BRANCH
 
 never amend commits or rewrite git history
 
+### searching past commits
+
+use 3 approaches to find commits that updated certain code
+
+```sh
+
+#search in the commit message
+git log --grep="search term"
+
+# Search for commits that added or removed a string
+git log -S "search term"
+
+# Search with regex among diff of commits
+git log -G "regex pattern"
+```
+
+Use all three passing variable names and function names in search strings
+
 ## github
 
 before creating any gh pr or issue output the title and body in chat and ask for confirmation first
