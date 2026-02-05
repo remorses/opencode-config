@@ -159,6 +159,8 @@ opensrc owner/repo@v1.0.0
 opensrc owner/repo#main
 ```
 
+something more here
+
 this will download them in a local ./opensrc folder
 
 this is preferable over manually cloning repos in tmp or using gitchamber
@@ -176,3 +178,35 @@ sometimes upstream/main is different, check what is the default branch first, co
 ## kimaki
 
 for kimaki.xyz commands always use global kimaki instead of npx kimaki, it will use the local version of kimaki cli with latest changes
+
+## committing only certain hunks
+
+sometimes other agents added unrelated changes in git diffs
+
+when committing you should first see the git diff, then if the files only have your changes commit those files only with
+
+```bash
+git commit path/to/file1 path/to/file2 -m "commit message"
+```
+
+If instead there are other changes in those same files you can use critique hunks command to stage only some portion of changes and leave unrelated changes unstaged and non committed
+
+```
+# List all unstaged hunks with stable IDs
+critique hunks list
+
+# List staged hunks
+critique hunks list --staged
+
+# Filter by file pattern
+critique hunks list --filter "src/**/*.ts"
+
+# Stage specific hunks by ID
+critique hunks add 'src/main.ts:@-10,6+10,7'
+
+# Stage multiple hunks
+critique hunks add 'src/main.ts:@-10,6+10,7' 'src/utils.ts:@-5,3+5,4'
+
+```
+
+> always use global critique command instead of using bunx so you use the latest version with latest changes, critique in PATH is using the local version of critique with latest changes and fixes
