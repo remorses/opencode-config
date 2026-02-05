@@ -159,7 +159,6 @@ opensrc owner/repo@v1.0.0
 opensrc owner/repo#main
 ```
 
-something more here
 
 this will download them in a local ./opensrc folder
 
