@@ -1,7 +1,7 @@
 ---
 description: ALWAYS use this agent to start the validation feedback loop after the first implementation is done. Pass as prompt the core idea of the code you added or updated. This is a smarter agent than you to use for debugging and bug fixing for complex tasks.
 mode: subagent
-model: openai/gpt-5.2-codex
+model: openai/gpt-5.3-codex
 
 ---
 
