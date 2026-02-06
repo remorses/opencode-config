@@ -6,7 +6,6 @@
   // "small_model": "claudecode/haiku",
   // "model": "google/gemini-3-flash-preview",
   // "model": "anthropic/claude-opus-4-5",
-  // "model": "openai/gpt-5.2-codex",
   "tui": { "scroll_speed": 6, "scroll_acceleration": { "enabled": true } },
   "lsp": false,
 
@@ -102,14 +101,11 @@
   },
   "plugin": [
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
-    "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
-    "@tarquinen/opencode-dcp",
-    // TODO
-    "/Users/morse/kimaki/codex-multi-auth/index.ts",
-    // "oc-chatgpt-multi-auth@latest",
-    // "opencode-anthropic-auth@0.0.7",
+    // "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
+    // "@tarquinen/opencode-dcp", SHIT. breaks claude rules of thinking
+    // "/Users/morse/kimaki/codex-multi-auth/index.ts", SHIT. breaks everything. codex 5.3 does not work.probably uses the API for some reason! spent a lot of money on API for no reason
+    // "oc-chatgpt-multi-auth@latest", SHIT. does not even work
     "opencode-google-antigravity-auth"
-    // "opencode-openai-codex-auth"
   ],
   "mcp": {
     // "playwriter": {
@@ -157,7 +153,7 @@
     },
     "oracle": {
       "mode": "subagent",
-      "model": "openai/gpt-5.2-codex",
+      "model": "openai/gpt-5.3-codex",
       "prompt": "{file:./agent/oracle.md}"
     },
     "plan": {
