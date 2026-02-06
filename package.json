@@ -2,7 +2,7 @@
   "dependencies": {
     "@ai-sdk/google": "^2.0.38",
     "@ai-sdk/google-vertex": "^4.0.11",
-    "@opencode-ai/plugin": "1.1.51",
+    "@opencode-ai/plugin": "1.1.53",
     "ai": "^5.0.95"
   },
   "devDependencies": {
