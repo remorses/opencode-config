@@ -15,5 +15,6 @@ agent: build
 
 IMPORTANT! use pnpm publish if there is a pnpm lock file. use bun publish if there is a bun lockfile. do not blidnly use npm! only as a last resort. otherwise workspace references in package.json will remain and break the published package
 
+after calling publish command like bun publish or pnpm publish ALWAYS do pnpm i or bun i after. this is needed so lockfile is updated with updated package version and workspace versions are resolved to the correct one later on.
 
-if multiple packages changed publish them in topological order, where the dependencies are published first.
+if multiple packages changed publish them in topological order, where the dependencies are published first. always publish dependencies if there were changes in them.
