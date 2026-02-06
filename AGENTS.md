@@ -39,6 +39,8 @@ git checkout upstream/$DEFAULT_BRANCH
 
 never amend commits or rewrite git history
 
+write very detailed commit messages. feel free to include diagrams and other markdown, tables, lists, quotes, etc. 
+
 ### searching past commits
 
 use 3 approaches to find commits that updated certain code
