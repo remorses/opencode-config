@@ -7,7 +7,7 @@ agent: build
 - Bump the relevant package.json version. NEVER do major bumps
 - Update the changelog with your changes, in bullet points, adding a new section with the right npm version, find the right CHANGELOG.md first or add one
 - Commit with appropriate commit message for the release
-- run npm publish, in the appropriate package or packages folders
+- run npm publish, (using right package manager like pnpm or bun) in the appropriate package or packages folders
 - create a tag with the package-name@version-number
 - If publish fails for tsc errors or other issues, try to resolve them and run it again
 - push your changes to github, with tags too
