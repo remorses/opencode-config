@@ -1,7 +1,7 @@
 {
   // Enable or disable the plugin
   "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
-  "enabled": false,
+  "enabled": true,
   // "pruneNotificationType": "chat",
 
   // Enable debug logging to ~/.config/opencode/logs/dcp/
