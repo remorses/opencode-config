@@ -37,9 +37,17 @@ git fetch upstream
 git checkout upstream/$DEFAULT_BRANCH
 ```
 
+## git commits
+
+ONLY commit when user asks to do so.
+
+before committing always check what files were changes and what is git diff. only commit your changes. if there are unrelated changes use `critique hunks list` command to list hunks and stage only relevant ones with `critique hunks add id1 id2`. see `critique --help` for more info
+
+if user says "commit all" then also commit other changes, grouping them accordingly and using detailed commit messages.
+
 never amend commits or rewrite git history
 
-write very detailed commit messages. feel free to include diagrams and other markdown, tables, lists, quotes, etc. 
+always write very detailed commit messages. feel free to include diagrams and  markdown, tables, lists, quotes, etc. 
 
 ### searching past commits
 
