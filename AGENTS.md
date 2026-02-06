@@ -180,6 +180,8 @@ sometimes upstream/main is different, check what is the default branch first, co
 
 for kimaki.xyz commands always use global kimaki instead of npx kimaki, it will use the local version of kimaki cli with latest changes
 
+after I ask to git push call the tool kimaki_archive_thread so the thread is removed from Discord sidebar and completed tasks are not shown in left sidebar.
+
 ## committing only certain hunks
 
 sometimes other agents added unrelated changes in git diffs
