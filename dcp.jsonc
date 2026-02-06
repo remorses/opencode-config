@@ -1,12 +1,13 @@
 {
   // Enable or disable the plugin
-  "$schema": "https://raw.githubusercontent.com/remorses/opencode-dynamic-context-pruning/schema/lib/schema.json",
-  "enabled": true,
+  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+  "enabled": false,
+  // "pruneNotificationType": "chat",
 
   // Enable debug logging to ~/.config/opencode/logs/dcp/
   "debug": false,
   // Show toast notifications when a new version is available
-  "showUpdateToasts": false,
+
   // Notification display: "off", "minimal", or "detailed"
   "pruneNotification": "off",
   // Protect from pruning for <turns> message turns
@@ -18,23 +19,28 @@
   "tools": {
     "settings": {
       "nudgeEnabled": false,
+
       "nudgeFrequency": 10,
       "protectedTools": [],
     },
-    "discard": {
-      "enabled": false,
 
+    "compress": {
+      "permission": "deny",
     },
-    "extract": {
-      "enabled": false,
-      "showDistillation": false,
+    "distill": {
+      "permission": "deny",
+    },
+    "prune": {
+      "permission": "deny",
     },
   },
   // Automatic pruning strategies
   "strategies": {
+
     // Remove duplicate tool calls (same tool with same arguments)
     "deduplication": {
       "enabled": true,
+
       "protectedTools": [],
     },
     // Prune write tool inputs when the file has been subsequently read
@@ -47,6 +53,5 @@
       "turns": 4,
       "protectedTools": [],
     },
-
   },
 }
