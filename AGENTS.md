@@ -41,7 +41,7 @@ git checkout upstream/$DEFAULT_BRANCH
 
 ONLY commit when user asks to do so.
 
-before committing always check what files were changes and what is git diff. only commit your changes. if there are unrelated changes use `critique hunks list` command to list hunks and stage only relevant ones with `critique hunks add id1 id2`. see `critique --help` for more info
+before committing always check what files were changed and what is git diff. only commit your changes. NEVER assume there are not other changes. other agents may have done other changes you do not know of. if there are unrelated changes use `critique hunks list` command to list hunks and stage only relevant ones with `critique hunks add id1 id2`. see `critique --help` for more info
 
 if user says "commit all" then also commit other changes, grouping them accordingly and using detailed commit messages.
 
@@ -229,3 +229,26 @@ critique hunks add 'src/main.ts:@-10,6+10,7' 'src/utils.ts:@-5,3+5,4'
 ```
 
 > always use global critique command instead of using bunx so you use the latest version with latest changes, critique in PATH is using the local version of critique with latest changes and fixes
+
+<!-- opensrc:start -->
+
+## Source Code Reference
+
+Source code for dependencies is available in `opensrc/` for deeper understanding of implementation details.
+
+See `opensrc/sources.json` for the list of available packages and their versions.
+
+Use this source code when you need to understand how a package works internally, not just its types/interface.
+
+### Fetching Additional Source Code
+
+To fetch source code for a package or repository you need to understand, run:
+
+```bash
+npx opensrc <package>           # npm package (e.g., npx opensrc zod)
+npx opensrc pypi:<package>      # Python package (e.g., npx opensrc pypi:requests)
+npx opensrc crates:<package>    # Rust crate (e.g., npx opensrc crates:serde)
+npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
+```
+
+<!-- opensrc:end -->
