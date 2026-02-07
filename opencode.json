@@ -72,6 +72,10 @@
           // }
         },
         "claude-opus-4-6": {
+          "limit": {
+            "context": 200000,
+            "output": 128000
+          },
           "options": {
             "thinking": {
               "type": "enabled",
