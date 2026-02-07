@@ -4,3 +4,6 @@ bun.lock
 *.log
 antigravity-accounts.json
 tmp
+
+# opensrc - source code for packages
+opensrc/
