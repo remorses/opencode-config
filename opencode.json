@@ -79,7 +79,7 @@
           "options": {
             "thinking": {
               "type": "enabled",
-              "budgetTokens": 16000
+              "budgetTokens": 30000
             }
           }
         },
