@@ -126,6 +126,14 @@ before updating agents instructions files always double check that they are not 
 
 when using task tool always be as detailed as possible on what you want: list goal of task, overall goal of session, requirements for task, tips for subagent, overall scope of project and why task is being used.
 
+## web search
+
+for web searches use the built-in `google_search` tool.
+
+do not use the local legacy `googlesearch` custom tool in `tool/googlesearch.ts`.
+
+when possible, ask the search to retrieve and include relevant GitHub project URLs in the results.
+
 ## reading images
 
 ALWAYS use the task tool for reading/analyzing images. never read images directly with the read tool as images consume a lot of context window space.
