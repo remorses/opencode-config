@@ -98,6 +98,9 @@ NEVER use git to revert files to previous state if you did not create those file
 
 Never submit pending reviews with placeholder messages like "Reviewing suggestions". If a pending review blocks comment replies, dismiss it instead of submitting with generic text comment.
 
+
+NEVER use we or our in messages. write as if you were me. making the body personal. writing as if you were me. write casually and concisely. not like a robot. focus on telling information quickly without stupid fluff and corporate idioms
+
 ## updating PRs and issues
 
 always update existing PRs, issues, or comments instead of recreating them. use `gh pr edit` or `gh issue edit` to update title/body.
@@ -229,6 +232,8 @@ critique hunks add 'src/main.ts:@-10,6+10,7' 'src/utils.ts:@-5,3+5,4'
 ```
 
 > always use global critique command instead of using bunx so you use the latest version with latest changes, critique in PATH is using the local version of critique with latest changes and fixes
+
+
 
 <!-- opensrc:start -->
 
