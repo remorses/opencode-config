@@ -3,6 +3,20 @@
  *
  * This plugin rotates OpenAI Codex OAuth accounts after rate-limit retry events.
  *
+ * ## Setup
+ *
+ * 1. Add this plugin to your OpenCode config (`opencode.json`):
+ *    `"plugins": ["file:///absolute/path/to/plugins/multicodex.ts"]`
+ * 2. Ensure `multicodex-accounts.json` exists next to this plugin (repo root in this setup).
+ * 3. Add at least two OpenAI OAuth accounts with the CLI script:
+ *    - `bun scripts/multicodex-cli.ts add`
+ *    - `bun scripts/multicodex-cli.ts list`
+ *    - `bun scripts/multicodex-cli.ts use <index>`
+ *
+ * The `add` command uses the same OAuth browser flow as built-in Codex auth, then stores
+ * account entries in `multicodex-accounts.json` and syncs the active account to
+ * `~/.local/share/opencode/auth.json` (or XDG equivalent).
+ *
  * ## Why this shape
  *
  * - No fetch override: avoids conflicts with built-in Codex auth transport.
@@ -59,29 +73,6 @@ type AccountStore = {
   activeIndex: number;
   accounts: AccountRecord[];
 };
-
-function parseJwtClaims(token: string): Record<string, unknown> | undefined {
-  const parts = token.split(".");
-  if (parts.length !== 3) return undefined;
-  const payload = parts[1];
-  if (!payload) return undefined;
-  try {
-    return JSON.parse(Buffer.from(payload, "base64url").toString()) as Record<string, unknown>;
-  } catch {
-    return undefined;
-  }
-}
-
-function emailFromAccessToken(access: string): string | undefined {
-  const claims = parseJwtClaims(access);
-  const profile =
-    claims && typeof claims["https://api.openai.com/profile"] === "object"
-      ? (claims["https://api.openai.com/profile"] as Record<string, unknown>)
-      : undefined;
-  const direct = typeof claims?.email === "string" ? claims.email : undefined;
-  const nested = typeof profile?.email === "string" ? profile.email : undefined;
-  return direct ?? nested;
-}
 
 function authFilePath() {
   const xdgDataHome = process.env.XDG_DATA_HOME;
@@ -175,10 +166,7 @@ function isRateLimitText(message: string) {
 async function setOpenAIAuth(auth: OAuthAuth, client: any) {
   const file = authFilePath();
   const data = await readJson<Record<string, unknown>>(file, {});
-  data.openai = {
-    ...auth,
-    email: auth.email ?? emailFromAccessToken(auth.access),
-  };
+  data.openai = auth;
   await writeJson(file, data);
   await client.auth.set({
     path: { id: "openai" },
