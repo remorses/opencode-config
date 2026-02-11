@@ -3,7 +3,8 @@
   "extends": "@tsconfig/bun/tsconfig.json",
   "compilerOptions": {},
   "include": [
-    "plugins"
+    "plugins",
+    "scripts"
   ],
   "exclude": [
     "opensrc"
