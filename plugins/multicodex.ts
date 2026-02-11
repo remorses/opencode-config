@@ -74,6 +74,57 @@ type AccountStore = {
   accounts: AccountRecord[];
 };
 
+type AuthFile = Record<string, unknown> & {
+  openai?: unknown;
+};
+
+type RetryStatusEvent = {
+  type: "session.status";
+  properties: {
+    sessionID: string;
+    status: {
+      type: "retry";
+      message: string;
+    };
+  };
+};
+
+type AuthClient = {
+  auth: {
+    set: (input: { path: { id: "openai" }; body: OAuthAuth }) => Promise<unknown>;
+  };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseOAuthAuth(value: unknown): OAuthAuth | undefined {
+  if (!isRecord(value)) return undefined;
+  if (value.type !== "oauth") return undefined;
+  if (typeof value.refresh !== "string") return undefined;
+  if (typeof value.access !== "string") return undefined;
+  if (typeof value.expires !== "number") return undefined;
+  return {
+    type: "oauth",
+    refresh: value.refresh,
+    access: value.access,
+    expires: value.expires,
+    accountId: typeof value.accountId === "string" ? value.accountId : undefined,
+    email: typeof value.email === "string" ? value.email : undefined,
+  };
+}
+
+function isRetryStatusEvent(event: unknown): event is RetryStatusEvent {
+  if (!isRecord(event) || event.type !== "session.status") return false;
+  if (!isRecord(event.properties)) return false;
+  const sessionID = event.properties.sessionID;
+  const status = event.properties.status;
+  if (typeof sessionID !== "string") return false;
+  if (!isRecord(status)) return false;
+  return status.type === "retry" && typeof status.message === "string";
+}
+
 function authFilePath() {
   const xdgDataHome = process.env.XDG_DATA_HOME;
   if (xdgDataHome) return path.join(xdgDataHome, "opencode", "auth.json");
@@ -163,69 +214,45 @@ function isRateLimitText(message: string) {
   );
 }
 
-async function setOpenAIAuth(auth: OAuthAuth, client: any) {
+async function setOpenAIAuth(auth: OAuthAuth, client: AuthClient) {
   const file = authFilePath();
-  const data = await readJson<Record<string, unknown>>(file, {});
+  const data = await readJson<AuthFile>(file, {});
   data.openai = auth;
   await writeJson(file, data);
   await client.auth.set({
     path: { id: "openai" },
-    body: data.openai,
+    body: auth,
   });
 }
 
-function extractSessionModelID(info: any): string | undefined {
-  if (!info || typeof info !== "object") return undefined;
+function extractSessionModelID(info: unknown): string | undefined {
+  if (!isRecord(info)) return undefined;
   if (typeof info.modelID === "string") return info.modelID;
   if (typeof info.modelId === "string") return info.modelId;
   if (typeof info.model === "string") return info.model;
-  if (info.model && typeof info.model.id === "string") return info.model.id;
+  if (isRecord(info.model) && typeof info.model.id === "string") return info.model.id;
   return undefined;
 }
 
 const MultiCodexPlugin: Plugin = async ({ client }) => {
   return {
     async event({ event }) {
-      const evt: any = event;
+      if (!isRetryStatusEvent(event)) return;
 
-      const isRetryStatus =
-        evt.type === "session.status" &&
-        evt.properties?.status?.type === "retry" &&
-        typeof evt.properties?.status?.message === "string";
-      if (!isRetryStatus) return;
-
-      const sessionID = evt.properties?.sessionID;
-      if (!sessionID) return;
-
-      const message = evt.properties.status.message as string;
+      const sessionID = event.properties.sessionID;
+      const message = event.properties.status.message;
       if (!message || !isRateLimitText(message)) return;
 
       const resolvedModelID = await client.session
         .get({ path: { id: sessionID } })
-        .then((session: any) => extractSessionModelID(session?.data))
+        .then((session) => extractSessionModelID(session.data))
         .catch(() => undefined);
       if (!resolvedModelID || !resolvedModelID.startsWith("openai/")) return;
 
       const authPath = authFilePath();
-      const authData = await readJson<Record<string, unknown>>(authPath, {});
-      const current = authData.openai;
-      if (!current || typeof current !== "object") return;
-      if ((current as any).type !== "oauth") return;
-
-      const currentAuth: OAuthAuth = {
-        type: "oauth",
-        refresh: String((current as any).refresh ?? ""),
-        access: String((current as any).access ?? ""),
-        expires: Number((current as any).expires ?? 0),
-        accountId:
-          typeof (current as any).accountId === "string"
-            ? (current as any).accountId
-            : undefined,
-        email:
-          typeof (current as any).email === "string"
-            ? (current as any).email
-            : undefined,
-      };
+      const authData = await readJson<AuthFile>(authPath, {});
+      const currentAuth = parseOAuthAuth(authData.openai);
+      if (!currentAuth) return;
 
       const store = await loadStore();
       if (store.accounts.length < 2) return;
