@@ -11,8 +11,8 @@
  *
  * ## How it works
  *
- * 1. Listen for `session.error` events.
- * 2. Detect rate-limit style errors from message text (`429`, `rate limit`, usage limit markers).
+ * 1. Listen for `session.status` retry events.
+ * 2. Detect rate-limit style retry messages (`429`, `rate limit`, usage limit markers).
  * 3. Resolve current session model and continue only when it starts with `openai/`.
  * 4. Load `multicodex-accounts.json` account pool and current OpenAI auth.
  * 5. Resolve current account index by matching refresh token, accountId, email, then `activeIndex`.
@@ -30,11 +30,13 @@ import type { Plugin } from "@opencode-ai/plugin";
 import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { MulticodexLogger } from "./utils/multicodex-logger";
 
 const MULTICODEX_ACCOUNTS_PATH = path.resolve(
   path.dirname(new URL(import.meta.url).pathname),
   "../multicodex-accounts.json",
 );
+const logger = new MulticodexLogger();
 
 type OAuthAuth = {
   type: "oauth";
@@ -60,6 +62,29 @@ type AccountStore = {
   activeIndex: number;
   accounts: AccountRecord[];
 };
+
+function parseJwtClaims(token: string): Record<string, unknown> | undefined {
+  const parts = token.split(".");
+  if (parts.length !== 3) return undefined;
+  const payload = parts[1];
+  if (!payload) return undefined;
+  try {
+    return JSON.parse(Buffer.from(payload, "base64url").toString()) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+function emailFromAccessToken(access: string): string | undefined {
+  const claims = parseJwtClaims(access);
+  const profile =
+    claims && typeof claims["https://api.openai.com/profile"] === "object"
+      ? (claims["https://api.openai.com/profile"] as Record<string, unknown>)
+      : undefined;
+  const direct = typeof claims?.email === "string" ? claims.email : undefined;
+  const nested = typeof profile?.email === "string" ? profile.email : undefined;
+  return direct ?? nested;
+}
 
 function authFilePath() {
   const xdgDataHome = process.env.XDG_DATA_HOME;
@@ -142,6 +167,7 @@ function isRateLimitText(message: string) {
   const haystack = message.toLowerCase();
   return (
     haystack.includes("429") ||
+    haystack.includes("usage limit") ||
     haystack.includes("rate limit") ||
     haystack.includes("rate_limit") ||
     haystack.includes("usage_limit_reached") ||
@@ -152,11 +178,14 @@ function isRateLimitText(message: string) {
 async function setOpenAIAuth(auth: OAuthAuth, client: any) {
   const file = authFilePath();
   const data = await readJson<Record<string, unknown>>(file, {});
-  data.openai = auth;
+  data.openai = {
+    ...auth,
+    email: auth.email ?? emailFromAccessToken(auth.access),
+  };
   await writeJson(file, data);
   await client.auth.set({
     path: { id: "openai" },
-    body: auth,
+    body: data.openai,
   });
 }
 
@@ -169,69 +198,209 @@ function extractSessionModelID(info: any): string | undefined {
   return undefined;
 }
 
+function extractModelFromMessageInfo(info: any): string | undefined {
+  if (!info || typeof info !== "object") return undefined;
+  if (typeof info.providerID === "string" && typeof info.modelID === "string") {
+    return `${info.providerID}/${info.modelID}`;
+  }
+  if (info.model && typeof info.model.providerID === "string" && typeof info.model.modelID === "string") {
+    return `${info.model.providerID}/${info.model.modelID}`;
+  }
+  return undefined;
+}
+
+async function resolveModelID(sessionID: string, client: any) {
+  const fromSession = await client.session
+    .get({ path: { id: sessionID } })
+    .then((session: any) => extractSessionModelID(session?.data))
+    .catch(() => undefined);
+  if (fromSession) return fromSession;
+
+  const fromMessages = await client.session
+    .messages({ path: { id: sessionID } })
+    .then((result: any) => {
+      const messages = Array.isArray(result?.data) ? result.data : [];
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const info = messages[i]?.info;
+        const model = extractModelFromMessageInfo(info);
+        if (model) return model;
+      }
+      return undefined;
+    })
+    .catch(() => undefined);
+
+  return fromMessages;
+}
+
 const MultiCodexPlugin: Plugin = async ({ client }) => {
+  await logger.info("multicodex plugin initialized", {
+    accountsPath: MULTICODEX_ACCOUNTS_PATH,
+    authPath: authFilePath(),
+    logPath: logger.logPath,
+  });
+
   return {
     async event({ event }) {
-      if (event.type !== "session.error") return;
-      const sessionID = event.properties.sessionID;
-      if (!sessionID) return;
+      const evt: any = event;
+      await logger.debug("plugin event received", {
+        type: evt.type,
+      });
 
-      const err = event.properties.error as any;
-      const message =
-        (typeof err?.message === "string" ? err.message : "") ||
-        (typeof err?.data?.message === "string" ? err.data.message : "");
-      if (!message || !isRateLimitText(message)) return;
+      try {
+        if (evt.type === "session.status") {
+          await logger.info("session.status received", {
+            sessionID: evt.properties?.sessionID,
+            status: evt.properties?.status,
+          });
+        }
 
-      const session = await client.session
-        .get({ path: { id: sessionID } })
-        .catch(() => ({ data: null }));
-      const modelID = extractSessionModelID((session as any)?.data);
-      if (!modelID || !modelID.startsWith("openai/")) return;
+        const isRetryStatus =
+          evt.type === "session.status" &&
+          evt.properties?.status?.type === "retry" &&
+          typeof evt.properties?.status?.message === "string";
+        if (!isRetryStatus) return;
 
-      const authPath = authFilePath();
-      const authData = await readJson<Record<string, unknown>>(authPath, {});
-      const current = authData.openai;
-      if (!current || typeof current !== "object") return;
-      if ((current as any).type !== "oauth") return;
+        const sessionID = evt.properties?.sessionID;
+        if (!sessionID) {
+          await logger.warn("retry status without sessionID", {
+            eventType: evt.type,
+          });
+          return;
+        }
 
-      const currentAuth: OAuthAuth = {
-        type: "oauth",
-        refresh: String((current as any).refresh ?? ""),
-        access: String((current as any).access ?? ""),
-        expires: Number((current as any).expires ?? 0),
-        accountId:
-          typeof (current as any).accountId === "string"
-            ? (current as any).accountId
-            : undefined,
-        email:
-          typeof (current as any).email === "string"
-            ? (current as any).email
-            : undefined,
-      };
+        const message = evt.properties.status.message as string;
+        const attempt = Number(evt.properties.status.attempt ?? 0);
+        const nextRetryAt = Number(evt.properties.status.next ?? 0);
 
-      const store = await loadStore();
-      if (store.accounts.length < 2) return;
+        await logger.info("retry status captured", {
+          sessionID,
+          attempt,
+          nextRetryAt,
+          message,
+          isRateLimit: isRateLimitText(message),
+        });
 
-      const currentIndex = findCurrentIndex(store, currentAuth);
-      const nextIndex = (currentIndex + 1) % store.accounts.length;
-      const next = store.accounts[nextIndex];
-      if (!next) return;
+        if (!message || !isRateLimitText(message)) {
+          await logger.debug("skipping retry status without rate-limit markers", {
+            sessionID,
+            message,
+          });
+          return;
+        }
 
-      next.lastUsed = Date.now();
-      store.activeIndex = nextIndex;
-      await saveStore(store);
+        const resolvedModelID = await resolveModelID(sessionID, client);
 
-      await setOpenAIAuth(
-        {
+        await logger.info("session model resolved", {
+          sessionID,
+          modelID: resolvedModelID,
+        });
+
+        if (!resolvedModelID || !resolvedModelID.startsWith("openai/")) {
+          await logger.debug("skipping non-openai model", {
+            sessionID,
+            modelID: resolvedModelID,
+          });
+          return;
+        }
+
+        const authPath = authFilePath();
+        const authData = await readJson<Record<string, unknown>>(authPath, {});
+        const current = authData.openai;
+        if (!current || typeof current !== "object") {
+          await logger.warn("openai auth missing in auth.json", {
+            sessionID,
+            authPath,
+          });
+          return;
+        }
+        if ((current as any).type !== "oauth") {
+          await logger.warn("openai auth is not oauth", {
+            sessionID,
+            authType: (current as any).type,
+          });
+          return;
+        }
+
+        const currentAuth: OAuthAuth = {
           type: "oauth",
-          refresh: next.refresh,
-          access: next.access,
-          expires: next.expires,
-          accountId: next.accountId,
-          email: next.email,
-        },
-        client,
-      );
+          refresh: String((current as any).refresh ?? ""),
+          access: String((current as any).access ?? ""),
+          expires: Number((current as any).expires ?? 0),
+          accountId:
+            typeof (current as any).accountId === "string"
+              ? (current as any).accountId
+              : undefined,
+          email:
+            typeof (current as any).email === "string"
+              ? (current as any).email
+              : undefined,
+        };
+
+        const store = await loadStore();
+        await logger.info("account store loaded", {
+          sessionID,
+          accountCount: store.accounts.length,
+          activeIndex: store.activeIndex,
+        });
+
+        if (store.accounts.length < 2) {
+          await logger.debug("rotation skipped: insufficient accounts", {
+            sessionID,
+            accountCount: store.accounts.length,
+          });
+          return;
+        }
+
+        const currentIndex = findCurrentIndex(store, currentAuth);
+        const nextIndex = (currentIndex + 1) % store.accounts.length;
+        const nextAccount = store.accounts[nextIndex];
+        if (!nextAccount) {
+          await logger.warn("rotation skipped: next account missing", {
+            sessionID,
+            currentIndex,
+            nextIndex,
+            accountCount: store.accounts.length,
+          });
+          return;
+        }
+
+        await logger.info("rotating account", {
+          sessionID,
+          currentIndex,
+          nextIndex,
+          currentEmail: currentAuth.email,
+          nextEmail: nextAccount.email,
+          currentAccountId: currentAuth.accountId,
+          nextAccountId: nextAccount.accountId,
+        });
+
+        nextAccount.lastUsed = Date.now();
+        store.activeIndex = nextIndex;
+        await saveStore(store);
+
+        await setOpenAIAuth(
+          {
+            type: "oauth",
+            refresh: nextAccount.refresh,
+            access: nextAccount.access,
+            expires: nextAccount.expires,
+            accountId: nextAccount.accountId,
+            email: nextAccount.email,
+          },
+          client,
+        );
+
+        await logger.info("rotation complete", {
+          sessionID,
+          newActiveIndex: nextIndex,
+          newEmail: nextAccount.email,
+          newAccountId: nextAccount.accountId,
+        });
+      } catch (error) {
+        await logger.error("rotation failed", error, {
+          eventType: evt.type,
+        });
+      }
     },
   };
 };
