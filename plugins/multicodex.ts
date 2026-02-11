@@ -79,7 +79,9 @@ async function writeJson(filePath: string, value: unknown) {
   await fs.chmod(filePath, 0o600);
 }
 
-function normalizeStore(input: Partial<AccountStore> | null | undefined): AccountStore {
+function normalizeStore(
+  input: Partial<AccountStore> | null | undefined,
+): AccountStore {
   const accounts = Array.isArray(input?.accounts)
     ? input.accounts.filter(
         (a): a is AccountRecord =>
@@ -89,8 +91,12 @@ function normalizeStore(input: Partial<AccountStore> | null | undefined): Accoun
           typeof a.expires === "number",
       )
     : [];
-  const rawIndex = typeof input?.activeIndex === "number" ? Math.floor(input.activeIndex) : 0;
-  const activeIndex = accounts.length === 0 ? 0 : ((rawIndex % accounts.length) + accounts.length) % accounts.length;
+  const rawIndex =
+    typeof input?.activeIndex === "number" ? Math.floor(input.activeIndex) : 0;
+  const activeIndex =
+    accounts.length === 0
+      ? 0
+      : ((rawIndex % accounts.length) + accounts.length) % accounts.length;
   return {
     version: 1,
     activeIndex,
@@ -99,7 +105,10 @@ function normalizeStore(input: Partial<AccountStore> | null | undefined): Accoun
 }
 
 async function loadStore() {
-  const raw = await readJson<Partial<AccountStore> | null>(MULTICODEX_ACCOUNTS_PATH, null);
+  const raw = await readJson<Partial<AccountStore> | null>(
+    MULTICODEX_ACCOUNTS_PATH,
+    null,
+  );
   return normalizeStore(raw);
 }
 
@@ -135,7 +144,9 @@ function getAccountIdFromJwt(token: string) {
   );
 }
 
-async function refreshAccess(refreshToken: string): Promise<{ refresh: string; access: string; expires: number } | null> {
+async function refreshAccess(
+  refreshToken: string,
+): Promise<{ refresh: string; access: string; expires: number } | null> {
   const response = await fetch(`${OAUTH_ISSUER}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -167,13 +178,17 @@ function findCurrentIndex(store: AccountStore, auth: OAuthAuth): number {
   if (byRefresh >= 0) return byRefresh;
 
   const byAccountId = auth.accountId
-    ? store.accounts.findIndex((a) => a.accountId && a.accountId === auth.accountId)
+    ? store.accounts.findIndex(
+        (a) => a.accountId && a.accountId === auth.accountId,
+      )
     : -1;
   if (byAccountId >= 0) return byAccountId;
 
   const authEmail = getEmailFromJwt(auth.access);
   const byEmail = authEmail
-    ? store.accounts.findIndex((a) => a.email && a.email.toLowerCase() === authEmail.toLowerCase())
+    ? store.accounts.findIndex(
+        (a) => a.email && a.email.toLowerCase() === authEmail.toLowerCase(),
+      )
     : -1;
   if (byEmail >= 0) return byEmail;
 
@@ -188,7 +203,10 @@ async function isRateLimitedResponse(response: Response): Promise<boolean> {
   if (response.status === 429) return true;
   if (!isRateLimitedStatus(response.status)) return false;
 
-  const text = await response.clone().text().catch(() => "");
+  const text = await response
+    .clone()
+    .text()
+    .catch(() => "");
   const haystack = text.toLowerCase();
   return (
     haystack.includes("rate_limit") ||
@@ -210,7 +228,10 @@ async function setOpenAIAuth(auth: OAuthAuth, client: any) {
   });
 }
 
-function cloneBodyInit(input: string | URL | Request, init?: RequestInit): RequestInit | undefined {
+function cloneBodyInit(
+  input: string | URL | Request,
+  init?: RequestInit,
+): RequestInit | undefined {
   if (!init) return init;
   if (init.body == null) return init;
   if (typeof init.body === "string") return init;
@@ -218,7 +239,7 @@ function cloneBodyInit(input: string | URL | Request, init?: RequestInit): Reque
   return init;
 }
 
-export const MultiCodexPlugin: Plugin = async ({ client }) => {
+const MultiCodexPlugin: Plugin = async ({ client }) => {
   return {
     auth: {
       provider: "openai",
@@ -259,7 +280,8 @@ export const MultiCodexPlugin: Plugin = async ({ client }) => {
                 next.access = refreshed.access;
                 next.expires = refreshed.expires;
                 next.email = next.email ?? getEmailFromJwt(refreshed.access);
-                next.accountId = next.accountId ?? getAccountIdFromJwt(refreshed.access);
+                next.accountId =
+                  next.accountId ?? getAccountIdFromJwt(refreshed.access);
               }
 
               next.lastUsed = Date.now();
@@ -292,3 +314,5 @@ export const MultiCodexPlugin: Plugin = async ({ client }) => {
     },
   };
 };
+
+export { MultiCodexPlugin };
