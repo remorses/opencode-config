@@ -1,6 +1,6 @@
 ---
 description: get branch diff.
-model: anthropic/claude-opus-4-5
+model: anthropic/claude-sonnet-4-5
 ---
 
 # Compare Current Branch Against Upstream Default
