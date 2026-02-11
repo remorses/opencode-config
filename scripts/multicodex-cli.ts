@@ -1,7 +1,11 @@
 // CLI for multicodex account management using the same OAuth browser flow as OpenCode Codex plugin.
 
 import fs from "node:fs/promises";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -10,7 +14,10 @@ const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const ISSUER = "https://auth.openai.com";
 const OAUTH_PORT = 1455;
 const REDIRECT_URI = `http://localhost:${OAUTH_PORT}/auth/callback`;
-const STORE_PATH = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../multicodex-accounts.json");
+const STORE_PATH = path.resolve(
+  path.dirname(new URL(import.meta.url).pathname),
+  "../multicodex-accounts.json",
+);
 
 type Tokens = {
   id_token?: string;
@@ -26,6 +33,7 @@ type Account = {
   access: string;
   expires: number;
   addedAt: number;
+  type: "oauth";
   lastUsed: number;
 };
 
@@ -51,7 +59,8 @@ let oauthServer: ReturnType<typeof createServer> | undefined;
 let pendingOAuth: PendingOAuth | undefined;
 
 function authFilePath() {
-  if (process.env.XDG_DATA_HOME) return path.join(process.env.XDG_DATA_HOME, "opencode", "auth.json");
+  if (process.env.XDG_DATA_HOME)
+    return path.join(process.env.XDG_DATA_HOME, "opencode", "auth.json");
   return path.join(homedir(), ".local", "share", "opencode", "auth.json");
 }
 
@@ -79,8 +88,12 @@ function normalizeStore(input: Partial<Store> | null | undefined): Store {
           typeof x.expires === "number",
       )
     : [];
-  const raw = typeof input?.activeIndex === "number" ? Math.floor(input.activeIndex) : 0;
-  const activeIndex = accounts.length === 0 ? 0 : ((raw % accounts.length) + accounts.length) % accounts.length;
+  const raw =
+    typeof input?.activeIndex === "number" ? Math.floor(input.activeIndex) : 0;
+  const activeIndex =
+    accounts.length === 0
+      ? 0
+      : ((raw % accounts.length) + accounts.length) % accounts.length;
   return { version: 1, activeIndex, accounts };
 }
 
@@ -94,7 +107,8 @@ async function saveStore(store: Store) {
 }
 
 function randomString(length: number) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return Array.from(bytes)
     .map((b) => chars[b % chars.length])
@@ -104,12 +118,18 @@ function randomString(length: number) {
 function base64UrlEncode(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
   const binary = String.fromCharCode(...bytes);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 async function generatePKCE() {
   const verifier = randomString(43);
-  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(verifier),
+  );
   return { verifier, challenge: base64UrlEncode(hash) };
 }
 
@@ -123,32 +143,54 @@ function parseJwtClaims(token: string): Record<string, unknown> | undefined {
   const payload = parts[1];
   if (!payload) return undefined;
   try {
-    return JSON.parse(Buffer.from(payload, "base64url").toString()) as Record<string, unknown>;
+    return JSON.parse(Buffer.from(payload, "base64url").toString()) as Record<
+      string,
+      unknown
+    >;
   } catch {
     return undefined;
   }
 }
 
 function extractAccountId(tokens: Tokens) {
-  const idClaims = tokens.id_token ? parseJwtClaims(tokens.id_token) : undefined;
+  const idClaims = tokens.id_token
+    ? parseJwtClaims(tokens.id_token)
+    : undefined;
   const accessClaims = parseJwtClaims(tokens.access_token);
-  const idAuth = (idClaims?.["https://api.openai.com/auth"] as Record<string, unknown> | undefined) ?? undefined;
-  const accessAuth = (accessClaims?.["https://api.openai.com/auth"] as Record<string, unknown> | undefined) ?? undefined;
+  const idAuth =
+    (idClaims?.["https://api.openai.com/auth"] as
+      | Record<string, unknown>
+      | undefined) ?? undefined;
+  const accessAuth =
+    (accessClaims?.["https://api.openai.com/auth"] as
+      | Record<string, unknown>
+      | undefined) ?? undefined;
 
   return (
-    (typeof idClaims?.chatgpt_account_id === "string" ? idClaims.chatgpt_account_id : undefined) ??
-    (typeof idAuth?.chatgpt_account_id === "string" ? idAuth.chatgpt_account_id : undefined) ??
+    (typeof idClaims?.chatgpt_account_id === "string"
+      ? idClaims.chatgpt_account_id
+      : undefined) ??
+    (typeof idAuth?.chatgpt_account_id === "string"
+      ? idAuth.chatgpt_account_id
+      : undefined) ??
     (Array.isArray(idClaims?.organizations) &&
-    typeof (idClaims.organizations[0] as Record<string, unknown> | undefined)?.id === "string"
+    typeof (idClaims.organizations[0] as Record<string, unknown> | undefined)
+      ?.id === "string"
       ? ((idClaims.organizations[0] as Record<string, unknown>).id as string)
       : undefined) ??
-    (typeof accessClaims?.chatgpt_account_id === "string" ? accessClaims.chatgpt_account_id : undefined) ??
-    (typeof accessAuth?.chatgpt_account_id === "string" ? accessAuth.chatgpt_account_id : undefined)
+    (typeof accessClaims?.chatgpt_account_id === "string"
+      ? accessClaims.chatgpt_account_id
+      : undefined) ??
+    (typeof accessAuth?.chatgpt_account_id === "string"
+      ? accessAuth.chatgpt_account_id
+      : undefined)
   );
 }
 
 function extractEmail(tokens: Tokens) {
-  const idClaims = tokens.id_token ? parseJwtClaims(tokens.id_token) : undefined;
+  const idClaims = tokens.id_token
+    ? parseJwtClaims(tokens.id_token)
+    : undefined;
   const accessClaims = parseJwtClaims(tokens.access_token);
   return (
     (typeof idClaims?.email === "string" ? idClaims.email : undefined) ??
@@ -184,7 +226,8 @@ async function exchangeCodeForTokens(code: string, verifier: string) {
       code_verifier: verifier,
     }).toString(),
   });
-  if (!response.ok) throw new Error(`Token exchange failed: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Token exchange failed: ${response.status}`);
   return (await response.json()) as Tokens;
 }
 
@@ -242,7 +285,9 @@ function handleOAuthRequest(req: IncomingMessage, res: ServerResponse) {
   pendingOAuth = undefined;
   exchangeCodeForTokens(code, current.verifier)
     .then((tokens) => current.resolve(tokens))
-    .catch((err) => current.reject(err instanceof Error ? err : new Error(String(err))));
+    .catch((err) =>
+      current.reject(err instanceof Error ? err : new Error(String(err))),
+    );
 
   res.statusCode = 200;
   res.setHeader("Content-Type", "text/html");
@@ -264,14 +309,22 @@ async function stopOAuthServer() {
   oauthServer = undefined;
 }
 
-function waitForOAuthCallback(verifier: string, state: string): Promise<Tokens> {
+function waitForOAuthCallback(
+  verifier: string,
+  state: string,
+): Promise<Tokens> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      if (pendingOAuth) {
-        pendingOAuth = undefined;
-        reject(new Error("OAuth callback timeout - authorization took too long"));
-      }
-    }, 5 * 60 * 1000);
+    const timeout = setTimeout(
+      () => {
+        if (pendingOAuth) {
+          pendingOAuth = undefined;
+          reject(
+            new Error("OAuth callback timeout - authorization took too long"),
+          );
+        }
+      },
+      5 * 60 * 1000,
+    );
 
     pendingOAuth = {
       verifier,
@@ -297,7 +350,9 @@ function upsert(store: Store, account: Account) {
   const idx = store.accounts.findIndex(
     (x) =>
       (account.accountId && x.accountId && account.accountId === x.accountId) ||
-      (account.email && x.email && account.email.toLowerCase() === x.email.toLowerCase()) ||
+      (account.email &&
+        x.email &&
+        account.email.toLowerCase() === x.email.toLowerCase()) ||
       account.refresh === x.refresh,
   );
   if (idx < 0) {
@@ -307,7 +362,11 @@ function upsert(store: Store, account: Account) {
   }
   const existing = store.accounts[idx];
   if (!existing) return idx;
-  store.accounts[idx] = { ...existing, ...account, addedAt: existing.addedAt ?? account.addedAt };
+  store.accounts[idx] = {
+    ...existing,
+    ...account,
+    addedAt: existing.addedAt ?? account.addedAt,
+  };
   store.activeIndex = idx;
   return idx;
 }
@@ -349,6 +408,7 @@ async function cmdAdd() {
     access: tokens.access_token,
     expires: now + (tokens.expires_in ?? 3600) * 1000,
     addedAt: now,
+    type: "oauth",
     lastUsed: now,
   };
 
@@ -356,7 +416,9 @@ async function cmdAdd() {
   const idx = upsert(store, account);
   await saveStore(store);
   await syncAuthFile(account);
-  console.log(`Added account #${idx + 1}${account.email ? ` (${account.email})` : ""}`);
+  console.log(
+    `Added account #${idx + 1}${account.email ? ` (${account.email})` : ""}`,
+  );
   console.log(`Store: ${STORE_PATH}`);
 }
 
@@ -376,7 +438,8 @@ async function cmdList() {
 
 async function cmdUse(arg?: string) {
   const n = Number(arg);
-  if (!Number.isFinite(n) || n < 1) throw new Error("Usage: bun scripts/multicodex-cli.ts use <index>");
+  if (!Number.isFinite(n) || n < 1)
+    throw new Error("Usage: bun scripts/multicodex-cli.ts use <index>");
   const store = await loadStore();
   const idx = Math.floor(n - 1);
   const account = store.accounts[idx];
@@ -385,7 +448,9 @@ async function cmdUse(arg?: string) {
   store.activeIndex = idx;
   await saveStore(store);
   await syncAuthFile(account);
-  console.log(`Switched to account ${n}${account.email ? ` (${account.email})` : ""}`);
+  console.log(
+    `Switched to account ${n}${account.email ? ` (${account.email})` : ""}`,
+  );
 }
 
 async function main() {
