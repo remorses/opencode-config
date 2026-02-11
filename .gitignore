@@ -4,7 +4,6 @@ bun.lock
 *.log
 antigravity-accounts.json
 multicodex-accounts.json
-multicodex-debug.log
 tmp
 
 # opensrc - source code for packages

@@ -1,22 +1,21 @@
 /**
  * # multicodex plugin
  *
- * This plugin rotates OpenAI Codex OAuth accounts after rate-limit session errors.
+ * This plugin rotates OpenAI Codex OAuth accounts after rate-limit retry events.
  *
  * ## Why this shape
  *
- * - It does not override provider fetch.
- * - It avoids interfering with OpenCode's built-in Codex auth transport.
- * - It only prepares the next account for subsequent requests.
+ * - No fetch override: avoids conflicts with built-in Codex auth transport.
+ * - Triggered by `session.status` retry events.
+ * - Prepares the next account for subsequent requests.
  *
  * ## How it works
  *
- * 1. Listen for `session.status` retry events.
- * 2. Detect rate-limit style retry messages (`429`, `rate limit`, usage limit markers).
- * 3. Resolve current session model and continue only when it starts with `openai/`.
- * 4. Load `multicodex-accounts.json` account pool and current OpenAI auth.
- * 5. Resolve current account index by matching refresh token, accountId, email, then `activeIndex`.
- * 6. Switch to next account with modulo, then persist:
+ * 1. Listen for `session.status` with `status.type === "retry"`.
+ * 2. Detect rate-limit retry message (`429`, `rate limit`, usage limit markers).
+ * 3. Continue only for models that start with `openai/`.
+ * 4. Resolve current account index by matching refresh/accountId/email then `activeIndex`.
+ * 5. Switch to next account with modulo and persist:
  *    - `multicodex-accounts.json`
  *    - OpenCode auth file (`~/.local/share/opencode/auth.json` or XDG path)
  *    - in-memory auth via `client.auth.set(...)`
@@ -30,13 +29,11 @@ import type { Plugin } from "@opencode-ai/plugin";
 import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { MulticodexLogger } from "./utils/multicodex-logger";
 
 const MULTICODEX_ACCOUNTS_PATH = path.resolve(
   path.dirname(new URL(import.meta.url).pathname),
   "../multicodex-accounts.json",
 );
-const logger = new MulticodexLogger();
 
 type OAuthAuth = {
   type: "oauth";
@@ -198,209 +195,73 @@ function extractSessionModelID(info: any): string | undefined {
   return undefined;
 }
 
-function extractModelFromMessageInfo(info: any): string | undefined {
-  if (!info || typeof info !== "object") return undefined;
-  if (typeof info.providerID === "string" && typeof info.modelID === "string") {
-    return `${info.providerID}/${info.modelID}`;
-  }
-  if (info.model && typeof info.model.providerID === "string" && typeof info.model.modelID === "string") {
-    return `${info.model.providerID}/${info.model.modelID}`;
-  }
-  return undefined;
-}
-
-async function resolveModelID(sessionID: string, client: any) {
-  const fromSession = await client.session
-    .get({ path: { id: sessionID } })
-    .then((session: any) => extractSessionModelID(session?.data))
-    .catch(() => undefined);
-  if (fromSession) return fromSession;
-
-  const fromMessages = await client.session
-    .messages({ path: { id: sessionID } })
-    .then((result: any) => {
-      const messages = Array.isArray(result?.data) ? result.data : [];
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const info = messages[i]?.info;
-        const model = extractModelFromMessageInfo(info);
-        if (model) return model;
-      }
-      return undefined;
-    })
-    .catch(() => undefined);
-
-  return fromMessages;
-}
-
 const MultiCodexPlugin: Plugin = async ({ client }) => {
-  await logger.info("multicodex plugin initialized", {
-    accountsPath: MULTICODEX_ACCOUNTS_PATH,
-    authPath: authFilePath(),
-    logPath: logger.logPath,
-  });
-
   return {
     async event({ event }) {
       const evt: any = event;
-      await logger.debug("plugin event received", {
-        type: evt.type,
-      });
 
-      try {
-        if (evt.type === "session.status") {
-          await logger.info("session.status received", {
-            sessionID: evt.properties?.sessionID,
-            status: evt.properties?.status,
-          });
-        }
+      const isRetryStatus =
+        evt.type === "session.status" &&
+        evt.properties?.status?.type === "retry" &&
+        typeof evt.properties?.status?.message === "string";
+      if (!isRetryStatus) return;
 
-        const isRetryStatus =
-          evt.type === "session.status" &&
-          evt.properties?.status?.type === "retry" &&
-          typeof evt.properties?.status?.message === "string";
-        if (!isRetryStatus) return;
+      const sessionID = evt.properties?.sessionID;
+      if (!sessionID) return;
 
-        const sessionID = evt.properties?.sessionID;
-        if (!sessionID) {
-          await logger.warn("retry status without sessionID", {
-            eventType: evt.type,
-          });
-          return;
-        }
+      const message = evt.properties.status.message as string;
+      if (!message || !isRateLimitText(message)) return;
 
-        const message = evt.properties.status.message as string;
-        const attempt = Number(evt.properties.status.attempt ?? 0);
-        const nextRetryAt = Number(evt.properties.status.next ?? 0);
+      const resolvedModelID = await client.session
+        .get({ path: { id: sessionID } })
+        .then((session: any) => extractSessionModelID(session?.data))
+        .catch(() => undefined);
+      if (!resolvedModelID || !resolvedModelID.startsWith("openai/")) return;
 
-        await logger.info("retry status captured", {
-          sessionID,
-          attempt,
-          nextRetryAt,
-          message,
-          isRateLimit: isRateLimitText(message),
-        });
+      const authPath = authFilePath();
+      const authData = await readJson<Record<string, unknown>>(authPath, {});
+      const current = authData.openai;
+      if (!current || typeof current !== "object") return;
+      if ((current as any).type !== "oauth") return;
 
-        if (!message || !isRateLimitText(message)) {
-          await logger.debug("skipping retry status without rate-limit markers", {
-            sessionID,
-            message,
-          });
-          return;
-        }
+      const currentAuth: OAuthAuth = {
+        type: "oauth",
+        refresh: String((current as any).refresh ?? ""),
+        access: String((current as any).access ?? ""),
+        expires: Number((current as any).expires ?? 0),
+        accountId:
+          typeof (current as any).accountId === "string"
+            ? (current as any).accountId
+            : undefined,
+        email:
+          typeof (current as any).email === "string"
+            ? (current as any).email
+            : undefined,
+      };
 
-        const resolvedModelID = await resolveModelID(sessionID, client);
+      const store = await loadStore();
+      if (store.accounts.length < 2) return;
 
-        await logger.info("session model resolved", {
-          sessionID,
-          modelID: resolvedModelID,
-        });
+      const currentIndex = findCurrentIndex(store, currentAuth);
+      const nextIndex = (currentIndex + 1) % store.accounts.length;
+      const nextAccount = store.accounts[nextIndex];
+      if (!nextAccount) return;
 
-        if (!resolvedModelID || !resolvedModelID.startsWith("openai/")) {
-          await logger.debug("skipping non-openai model", {
-            sessionID,
-            modelID: resolvedModelID,
-          });
-          return;
-        }
+      nextAccount.lastUsed = Date.now();
+      store.activeIndex = nextIndex;
+      await saveStore(store);
 
-        const authPath = authFilePath();
-        const authData = await readJson<Record<string, unknown>>(authPath, {});
-        const current = authData.openai;
-        if (!current || typeof current !== "object") {
-          await logger.warn("openai auth missing in auth.json", {
-            sessionID,
-            authPath,
-          });
-          return;
-        }
-        if ((current as any).type !== "oauth") {
-          await logger.warn("openai auth is not oauth", {
-            sessionID,
-            authType: (current as any).type,
-          });
-          return;
-        }
-
-        const currentAuth: OAuthAuth = {
+      await setOpenAIAuth(
+        {
           type: "oauth",
-          refresh: String((current as any).refresh ?? ""),
-          access: String((current as any).access ?? ""),
-          expires: Number((current as any).expires ?? 0),
-          accountId:
-            typeof (current as any).accountId === "string"
-              ? (current as any).accountId
-              : undefined,
-          email:
-            typeof (current as any).email === "string"
-              ? (current as any).email
-              : undefined,
-        };
-
-        const store = await loadStore();
-        await logger.info("account store loaded", {
-          sessionID,
-          accountCount: store.accounts.length,
-          activeIndex: store.activeIndex,
-        });
-
-        if (store.accounts.length < 2) {
-          await logger.debug("rotation skipped: insufficient accounts", {
-            sessionID,
-            accountCount: store.accounts.length,
-          });
-          return;
-        }
-
-        const currentIndex = findCurrentIndex(store, currentAuth);
-        const nextIndex = (currentIndex + 1) % store.accounts.length;
-        const nextAccount = store.accounts[nextIndex];
-        if (!nextAccount) {
-          await logger.warn("rotation skipped: next account missing", {
-            sessionID,
-            currentIndex,
-            nextIndex,
-            accountCount: store.accounts.length,
-          });
-          return;
-        }
-
-        await logger.info("rotating account", {
-          sessionID,
-          currentIndex,
-          nextIndex,
-          currentEmail: currentAuth.email,
-          nextEmail: nextAccount.email,
-          currentAccountId: currentAuth.accountId,
-          nextAccountId: nextAccount.accountId,
-        });
-
-        nextAccount.lastUsed = Date.now();
-        store.activeIndex = nextIndex;
-        await saveStore(store);
-
-        await setOpenAIAuth(
-          {
-            type: "oauth",
-            refresh: nextAccount.refresh,
-            access: nextAccount.access,
-            expires: nextAccount.expires,
-            accountId: nextAccount.accountId,
-            email: nextAccount.email,
-          },
-          client,
-        );
-
-        await logger.info("rotation complete", {
-          sessionID,
-          newActiveIndex: nextIndex,
-          newEmail: nextAccount.email,
-          newAccountId: nextAccount.accountId,
-        });
-      } catch (error) {
-        await logger.error("rotation failed", error, {
-          eventType: evt.type,
-        });
-      }
+          refresh: nextAccount.refresh,
+          access: nextAccount.access,
+          expires: nextAccount.expires,
+          accountId: nextAccount.accountId,
+          email: nextAccount.email,
+        },
+        client,
+      );
     },
   };
 };
