@@ -1,6 +1,8 @@
 ---
 description: Commit, update changelog, npm publish
 agent: build
+model: anthropic/claude-opus-4-5
+subtask: true
 ---
 
 - run git diff to read current changes. including new files. run command like `git log packagename@0.4.55..HEAD` to read diff of commits since last release. you must first understand what was done in the repo
