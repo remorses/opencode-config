@@ -1,25 +1,29 @@
 /**
  * # multicodex plugin
  *
- * This plugin wraps the `openai` provider fetch used by OpenCode and rotates OAuth accounts
- * when a request is rate-limited.
+ * This plugin rotates OpenAI Codex OAuth accounts after rate-limit session errors.
+ *
+ * ## Why this shape
+ *
+ * - It does not override provider fetch.
+ * - It avoids interfering with OpenCode's built-in Codex auth transport.
+ * - It only prepares the next account for subsequent requests.
  *
  * ## How it works
  *
- * 1. Send request with current OpenAI OAuth auth.
- * 2. Detect rate-limit style failures (`429`, plus some `403/404` payload markers).
- * 3. Load `multicodex-accounts.json` account pool.
- * 4. Resolve current account index by matching refresh token, accountId, email, then `activeIndex`.
- * 5. Rotate to next account with modulo, refresh token if expired, then persist:
+ * 1. Listen for `session.error` events.
+ * 2. Detect rate-limit style errors from message text (`429`, `rate limit`, usage limit markers).
+ * 3. Resolve current session model and continue only when it starts with `openai/`.
+ * 4. Load `multicodex-accounts.json` account pool and current OpenAI auth.
+ * 5. Resolve current account index by matching refresh token, accountId, email, then `activeIndex`.
+ * 6. Switch to next account with modulo, then persist:
  *    - `multicodex-accounts.json`
  *    - OpenCode auth file (`~/.local/share/opencode/auth.json` or XDG path)
  *    - in-memory auth via `client.auth.set(...)`
- * 6. Retry request until one account succeeds or all accounts are exhausted once.
  *
  * ## Single-account behavior
  *
  * If there are fewer than 2 accounts in `multicodex-accounts.json`, no rotation is attempted.
- * The plugin returns the original response as-is (including rate-limit responses).
  */
 
 import type { Plugin } from "@opencode-ai/plugin";
@@ -27,8 +31,6 @@ import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
-const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-const OAUTH_ISSUER = "https://auth.openai.com";
 const MULTICODEX_ACCOUNTS_PATH = path.resolve(
   path.dirname(new URL(import.meta.url).pathname),
   "../multicodex-accounts.json",
@@ -97,11 +99,7 @@ function normalizeStore(
     accounts.length === 0
       ? 0
       : ((rawIndex % accounts.length) + accounts.length) % accounts.length;
-  return {
-    version: 1,
-    activeIndex,
-    accounts,
-  };
+  return { version: 1, activeIndex, accounts };
 }
 
 async function loadStore() {
@@ -114,61 +112,6 @@ async function loadStore() {
 
 async function saveStore(store: AccountStore) {
   await writeJson(MULTICODEX_ACCOUNTS_PATH, normalizeStore(store));
-}
-
-function parseJwtClaims(token: string): Record<string, any> | undefined {
-  const parts = token.split(".");
-  if (parts.length !== 3) return undefined;
-  const payload = parts[1];
-  if (!payload) return undefined;
-  try {
-    return JSON.parse(Buffer.from(payload, "base64url").toString());
-  } catch {
-    return undefined;
-  }
-}
-
-function getEmailFromJwt(token: string) {
-  const claims = parseJwtClaims(token);
-  return typeof claims?.email === "string" ? claims.email : undefined;
-}
-
-function getAccountIdFromJwt(token: string) {
-  const claims = parseJwtClaims(token);
-  const auth = claims?.["https://api.openai.com/auth"];
-  return (
-    claims?.chatgpt_account_id ??
-    auth?.chatgpt_account_id ??
-    claims?.organizations?.[0]?.id ??
-    undefined
-  );
-}
-
-async function refreshAccess(
-  refreshToken: string,
-): Promise<{ refresh: string; access: string; expires: number } | null> {
-  const response = await fetch(`${OAUTH_ISSUER}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: CLIENT_ID,
-    }).toString(),
-  });
-
-  if (!response.ok) return null;
-  const data = (await response.json()) as {
-    refresh_token: string;
-    access_token: string;
-    expires_in?: number;
-  };
-
-  return {
-    refresh: data.refresh_token,
-    access: data.access_token,
-    expires: Date.now() + (data.expires_in ?? 3600) * 1000,
-  };
 }
 
 function findCurrentIndex(store: AccountStore, auth: OAuthAuth): number {
@@ -184,7 +127,7 @@ function findCurrentIndex(store: AccountStore, auth: OAuthAuth): number {
     : -1;
   if (byAccountId >= 0) return byAccountId;
 
-  const authEmail = getEmailFromJwt(auth.access);
+  const authEmail = auth.email;
   const byEmail = authEmail
     ? store.accounts.findIndex(
         (a) => a.email && a.email.toLowerCase() === authEmail.toLowerCase(),
@@ -195,122 +138,100 @@ function findCurrentIndex(store: AccountStore, auth: OAuthAuth): number {
   return store.activeIndex;
 }
 
-function isRateLimitedStatus(status: number) {
-  return status === 429 || status === 403 || status === 404;
-}
-
-async function isRateLimitedResponse(response: Response): Promise<boolean> {
-  if (response.status === 429) return true;
-  if (!isRateLimitedStatus(response.status)) return false;
-
-  const text = await response
-    .clone()
-    .text()
-    .catch(() => "");
-  const haystack = text.toLowerCase();
+function isRateLimitText(message: string) {
+  const haystack = message.toLowerCase();
   return (
-    haystack.includes("rate_limit") ||
+    haystack.includes("429") ||
     haystack.includes("rate limit") ||
+    haystack.includes("rate_limit") ||
     haystack.includes("usage_limit_reached") ||
     haystack.includes("usage_not_included")
   );
 }
 
 async function setOpenAIAuth(auth: OAuthAuth, client: any) {
-  const authPath = authFilePath();
-  const data = await readJson<Record<string, any>>(authPath, {});
+  const file = authFilePath();
+  const data = await readJson<Record<string, unknown>>(file, {});
   data.openai = auth;
-  await writeJson(authPath, data);
-
+  await writeJson(file, data);
   await client.auth.set({
     path: { id: "openai" },
     body: auth,
   });
 }
 
-function cloneBodyInit(
-  input: string | URL | Request,
-  init?: RequestInit,
-): RequestInit | undefined {
-  if (!init) return init;
-  if (init.body == null) return init;
-  if (typeof init.body === "string") return init;
-  if (input instanceof Request && input.bodyUsed) return init;
-  return init;
+function extractSessionModelID(info: any): string | undefined {
+  if (!info || typeof info !== "object") return undefined;
+  if (typeof info.modelID === "string") return info.modelID;
+  if (typeof info.modelId === "string") return info.modelId;
+  if (typeof info.model === "string") return info.model;
+  if (info.model && typeof info.model.id === "string") return info.model.id;
+  return undefined;
 }
 
 const MultiCodexPlugin: Plugin = async ({ client }) => {
   return {
-    auth: {
-      provider: "openai",
-      methods: [],
-      async loader(getAuth) {
-        const initial = await getAuth();
-        if (initial.type !== "oauth") return {};
+    async event({ event }) {
+      if (event.type !== "session.error") return;
+      const sessionID = event.properties.sessionID;
+      if (!sessionID) return;
 
-        return {
-          async fetch(input: string | URL | Request, init?: RequestInit) {
-            const baseInit = cloneBodyInit(input, init);
-            let response = await fetch(input, baseInit);
-            if (!(await isRateLimitedResponse(response))) {
-              return response;
-            }
+      const err = event.properties.error as any;
+      const message =
+        (typeof err?.message === "string" ? err.message : "") ||
+        (typeof err?.data?.message === "string" ? err.data.message : "");
+      if (!message || !isRateLimitText(message)) return;
 
-            const currentAuth = await getAuth();
-            if (currentAuth.type !== "oauth") {
-              return response;
-            }
+      const session = await client.session
+        .get({ path: { id: sessionID } })
+        .catch(() => ({ data: null }));
+      const modelID = extractSessionModelID((session as any)?.data);
+      if (!modelID || !modelID.startsWith("openai/")) return;
 
-            const store = await loadStore();
-            if (store.accounts.length < 2) {
-              return response;
-            }
+      const authPath = authFilePath();
+      const authData = await readJson<Record<string, unknown>>(authPath, {});
+      const current = authData.openai;
+      if (!current || typeof current !== "object") return;
+      if ((current as any).type !== "oauth") return;
 
-            const currentIndex = findCurrentIndex(store, currentAuth);
+      const currentAuth: OAuthAuth = {
+        type: "oauth",
+        refresh: String((current as any).refresh ?? ""),
+        access: String((current as any).access ?? ""),
+        expires: Number((current as any).expires ?? 0),
+        accountId:
+          typeof (current as any).accountId === "string"
+            ? (current as any).accountId
+            : undefined,
+        email:
+          typeof (current as any).email === "string"
+            ? (current as any).email
+            : undefined,
+      };
 
-            for (let step = 1; step < store.accounts.length; step++) {
-              const nextIndex = (currentIndex + step) % store.accounts.length;
-              const next = store.accounts[nextIndex];
-              if (!next) continue;
+      const store = await loadStore();
+      if (store.accounts.length < 2) return;
 
-              if (next.expires <= Date.now()) {
-                const refreshed = await refreshAccess(next.refresh);
-                if (!refreshed) continue;
-                next.refresh = refreshed.refresh;
-                next.access = refreshed.access;
-                next.expires = refreshed.expires;
-                next.email = next.email ?? getEmailFromJwt(refreshed.access);
-                next.accountId =
-                  next.accountId ?? getAccountIdFromJwt(refreshed.access);
-              }
+      const currentIndex = findCurrentIndex(store, currentAuth);
+      const nextIndex = (currentIndex + 1) % store.accounts.length;
+      const next = store.accounts[nextIndex];
+      if (!next) return;
 
-              next.lastUsed = Date.now();
-              store.activeIndex = nextIndex;
+      next.lastUsed = Date.now();
+      store.activeIndex = nextIndex;
+      await saveStore(store);
 
-              await saveStore(store);
-
-              await setOpenAIAuth(
-                {
-                  type: "oauth",
-                  refresh: next.refresh,
-                  access: next.access,
-                  expires: next.expires,
-                  accountId: next.accountId,
-                  email: next.email,
-                },
-                client,
-              );
-
-              response = await fetch(input, baseInit);
-              if (!(await isRateLimitedResponse(response))) {
-                return response;
-              }
-            }
-
-            return response;
-          },
-        };
-      },
+      await setOpenAIAuth(
+        {
+          type: "oauth",
+          refresh: next.refresh,
+          access: next.access,
+          expires: next.expires,
+          accountId: next.accountId,
+          email: next.email,
+        },
+        client,
+      );
     },
   };
 };
