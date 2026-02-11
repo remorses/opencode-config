@@ -1,3 +1,8 @@
+---
+description: get branch diff.
+model: anthropic/claude-opus-4-5
+---
+
 # Compare Current Branch Against Upstream Default
 
 Compare the current branch against the upstream default branch and view the full diff.
