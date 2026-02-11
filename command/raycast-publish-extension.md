@@ -1,8 +1,9 @@
-
+---
+model: anthropic/claude-opus-4-5
+subtask: true
+---
 
 # publishing an extension update
-
-
 
 ## Validate Before Publishing
 
