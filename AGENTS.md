@@ -71,8 +71,7 @@ Use all three passing variable names and function names in search strings
 
 before creating any gh pr or issue output the title and body in chat and ask for confirmation first
 
-if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. dont use headings in the body (it looks like AI slop). never use markdown headings in PR unless that is the PR template and standard practice. only bold text as headings instead.
-
+if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. dont use headings in the body (it looks like AI slop), instead try to use bold text as headings which is more refined looking and less commonly done by AI.
 
 after creating a pr always print the pr url to the user, then watch for ci to complete successfully using command like
 
@@ -105,6 +104,8 @@ NEVER use we or our in messages. write as if you were me. making the body person
 ## updating PRs and issues
 
 always update existing PRs, issues, or comments instead of recreating them. use `gh pr edit` or `gh issue edit` to update title/body.
+
+nicely format them using markdown. do not write big blobs of text.
 
 when checking if there is already a pr for current branch always check upstream first
 
