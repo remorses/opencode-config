@@ -49,6 +49,31 @@ const MULTICODEX_ACCOUNTS_PATH = path.resolve(
   "../multicodex-accounts.json",
 );
 
+const LOG_PATH = path.resolve(
+  path.dirname(new URL(import.meta.url).pathname),
+  "../multicodex-plugin.log",
+);
+
+async function fileLog(...args: unknown[]) {
+  const logLine =
+    `[${new Date().toISOString()}] ` +
+    args
+      .map((a) =>
+        typeof a === "string"
+          ? a
+          : a instanceof Error
+            ? a.stack || a.message
+            : JSON.stringify(a, null, 2),
+      )
+      .join(" ") +
+    "\n";
+  try {
+    await fs.appendFile(LOG_PATH, logLine, "utf8");
+  } catch (err) {
+    // Silent fail: don't block plugin on logging error
+  }
+}
+
 type OAuthAuth = {
   type: "oauth";
   refresh: string;
@@ -91,7 +116,10 @@ type RetryStatusEvent = {
 
 type AuthClient = {
   auth: {
-    set: (input: { path: { id: "openai" }; body: OAuthAuth }) => Promise<unknown>;
+    set: (input: {
+      path: { id: "openai" };
+      body: OAuthAuth;
+    }) => Promise<unknown>;
   };
 };
 
@@ -110,7 +138,8 @@ function parseOAuthAuth(value: unknown): OAuthAuth | undefined {
     refresh: value.refresh,
     access: value.access,
     expires: value.expires,
-    accountId: typeof value.accountId === "string" ? value.accountId : undefined,
+    accountId:
+      typeof value.accountId === "string" ? value.accountId : undefined,
     email: typeof value.email === "string" ? value.email : undefined,
   };
 }
@@ -121,6 +150,7 @@ function isRetryStatusEvent(event: unknown): event is RetryStatusEvent {
   const sessionID = event.properties.sessionID;
   const status = event.properties.status;
   if (typeof sessionID !== "string") return false;
+  fileLog("status", status);
   if (!isRecord(status)) return false;
   return status.type === "retry" && typeof status.message === "string";
 }
@@ -225,15 +255,6 @@ async function setOpenAIAuth(auth: OAuthAuth, client: AuthClient) {
   });
 }
 
-function extractSessionModelID(info: unknown): string | undefined {
-  if (!isRecord(info)) return undefined;
-  if (typeof info.modelID === "string") return info.modelID;
-  if (typeof info.modelId === "string") return info.modelId;
-  if (typeof info.model === "string") return info.model;
-  if (isRecord(info.model) && typeof info.model.id === "string") return info.model.id;
-  return undefined;
-}
-
 const MultiCodexPlugin: Plugin = async ({ client }) => {
   return {
     async event({ event }) {
@@ -241,13 +262,29 @@ const MultiCodexPlugin: Plugin = async ({ client }) => {
 
       const sessionID = event.properties.sessionID;
       const message = event.properties.status.message;
-      if (!message || !isRateLimitText(message)) return;
+      if (!message || !isRateLimitText(message)) {
+        fileLog('not a rate limit message, skipping', message)
+        return;
+      }
 
       const resolvedModelID = await client.session
-        .get({ path: { id: sessionID } })
-        .then((session) => extractSessionModelID(session.data))
+        .messages({ path: { id: sessionID } })
+        .then((res) => {
+          const lastMessage = res.data
+            ?.filter((m) => m.info)
+            .at(-1)?.info;
+          if (!lastMessage) return undefined;
+          // AssistantMessage has modelID/providerID directly, UserMessage has model.modelID/model.providerID
+          if (lastMessage.role === "assistant") {
+            return `${lastMessage.providerID}/${lastMessage.modelID}`;
+          }
+          return `${lastMessage.model.providerID}/${lastMessage.model.modelID}`;
+        })
         .catch(() => undefined);
-      if (!resolvedModelID || !resolvedModelID.startsWith("openai/")) return;
+      if (!resolvedModelID || !resolvedModelID.startsWith("openai/")) {
+        fileLog("ignoring model", resolvedModelID);
+        return;
+      }
 
       const authPath = authFilePath();
       const authData = await readJson<AuthFile>(authPath, {});
@@ -260,11 +297,15 @@ const MultiCodexPlugin: Plugin = async ({ client }) => {
       const currentIndex = findCurrentIndex(store, currentAuth);
       const nextIndex = (currentIndex + 1) % store.accounts.length;
       const nextAccount = store.accounts[nextIndex];
-      if (!nextAccount) return;
+      if (!nextAccount) {
+        fileLog("no next account to use");
+        return;
+      }
 
       nextAccount.lastUsed = Date.now();
       store.activeIndex = nextIndex;
       await saveStore(store);
+      fileLog("using next account", currentIndex + 1, nextAccount.email);
 
       await setOpenAIAuth(
         {
