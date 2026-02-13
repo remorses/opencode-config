@@ -133,9 +133,7 @@ when using task tool always be as detailed as possible on what you want: list go
 
 ## web search
 
-for web searches use the built-in `google_search` tool.
-
-do not use the local legacy `googlesearch` custom tool in `tool/googlesearch.ts`.
+for web searches use `googlesearch` tool (which uses Gemini with Google Search grounding).
 
 when possible, ask the search to retrieve and include relevant GitHub project URLs in the results.
 
