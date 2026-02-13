@@ -169,6 +169,8 @@ if you want to add some knowledge about the overall codebase write it in a ./doc
 
 .toMatchInlineSnapshot is the preferred way to write tests, added before any expect call. leave them empty the first time, update them with -u. check git diff for the test file every time you update them with -u to make sure the snapshots are expected and correct.
 
+for multiline inline snapshots always prefix them with \n with `.toMatchInlineSnapshot('\n' + content)` so they look good.
+
 NEVER use mocks in tests. NEVER mock modules.
 
 # opensrc
