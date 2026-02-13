@@ -11,15 +11,15 @@ if you need to create scripts always prefer typescript over bash or js. never cr
 
 ## planning
 
-when user asks you to plan he wants you to read all relevant files and create a concrete plan with steps: sections where you describe what files you would update and what tests you would add to validate the new changes.
+when the user asks you to plan, they want you to read all relevant files and create a concrete plan with steps: sections where you describe what files you would update and what tests you would add to validate the new changes.
 
 NEVER output a plan where you "plan" to read files or plan to explore the codebase. the goal of a plan is to do these things before starting the implementation part. you have to explore the codebase, read files, validate assumptions BEFORE showing the user the plan in chat. 
 
-if there are multiple ways to implement the changes show an high level summary of each approach before showing the full plan.
+if there are multiple ways to implement the changes, show a high-level summary of each approach before showing the full plan.
 
 ## playwriter
 
-ALWAYS use locally installed playwriter without npx or bunx. this way we will use the locally running playwriter instead which can have required fixes and other improvements. 
+ALWAYS use locally installed playwriter without npx or bunx. This ensures you use the local version, which may have fixes and improvements not yet published. 
 
 ## git
 
@@ -41,13 +41,13 @@ git checkout upstream/$DEFAULT_BRANCH
 
 ONLY commit when user asks to do so.
 
-before committing always check what files were changed and what is git diff. only commit your changes. NEVER assume there are not other changes. other agents may have done other changes you do not know of. if there are unrelated changes use `critique hunks list` command to list hunks and stage only relevant ones with `critique hunks add id1 id2`. see `critique --help` for more info
+before committing, always check what files were changed and review the git diff. Only commit your changes. NEVER assume there are no other changes—other agents may have made changes you don't know of. If there are unrelated changes, use `critique hunks list` to list hunks and stage only the relevant ones with `critique hunks add id1 id2`. See `critique --help` for more info.
 
 if user says "commit all" then also commit other changes, grouping them accordingly and using detailed commit messages.
 
 never amend commits or rewrite git history
 
-always write very detailed commit messages. feel free to include diagrams and  markdown, tables, lists, quotes, etc. 
+always write very detailed commit messages. Feel free to include diagrams, markdown, tables, lists, quotes, etc. 
 
 ### searching past commits
 
@@ -65,13 +65,13 @@ git log -S "search term"
 git log -G "regex pattern"
 ```
 
-Use all three passing variable names and function names in search strings
+Use all three approaches, passing variable names and function names as search strings.
 
 ## github
 
 before creating any gh pr or issue output the title and body in chat and ask for confirmation first
 
-if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. dont use headings in the body (it looks like AI slop), instead try to use bold text as headings which is more refined looking and less commonly done by AI.
+if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. don't use headings in the body (it looks like AI slop), instead try to use bold text as headings which is more refined looking and less commonly done by AI.
 
 after creating a pr always print the pr url to the user, then watch for ci to complete successfully using command like
 
@@ -99,7 +99,7 @@ NEVER use git to revert files to previous state if you did not create those file
 Never submit pending reviews with placeholder messages like "Reviewing suggestions". If a pending review blocks comment replies, dismiss it instead of submitting with generic text comment.
 
 
-NEVER use we or our in messages. write as if you were me. making the body personal. writing as if you were me. write casually and concisely. not like a robot. focus on telling information quickly without stupid fluff and corporate idioms
+NEVER use we or our in messages. Write as if you were me, making the body personal. Write casually and concisely, not like a robot. Focus on telling information quickly without stupid fluff and corporate idioms.
 
 ## updating PRs and issues
 
@@ -119,13 +119,13 @@ when planning a task, first read all files relevant to the plan:
 - files they import (dependencies)
 - files that import them (importees/dependents)
 
-this gives you the full picture of the codebase before writing the plan. after gathering context, use the prune tool to cleanup read tool calls that ended up not being needed, saving context usage for the actual implementation
+this gives you the full picture of the codebase before writing the plan. after gathering context, use the prune tool to clean up read tool calls that ended up not being needed, saving context usage for the actual implementation
 
 read all files you need! do not try to save context window by not reading files. instead DO read them and then prune them later if not relevant.
 
 ## updating AGENTS.md files
 
-before updating agents instructions files always double check that they are not generated by other commands, in that case you should never edit them directly. this is common, just read the first 10 lines to see if the AGENTS.md tells it is being generated by another script. if this is the case look at the root package.json for the script that generates it, usually there are other files that have project specific instructions you can edit instead. like PROJECTNAME_AGENTS.md
+before updating agents instructions files, always double check that they are not generated by other commands. If they are, never edit them directly. This is common—just read the first 10 lines to see if the AGENTS.md says it is being generated by another script. If so, look at the root package.json for the script that generates it. Usually there are other files with project-specific instructions you can edit instead, like PROJECTNAME_AGENTS.md.
 
 ## tasks
 
@@ -155,7 +155,7 @@ if user asks you to create .md files with findings always put them in a docs fol
 
 ## background processes
 
-for running dev servers and other long running commands use tmux background sessions with names
+for running dev servers and other long-running commands, use tmux background sessions with names
 
 ## compounding engineering
 
@@ -167,7 +167,7 @@ if you want to add some knowledge about the overall codebase write it in a ./doc
 
 ## testing
 
-.toMatchInlineSnapshot is the preferred way to write tests, added before any expect call. leave them empty the first time, update them with -u. check git diff for the test file every time you update them with -u to make sure the snapshots are expected and correct.
+.toMatchInlineSnapshot is the preferred way to write tests. Place it before any expect call, leaving it empty the first time, then update with -u. Check the git diff for the test file every time you update with -u to make sure the snapshots are expected and correct.
 
 for multiline inline snapshots always prefix them with \n with `.toMatchInlineSnapshot('\n' + content)` so they look good.
 
@@ -197,13 +197,13 @@ when user asks you to create new worktree for the session do this
 git worktree add ../{reponame}-{branchname} -b {branchname} upstream/main
 ```
 
-sometimes upstream/main is different, check what is the default branch first, could be not main
+sometimes upstream/main is different, check what is the default branch first, it might not be main
 
 ## kimaki
 
 for kimaki.xyz commands always use global kimaki instead of npx kimaki, it will use the local version of kimaki cli with latest changes
 
-after I ask to git push call the tool kimaki_archive_thread so the thread is removed from Discord sidebar and completed tasks are not shown in left sidebar.
+after I ask you to push, call the tool kimaki_archive_thread so the thread is removed from Discord sidebar and completed tasks are not shown in left sidebar.
 
 ## committing only certain hunks
 
@@ -215,7 +215,7 @@ when committing you should first see the git diff, then if the files only have y
 git commit path/to/file1 path/to/file2 -m "commit message"
 ```
 
-If instead there are other changes in those same files you can use critique hunks command to stage only some portion of changes and leave unrelated changes unstaged and non committed
+If instead other changes exist in those same files, you can use the critique hunks command to stage only some portions and leave unrelated changes unstaged and uncommitted
 
 ```
 # List all unstaged hunks with stable IDs
