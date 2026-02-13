@@ -5,7 +5,7 @@
   "include": [
     "plugins",
     "scripts"
-  ],
+, "disabled-plugins/session-lock.ts", "disabled-plugins/prune.ts", "disabled-plugins/chat-finished.ts", "disabled-plugins/permission-tts.ts", "disabled-plugins/plan-to-build.ts"  ],
   "exclude": [
     "opensrc"
   ]

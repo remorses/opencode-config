@@ -4,7 +4,7 @@
 
 import type { Plugin } from "@opencode-ai/plugin";
 import type { Permission } from "@opencode-ai/sdk";
-import { getProjectFolder, speak, VOICES, OUTPUT_PATHS } from "./utils/tts";
+import { getProjectFolder, speak, VOICES, OUTPUT_PATHS } from "../plugins/utils/tts";
 
 function formatPermissionMessage(permission: Permission, folder: string): string {
   const { type, title } = permission;

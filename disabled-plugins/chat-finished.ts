@@ -2,7 +2,7 @@
 // Waits 2s before speaking to avoid interrupting resumed sessions.
 
 import type { Plugin } from "@opencode-ai/plugin";
-import { getProjectFolder, speak } from "./utils/tts";
+import { getProjectFolder, speak } from "../plugins/utils/tts";
 
 const MAX_TITLE_WORDS = 5;
 

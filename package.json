@@ -2,12 +2,17 @@
   "dependencies": {
     "@ai-sdk/google": "^2.0.38",
     "@ai-sdk/google-vertex": "^4.0.11",
-    "@opencode-ai/plugin": "1.1.60",
-    "ai": "^5.0.95"
+    "@opencode-ai/plugin": "1.1.65",
+    "ai": "^5.0.95",
+    "proper-lockfile": "^4.1.2",
+    "tree-sitter-bash": "^0.25.0",
+    "web-tree-sitter": "^0.25.10"
   },
   "devDependencies": {
     "@tsconfig/bun": "^1.0.10",
+    "@types/bun": "^1.2.8",
     "@types/node": "^25.1.0",
+    "@types/proper-lockfile": "^4.1.4",
     "typescript": "^5.9.3"
   }
 }
