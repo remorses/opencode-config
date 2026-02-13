@@ -349,7 +349,6 @@ function openBrowser(url: string) {
 function upsert(store: Store, account: Account) {
   const idx = store.accounts.findIndex(
     (x) =>
-      (account.accountId && x.accountId && account.accountId === x.accountId) ||
       (account.email &&
         x.email &&
         account.email.toLowerCase() === x.email.toLowerCase()) ||
