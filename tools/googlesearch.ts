@@ -1,5 +1,6 @@
-// Custom tool for web search using Gemini with Google Search grounding.
-// Returns in-depth research summaries with code examples.
+// Web search tool using Gemini with Google Search grounding.
+// Performs real-time searches and returns structured summaries with code examples,
+// documentation links, and GitHub repos. Optimized for coding agent queries.
 
 import { tool } from "@opencode-ai/plugin";
 import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
@@ -10,19 +11,29 @@ const google = createGoogleGenerativeAI({
 });
 
 export const googlesearch = tool({
-  description:
-    `
-    For the query: A detailed description of what should be searched for. use a long descriptive phrase that describes what you are searching for. Using good english and comprehensive. Tell what is the goal of the query, what this search query should accomplish and what data should be gathered.
+  description: `Search the web using Google via Gemini. Returns in-depth research summaries with code examples, documentation links, and GitHub repos.
 
-    Search for a query on the internet using Google. This tool can be used in parallel with many independent description parameters
+**When to use:**
+- Current events, recent releases, or time-sensitive information
+- API usage patterns, library documentation, or framework guides
+- Troubleshooting errors or finding solutions to specific problems
+- Finding GitHub repos, npm packages, or official docs
 
-    Reading .d.ts files is preferable over google if possible. Only do google searches if the local .d.ts are not enough. Or you cannot directly download relevant source code repo into ./tmp and start a task to explore and answer questions
-    `,
+**When NOT to use (prefer alternatives):**
+- For library internals: use lib-investigator agent or download source to ./opensrc
+- For API signatures: read local .d.ts files first
+- For code patterns: use codesearch tool and gh search cli
+
+**Tips:**
+- Call multiple times in parallel with different query angles for faster, broader coverage
+- Use natural language descriptions, not keyword searches
+- Include context about your goal so results are more targeted`,
+
   args: {
     query: tool.schema
       .string()
       .describe(
-        "",
+        "A detailed natural language description of what to search for. Include: what you're trying to accomplish, relevant technologies/frameworks, and what kind of information you need (docs, examples, repos, etc.).",
       ),
   },
 
@@ -41,24 +52,25 @@ export const googlesearch = tool({
         google_search: google.tools.googleSearch({}),
       },
       stopWhen: () => false,
-      prompt: `
+      prompt: `You are a research assistant for a coding agent. Search the web thoroughly and return findings.
 
-      Search the web for the following in-depth query: ${JSON.stringify(args.query)}.
+**Query:** ${JSON.stringify(args.query)}
 
-      This search query was submitted by a coding agent, with the purpose of searching the web to find out how to accomplish something via code or terminal commands.
+**Instructions:**
+1. Search multiple times with varied terms to get comprehensive coverage
+2. Read and synthesize the most relevant results
+3. Structure your response with:
+   - Key findings as concise bullet points
+   - Code snippets (properly formatted) when available
+   - Links to official docs, GitHub repos, and authoritative sources
+   - Version numbers and dates when relevant
 
-      Summarize in concise bullet points. Include code snippets.
-
-      Do an in deep research of the argument, searching multiple times. return an in depth summary by reading all necessary results are resources on the argument. Return code examples if possible.
-
-      The search results will be used by a coding agent, so mention docs urls and github repos if present.
-
-      Do not  make up content in your response. Quote directly the content you found and add examples. Do not try to explain the query yourself. Just report all the found sources and quote them if they are relevant.
-
-      At the end of the result write "if this search result was not exhaustive enough or did not provide a good enough response update the query and do a new google search. multiple calls in parallel with different strategies to search faster"
-
-
-      `,
+**Important:**
+- Quote directly from sources rather than paraphrasing
+- Do not fabricate information - only report what you found
+- Be concise
+- Prioritize official documentation and well-maintained repos
+- Include URLs for all referenced resources`,
     });
 
     return text;
