@@ -117,7 +117,7 @@
     // "@tarquinen/opencode-dcp", SHIT. breaks claude rules of thinking
     // "/Users/morse/kimaki/codex-multi-auth/index.ts", SHIT. breaks everything. codex 5.3 does not work.probably uses the API for some reason! spent a lot of money on API for no reason
     // "oc-chatgpt-multi-auth@latest", SHIT. does not even work
-    "opencode-google-antigravity-auth"
+    // "opencode-google-antigravity-auth" https://github.com/shekohex/opencode-google-antigravity-auth/issues/39
   ],
   "mcp": {
     // "playwriter": {
