@@ -1,4 +1,3 @@
-
 // Custom tool for web search using Gemini with Google Search grounding.
 // Returns in-depth research summaries with code examples.
 
@@ -10,7 +9,7 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
-const search = tool({
+export const googlesearch = tool({
   description:
     `
     For the query: A detailed description of what should be searched for. use a long descriptive phrase that describes what you are searching for. Using good english and comprehensive. Tell what is the goal of the query, what this search query should accomplish and what data should be gathered.
@@ -66,4 +65,4 @@ const search = tool({
   },
 });
 
-// export default search
+export default googlesearch;
