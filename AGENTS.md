@@ -73,6 +73,17 @@ before creating any gh pr or issue output the title and body in chat and ask for
 
 if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. don't use headings in the body (it looks like AI slop), instead try to use bold text as headings which is more refined looking and less commonly done by AI.
 
+Never use `\n` in `--body` or `--message` flags; shells don't turn these into real newlines. For multiline content, always use a heredoc:
+
+```bash
+gh pr create --title "title" --body "$(cat <<'EOF'
+First paragraph.
+
+Second paragraph with `code`.
+EOF
+)"
+```
+
 after creating a pr always print the pr url to the user, then watch for ci to complete successfully using command like
 
 ```bash
