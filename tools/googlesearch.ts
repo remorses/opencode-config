@@ -3,14 +3,17 @@
 // documentation links, and GitHub repos. Optimized for coding agent queries.
 
 import { tool } from "@opencode-ai/plugin";
-import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
+import {
+  createGoogleGenerativeAI,
+  type GoogleGenerativeAIProviderOptions,
+} from "@ai-sdk/google";
 import { generateText } from "ai";
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
-export const googlesearch = tool({
+const googlesearch = tool({
   description: `Search the web using Google via Gemini. Returns in-depth research summaries with code examples, documentation links, and GitHub repos.
 
 **When to use:**
