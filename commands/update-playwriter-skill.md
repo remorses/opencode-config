@@ -1,7 +1,7 @@
 ---
 description: learn new things about playwriter and store them to skill.md
 model: anthropic/claude-opus-4-6
-permissions:
+permission:
   "external_directory":
     "/Users/morse/Documents/GitHub/playwriter/*": "allow"
 ---
