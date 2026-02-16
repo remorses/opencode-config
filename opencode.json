@@ -73,7 +73,7 @@
         },
         "claude-opus-4-6": {
           "limit": {
-            "context": 200000,
+            "context": 270000,
             "output": 128000
           },
           "options": {
