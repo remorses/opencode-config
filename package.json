@@ -2,7 +2,7 @@
   "dependencies": {
     "@ai-sdk/google": "^2.0.38",
     "@ai-sdk/google-vertex": "^4.0.11",
-    "@opencode-ai/plugin": "1.2.5",
+    "@opencode-ai/plugin": "1.2.6",
     "ai": "^5.0.95",
     "proper-lockfile": "^4.1.2",
     "tree-sitter-bash": "^0.25.0",
