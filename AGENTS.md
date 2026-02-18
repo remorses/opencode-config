@@ -300,3 +300,7 @@ you can generate pdfs to view in my boox device by dropping them in the drive fo
 this way I can read those files in my e ink tablet. for example useful when using critique to generate a pdf of the changes with `critique --pdf /Users/morse/Documents/googledrive/changes-name.pdf`
 
 after that drive will sync it automatically
+
+## pbcopy
+
+if i ask you to copy something use pbcopy command to do it. don't tell me to run the command to copy. you must run the pbcopy command yourself.
