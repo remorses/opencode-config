@@ -63,7 +63,7 @@ is your plan for an implementation? if yes, implement it. Follow the plan closel
           agent: "build",
           model: {
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5-20250929",
+            modelID: "claude-sonnet-4-6",
           },
           parts: [
             {

@@ -1,7 +1,7 @@
 ---
 description: Commit, update changelog, npm publish
 agent: build
-model: anthropic/claude-sonnet-4-5
+model: anthropic/claude-sonnet-4-6
 subtask: true
 ---
 
