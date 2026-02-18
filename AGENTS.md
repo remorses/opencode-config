@@ -8,18 +8,17 @@ ALWAYS use the right package manager for ts repos. you can see the right one bas
 
 if you need to create scripts always prefer typescript over bash or js. never create new files in js unless strictly required.
 
-
 ## planning
 
 when the user asks you to plan, they want you to read all relevant files and create a concrete plan with steps: sections where you describe what files you would update and what tests you would add to validate the new changes.
 
-NEVER output a plan where you "plan" to read files or plan to explore the codebase. the goal of a plan is to do these things before starting the implementation part. you have to explore the codebase, read files, validate assumptions BEFORE showing the user the plan in chat. 
+NEVER output a plan where you "plan" to read files or plan to explore the codebase. the goal of a plan is to do these things before starting the implementation part. you have to explore the codebase, read files, validate assumptions BEFORE showing the user the plan in chat.
 
 if there are multiple ways to implement the changes, show a high-level summary of each approach before showing the full plan.
 
 ## playwriter
 
-ALWAYS use locally installed playwriter without npx or bunx. This ensures you use the local version, which may have fixes and improvements not yet published. 
+ALWAYS use locally installed playwriter without npx or bunx. This ensures you use the local version, which may have fixes and improvements not yet published.
 
 ## git
 
@@ -47,7 +46,7 @@ if user says "commit all" then also commit other changes, grouping them accordin
 
 never amend commits or rewrite git history
 
-always write very detailed commit messages. Feel free to include diagrams, markdown, tables, lists, quotes, etc. 
+always write very detailed commit messages. Feel free to include diagrams, markdown, tables, lists, quotes, etc.
 
 ### searching past commits
 
@@ -155,8 +154,11 @@ NEVER use git to revert files to previous state if you did not create those file
 
 Never submit pending reviews with placeholder messages like "Reviewing suggestions". If a pending review blocks comment replies, dismiss it instead of submitting with generic text comment.
 
-
 NEVER use we or our in messages. Write as if you were me, making the body personal. Write casually and concisely, not like a robot. Focus on telling information quickly without stupid fluff and corporate idioms.
+
+## github releases
+
+always omit chores or internal things from github release. end users are going to read these so we should omit internal not user facing changes and instead be very detailed on user facing APIs changes and features. adding code snippets and nice code formatting.
 
 ## updating PRs and issues
 
@@ -239,7 +241,6 @@ opensrc owner/repo@v1.0.0
 opensrc owner/repo#main
 ```
 
-
 this will download them in a local ./opensrc folder
 
 this is preferable over manually cloning repos in tmp or using gitchamber
@@ -291,7 +292,6 @@ critique hunks add 'src/main.ts:@-10,6+10,7' 'src/utils.ts:@-5,3+5,4'
 ```
 
 > always use global critique command instead of using bunx so you use the latest version with latest changes, critique in PATH is using the local version of critique with latest changes and fixes
-
 
 ## sharing files with boox tablet and devices
 
