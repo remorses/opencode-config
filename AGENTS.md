@@ -67,6 +67,52 @@ git log -G "regex pattern"
 
 Use all three approaches, passing variable names and function names as search strings.
 
+### full history of a line
+
+use `git log -L` to see every commit that ever touched a specific line. unlike `git blame` which only shows the last commit per line, `git log -L` traces the full evolution. git follows the actual content of the line, not just its position — it tracks the line through insertions, deletions, and moves above it.
+
+use this to understand the goal or reason behind a change: find the commits that touched a line, then read their messages or full diffs for context.
+
+```bash
+# all commits that touched line 42
+git log -L 42,42:path/to/file.ts
+
+# all commits that touched lines 10-20
+git log -L 10,20:path/to/file.ts
+
+# all commits that touched a specific function
+git log -L :functionName:path/to/file.ts
+
+# compact: just commit hashes and messages
+git log -L 42,42:path/to/file.ts --oneline
+
+# then read the full diff of a specific commit
+git show <hash>
+```
+
+### full history of a file or folder
+
+use `git log -- path` to see every commit that touched a file or folder. add `--follow` for files to track history across renames.
+
+```bash
+# all commits that touched a file
+git log --oneline -- path/to/file.ts
+
+# track history across renames (single file only)
+git log --oneline --follow -- path/to/file.ts
+
+# all commits that touched a folder
+git log --oneline -- src/components/
+
+# with diffs
+git log -p -- path/to/file.ts
+
+# with file change stats
+git log --stat -- path/to/file.ts
+```
+
+the `--` separator explicitly marks where paths begin, preventing git from confusing filenames with branch names.
+
 ## github
 
 before creating any gh pr or issue output the title and body in chat and ask for confirmation first
