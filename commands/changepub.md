@@ -22,3 +22,5 @@ after calling publish command like bun publish or pnpm publish ALWAYS do pnpm i 
 if multiple packages changed publish them in topological order, where the dependencies are published first. always publish dependencies if there were changes in them.
 
 to know if some package needs publisihing you can use `npm show packagename version` to see what is the last published version. important for workspaces to see what packages needs publishing.
+
+if a package is inside a submodule the gh release should be done for that submodule. running gh command inside that folder.
