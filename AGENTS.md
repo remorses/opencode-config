@@ -304,3 +304,8 @@ after that drive will sync it automatically
 ## pbcopy
 
 if i ask you to copy something use pbcopy command to do it. don't tell me to run the command to copy. you must run the pbcopy command yourself.
+
+
+## editing skills
+
+If I ask to edit a skill search for the skill path in cwd not inside kimaki. search for files SKILL.md
