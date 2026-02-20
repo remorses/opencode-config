@@ -1,11 +1,58 @@
 /**
  * # Session Lock Plugin
  *
- * Keeps concurrent sessions from stepping on each other.
+ * This plugin makes it practical to run many agent sessions in the same
+ * codebase without stepping on each other.
  *
- * - Waits its turn when another session is already writing.
- * - Shows clear lock status updates while waiting and when released.
- * - Automatically frees locks when a session finishes or is closed.
+ * ## Why this exists
+ *
+ * Worktrees are powerful, but for high-parallel agent workflows they can add
+ * accidental complexity (extra branches, sync overhead, cleanup, and context
+ * drift). This plugin takes a simpler approach for a shared checkout:
+ *
+ * - Let all sessions explore and plan freely in the same tree.
+ * - Serialize only the small mutation window (writes and mutating git).
+ * - Keep users informed while sessions wait.
+ *
+ * In practice, most agent time is spent reading, searching, planning, and
+ * reasoning. Actual write time is usually short. Because of that, queueing the
+ * write phase gives high throughput with much lower operational complexity.
+ *
+ * ## Lock semantics
+ *
+ * Locks are session-scoped and long-lived: once acquired, they are held until
+ * the session goes idle or is deleted.
+ *
+ * - File locks: for `write`, `edit`, `multiedit`, and files touched by
+ *   `apply_patch`.
+ * - Repo locks: for side-effecting `git` commands executed via `bash`.
+ *
+ * Queueing is fair per lock key. A session joins a FIFO queue and waits with
+ * sleep-based polling until it reaches the head and the lock is available.
+ *
+ * ## Lock keys
+ *
+ * - File key format: `file:<absolute-path>`
+ * - Repo key format: `repo:<resolved-working-directory>`
+ *
+ * For git commands, the lock key is derived from the resolved command cwd
+ * (`bash.workdir` when present, otherwise project directory).
+ *
+ * ## Release semantics
+ *
+ * Locks are released when:
+ *
+ * - The owning session emits `session.status` with `idle`
+ * - The owning session is deleted (`session.deleted`)
+ *
+ * Queue entries are always cleaned up after acquire attempts, and stale lock
+ * owners can be reaped so the system keeps moving after crashes.
+ *
+ * ## Status visibility
+ *
+ * The plugin emits lock lifecycle updates (`queued`, `waiting`, `acquired`,
+ * `released`, `timeout`, `stale_reaped`) to both app logs and TUI toasts, so
+ * contention is visible instead of silent.
  */
 
 import type { Hooks, PluginInput, Plugin } from "@opencode-ai/plugin"
