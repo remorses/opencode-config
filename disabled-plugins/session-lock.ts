@@ -1,9 +1,12 @@
-// Locks files and repo-level git side effects across concurrent sessions.
-//
-// This plugin acquires long-lived locks (until the session becomes idle) the
-// first time a session writes to a file, and prevents other sessions from
-// writing that same file concurrently. It also acquires a repo-level lock for
-// side-effecting `git` commands run via the bash tool.
+/**
+ * # Session Lock Plugin
+ *
+ * Keeps concurrent sessions from stepping on each other.
+ *
+ * - Waits its turn when another session is already writing.
+ * - Shows clear lock status updates while waiting and when released.
+ * - Automatically frees locks when a session finishes or is closed.
+ */
 
 import type { Hooks, PluginInput, Plugin } from "@opencode-ai/plugin"
 import { Database } from "bun:sqlite"
@@ -21,6 +24,21 @@ import lockfile from "proper-lockfile"
 
 type Release = () => Promise<void>
 
+type LockPhase = "queued" | "waiting" | "acquired" | "released" | "stale_reaped" | "timeout"
+
+type LockStatus = {
+  phase: LockPhase
+  sessionID: string
+  kind: "file" | "repo"
+  key: string
+  target: string
+  queuePosition?: number
+  queueLength?: number
+  ownerSession?: string
+  waitMs?: number
+  releasedCount?: number
+}
+
 type Row = {
   key: string
   session: string
@@ -28,6 +46,20 @@ type Row = {
   target: string
   lockfile: string
   created: number
+}
+
+type QueueRow = {
+  ticket: number
+  key: string
+  session: string
+  kind: "file" | "repo"
+  target: string
+  created: number
+}
+
+type Held = {
+  sessionID: string
+  release: Release
 }
 
 type Lockfile = {
@@ -47,21 +79,30 @@ type Lockfile = {
 type SessionLockOptions = {
   directory: string
   staleMs?: number
+  pollMs?: number
+  maxWaitMs?: number
+  notify?: (status: LockStatus) => Promise<void> | void
 }
 
 class SessionLock {
   readonly directory: string
   readonly staleMs: number
+  readonly pollMs: number
+  readonly maxWaitMs: number
 
   #db: Database
-  #held = new Map<string, Release>()
+  #held = new Map<string, Held>()
   #lockfile: Lockfile
+  #notify?: (status: LockStatus) => Promise<void> | void
 
   constructor(options: SessionLockOptions & { lockfile: Lockfile }) {
     this.directory = options.directory
     this.staleMs = options.staleMs ?? 2 * 60_000
+    this.pollMs = Math.max(100, options.pollMs ?? 250)
+    this.maxWaitMs = Math.max(this.staleMs * 2, options.maxWaitMs ?? 10 * 60_000)
     this.#db = openDb(options.directory)
     this.#lockfile = options.lockfile
+    this.#notify = options.notify
   }
 
   async file(sessionID: string, filepath: string) {
@@ -81,54 +122,263 @@ class SessionLock {
       .query<Row, [string]>("select key, session, kind, target, lockfile, created from lock where session = ?")
       .all(sessionID)
 
-    await this.#write(() => this.#db.query("delete from lock where session = ?").run(sessionID))
+    await this.#write(() => {
+      this.#db.query("delete from lock where session = ?").run(sessionID)
+      this.#db.query("delete from wait_queue where session = ?").run(sessionID)
+    })
 
     await Promise.all(
       rows.map(async (row) => {
-        const release = this.#held.get(row.key)
-        if (release) {
+        const held = this.#held.get(row.key)
+        if (held && held.sessionID === sessionID) {
           this.#held.delete(row.key)
-          await release().catch(() => {})
+          await held.release().catch(() => {})
           return
         }
         await this.#lockfile.unlock(row.target, { realpath: false, lockfilePath: row.lockfile }).catch(() => {})
       }),
     )
+
+    if (rows.length > 0) {
+      const first = rows[0]
+      if (first) {
+        await this.#emit({
+          phase: "released",
+          sessionID,
+          key: first.key,
+          kind: first.kind,
+          target: first.target,
+          releasedCount: rows.length,
+        })
+      }
+    }
   }
 
   async #acquire(input: { key: string; sessionID: string; kind: Row["kind"]; target: string }) {
     await ensureDir(path.join(this.directory, ".opencode", "locks"))
     const lockfilePath = path.join(this.directory, ".opencode", "locks", hash(input.key) + ".lock")
+    const held = this.#held.get(input.key)
+    if (held?.sessionID === input.sessionID) return
+
+    const started = Date.now()
+    const ticket = await this.#enqueue(input)
+    await this.#emit({
+      phase: "queued",
+      sessionID: input.sessionID,
+      key: input.key,
+      kind: input.kind,
+      target: input.target,
+      queuePosition: 1,
+      queueLength: 1,
+      waitMs: 0,
+    })
+
+    let lastWaitUpdate = 0
+    let lastRowOwner = ""
+
+    try {
+      while (true) {
+        const now = Date.now()
+        const waitMs = now - started
+        if (waitMs > this.maxWaitMs) {
+          await this.#emit({
+            phase: "timeout",
+            sessionID: input.sessionID,
+            key: input.key,
+            kind: input.kind,
+            target: input.target,
+            waitMs,
+          })
+          throw new Error(
+            `${input.kind} lock timed out after ${Math.ceil(waitMs / 1000)}s (${input.target})`,
+          )
+        }
+
+        const queue = this.#queueState(input.key, ticket)
+        if (queue.position > 1) {
+          if (now - lastWaitUpdate >= 1500) {
+            await this.#emit({
+              phase: "waiting",
+              sessionID: input.sessionID,
+              key: input.key,
+              kind: input.kind,
+              target: input.target,
+              queuePosition: queue.position,
+              queueLength: queue.length,
+              ownerSession: queue.headSession,
+              waitMs,
+            })
+            lastWaitUpdate = now
+          }
+          await Bun.sleep(this.pollMs)
+          continue
+        }
+
+        const row = this.#db
+          .query<Row, [string]>("select key, session, kind, target, lockfile, created from lock where key = ?")
+          .get(input.key)
+
+        if (row?.session === input.sessionID) {
+          if (!this.#held.has(input.key)) {
+            const release = await this.#lockfile.lock(input.target, this.#options(lockfilePath))
+            this.#held.set(input.key, { sessionID: input.sessionID, release })
+          }
+          await this.#emit({
+            phase: "acquired",
+            sessionID: input.sessionID,
+            key: input.key,
+            kind: input.kind,
+            target: input.target,
+            queuePosition: queue.position,
+            queueLength: queue.length,
+            waitMs,
+          })
+          return
+        }
+
+        if (row) {
+          const stale = await isStale(row.lockfile, this.staleMs)
+          if (stale) {
+            await this.#write(() => this.#db.query("delete from lock where key = ?").run(input.key))
+            await this.#lockfile
+              .unlock(row.target, { realpath: false, lockfilePath: row.lockfile })
+              .catch(() => {})
+            await this.#emit({
+              phase: "stale_reaped",
+              sessionID: input.sessionID,
+              key: input.key,
+              kind: input.kind,
+              target: input.target,
+              ownerSession: row.session,
+              waitMs,
+            })
+            continue
+          }
+
+          if (now - lastWaitUpdate >= 1500 || lastRowOwner !== row.session) {
+            await this.#emit({
+              phase: "waiting",
+              sessionID: input.sessionID,
+              key: input.key,
+              kind: input.kind,
+              target: input.target,
+              queuePosition: queue.position,
+              queueLength: queue.length,
+              ownerSession: row.session,
+              waitMs,
+            })
+            lastWaitUpdate = now
+            lastRowOwner = row.session
+          }
+          await Bun.sleep(this.pollMs)
+          continue
+        }
+
+        let release: Release | undefined
+        try {
+          release = await this.#lockfile.lock(input.target, this.#options(lockfilePath))
+        } catch {
+          if (now - lastWaitUpdate >= 1500) {
+            await this.#emit({
+              phase: "waiting",
+              sessionID: input.sessionID,
+              key: input.key,
+              kind: input.kind,
+              target: input.target,
+              queuePosition: queue.position,
+              queueLength: queue.length,
+              waitMs,
+            })
+            lastWaitUpdate = now
+          }
+          await Bun.sleep(this.pollMs)
+          continue
+        }
+
+        try {
+          await this.#write(() =>
+            this.#db
+              .query("insert into lock (key, session, kind, target, lockfile, created) values (?, ?, ?, ?, ?, ?)")
+              .run(input.key, input.sessionID, input.kind, input.target, lockfilePath, now),
+          )
+        } catch (e) {
+          await release().catch(() => {})
+          const msg = e instanceof Error ? e.message : String(e)
+          if (/SQLITE_(BUSY|LOCKED|CONSTRAINT)/i.test(msg) || /database is locked/i.test(msg)) {
+            await Bun.sleep(this.pollMs)
+            continue
+          }
+          throw e
+        }
+
+        this.#held.set(input.key, { sessionID: input.sessionID, release })
+        await this.#emit({
+          phase: "acquired",
+          sessionID: input.sessionID,
+          key: input.key,
+          kind: input.kind,
+          target: input.target,
+          queuePosition: queue.position,
+          queueLength: queue.length,
+          waitMs,
+        })
+        return
+      }
+    } finally {
+      await this.#dequeue(ticket)
+    }
+  }
+
+  async #enqueue(input: { key: string; sessionID: string; kind: Row["kind"]; target: string }) {
     const now = Date.now()
-
-    const row = this.#db
-      .query<Row, [string]>("select key, session, kind, target, lockfile, created from lock where key = ?")
-      .get(input.key)
-
-    if (row?.session === input.sessionID) {
-      if (!this.#held.has(input.key)) {
-        const release = await this.#lockfile.lock(input.target, this.#options(lockfilePath))
-        this.#held.set(input.key, release)
-      }
-      return
-    }
-
-    if (row) {
-      const stale = await isStale(row.lockfile, this.staleMs)
-      if (!stale) {
-        throw new Error(`${input.kind} is locked by another session (${row.session})`)
-      }
-      await this.#write(() => this.#db.query("delete from lock where key = ?").run(input.key))
-    }
-
-    await this.#write(() =>
+    const result = await this.#write(() =>
       this.#db
-        .query("insert into lock (key, session, kind, target, lockfile, created) values (?, ?, ?, ?, ?, ?)")
-        .run(input.key, input.sessionID, input.kind, input.target, lockfilePath, now),
+        .query("insert into wait_queue (key, session, kind, target, created) values (?, ?, ?, ?, ?)")
+        .run(input.key, input.sessionID, input.kind, input.target, now),
     )
+    const raw = (result as { lastInsertRowid?: number | bigint }).lastInsertRowid
+    if (typeof raw === "bigint") return Number(raw)
+    if (typeof raw === "number") return raw
 
-    const release = await this.#lockfile.lock(input.target, this.#options(lockfilePath))
-    this.#held.set(input.key, release)
+    const fallback = this.#db
+      .query<{ ticket: number }, []>("select ifnull(max(ticket), 0) as ticket from wait_queue")
+      .get()
+    return fallback?.ticket ?? 0
+  }
+
+  async #dequeue(ticket: number) {
+    await this.#write(() => this.#db.query("delete from wait_queue where ticket = ?").run(ticket))
+  }
+
+  #queueState(key: string, ticket: number) {
+    const head = this.#db
+      .query<{ ticket: number; session: string }, [string]>(
+        "select ticket, session from wait_queue where key = ? order by ticket asc limit 1",
+      )
+      .get(key)
+
+    const position =
+      this.#db
+        .query<{ position: number }, [string, number]>(
+          "select count(*) as position from wait_queue where key = ? and ticket <= ?",
+        )
+        .get(key, ticket)?.position ?? 1
+
+    const length =
+      this.#db
+        .query<{ length: number }, [string]>("select count(*) as length from wait_queue where key = ?")
+        .get(key)?.length ?? 1
+
+    return {
+      position,
+      length,
+      headSession: head?.session,
+    }
+  }
+
+  async #emit(status: LockStatus) {
+    if (!this.#notify) return
+    await this.#notify(status)
   }
 
   async #write<T>(fn: () => T) {
@@ -178,6 +428,11 @@ function openDb(dir: string) {
     )
   }
   db.exec("create index if not exists lock_session on lock(session)")
+  db.exec(
+    "create table if not exists wait_queue (ticket integer primary key autoincrement, key text not null, session text not null, kind text not null, target text not null, created integer not null)",
+  )
+  db.exec("create index if not exists wait_queue_key_ticket on wait_queue(key, ticket)")
+  db.exec("create index if not exists wait_queue_session on wait_queue(session)")
   return db
 }
 
@@ -310,9 +565,6 @@ const readOnlyGit = new Set([
   "grep",
   "blame",
   "describe",
-  "remote",
-  "branch",
-  "tag",
 ])
 
 function isGitSideEffect(argv: string[]) {
@@ -378,6 +630,10 @@ async function gitSideEffects(cmd: string) {
   return false
 }
 
+function fallbackGitSideEffects(cmd: string) {
+  return /(^|[;&|]\s*)git(\s|$)/.test(cmd)
+}
+
 // -----------------------------------------------------------------------------
 // Plugin
 // -----------------------------------------------------------------------------
@@ -387,7 +643,85 @@ function isRecord(input: unknown): input is Record<string, unknown> {
 }
 
 const SessionLockPlugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
-  const locks = new SessionLock({ directory: input.directory, lockfile })
+  const waitToastDebounce = new Map<string, number>()
+
+  function shortTarget(target: string) {
+    const rel = path.relative(input.directory, target)
+    if (!rel || rel === ".") return target
+    if (rel.startsWith("..")) return target
+    return rel
+  }
+
+  function statusMessage(status: LockStatus) {
+    const label = shortTarget(status.target)
+    const wait = status.waitMs ? ` (${Math.max(1, Math.ceil(status.waitMs / 1000))}s)` : ""
+    const queue =
+      typeof status.queuePosition === "number" && typeof status.queueLength === "number"
+        ? ` [${status.queuePosition}/${status.queueLength}]`
+        : ""
+
+    if (status.phase === "queued") return `Queued ${status.kind} lock for ${label}${queue}`
+    if (status.phase === "waiting") {
+      const owner = status.ownerSession ? ` owner=${status.ownerSession}` : ""
+      return `Waiting for ${status.kind} lock on ${label}${queue}${wait}${owner}`
+    }
+    if (status.phase === "acquired") return `Acquired ${status.kind} lock for ${label}${wait}`
+    if (status.phase === "stale_reaped") {
+      const owner = status.ownerSession ? ` from ${status.ownerSession}` : ""
+      return `Reaped stale ${status.kind} lock for ${label}${owner}`
+    }
+    if (status.phase === "released") {
+      const count = status.releasedCount ?? 1
+      return `Released ${count} lock${count === 1 ? "" : "s"}`
+    }
+    return `Timed out waiting for ${status.kind} lock on ${label}${wait}`
+  }
+
+  async function notify(status: LockStatus) {
+    const message = statusMessage(status)
+    const key = `${status.sessionID}:${status.key}:${status.phase}`
+    const now = Date.now()
+
+    if (status.phase === "waiting") {
+      const prev = waitToastDebounce.get(key) ?? 0
+      if (now - prev < 1500) return
+      waitToastDebounce.set(key, now)
+    }
+
+    await input.client.app
+      .log({
+        body: {
+          service: "session-lock",
+          level: status.phase === "timeout" ? "warn" : "info",
+          message,
+          extra: {
+            sessionID: status.sessionID,
+            key: status.key,
+            kind: status.kind,
+            target: status.target,
+            queuePosition: status.queuePosition,
+            queueLength: status.queueLength,
+            ownerSession: status.ownerSession,
+            waitMs: status.waitMs,
+            releasedCount: status.releasedCount,
+          },
+        },
+      })
+      .catch(() => {})
+
+    await input.client.tui
+      .showToast({
+        body: {
+          title: "Session lock",
+          message,
+          variant: status.phase === "timeout" ? "warning" : status.phase === "released" ? "success" : "info",
+          duration: status.phase === "waiting" ? 1400 : 2200,
+        },
+      })
+      .catch(() => {})
+  }
+
+  const locks = new SessionLock({ directory: input.directory, lockfile, notify })
 
   return {
     async "tool.execute.before"(evt, out) {
@@ -416,7 +750,7 @@ const SessionLockPlugin: Plugin = async (input: PluginInput): Promise<Hooks> => 
 
         const workdir = typeof args.workdir === "string" && args.workdir.length ? args.workdir : undefined
         const cwd = workdir ?? input.directory
-        const sideEffect = await gitSideEffects(command).catch(() => false)
+        const sideEffect = await gitSideEffects(command).catch(() => fallbackGitSideEffects(command))
         if (!sideEffect) return
         await locks.repo(evt.sessionID, cwd)
       }
@@ -433,4 +767,4 @@ const SessionLockPlugin: Plugin = async (input: PluginInput): Promise<Hooks> => 
   }
 }
 
-// export { SessionLockPlugin }
+export { SessionLockPlugin }
