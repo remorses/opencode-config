@@ -50,6 +50,8 @@ never amend commits or rewrite git history
 
 always write very detailed commit messages. Feel free to include diagrams, markdown, tables, lists, quotes, etc.
 
+NEVER use `chore: commit remaining workspace updates`. read the diff and analyze it to commit with descriptive message. splitting in many commits to split changes by goal.
+
 ### searching past commits
 
 use 3 approaches to find commits that updated certain code
