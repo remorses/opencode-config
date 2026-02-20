@@ -6,7 +6,11 @@ always use kebab case for new filenames. never use uppercase letters in filename
 
 ALWAYS use the right package manager for ts repos. you can see the right one based on lock files like bun.lock. for example bun publish instead of npm publish.
 
+## scripts
+
 if you need to create scripts always prefer typescript over bash or js. never create new files in js unless strictly required.
+
+prefer always writing scripts in Node.js and run them with tsx or bun. If you ever need to run them with python for some reason use uv and uvx
 
 ## planning
 
