@@ -36,6 +36,8 @@ git fetch upstream
 git checkout upstream/$DEFAULT_BRANCH
 ```
 
+NEVER do `git stash pop`. ALWAYS apply. so we can get back the stash if needed.
+
 ## git commits
 
 ONLY commit when user asks to do so.
