@@ -112,7 +112,8 @@
     }
   },
   "plugin": [
-    "/Users/morse/kimaki/mappamundi/opencode/src/index.ts"
+    "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
+    "/Users/morse/.config/opencode/plugins/anthropic-auth.ts"
     // "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
     // "@tarquinen/opencode-dcp", SHIT. breaks claude rules of thinking
     // "/Users/morse/kimaki/codex-multi-auth/index.ts", SHIT. breaks everything. codex 5.3 does not work.probably uses the API for some reason! spent a lot of money on API for no reason
