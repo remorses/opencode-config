@@ -206,7 +206,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
               const requiredBetas = [
                 "oauth-2025-04-20",
                 "interleaved-thinking-2025-05-14",
-                "context-1m-2025-08-07", // 1M context window for Opus 4.6
+                // "context-1m-2025-08-07", // 1M context window for Opus 4.6
               ];
               const mergedBetas = [
                 ...new Set([...requiredBetas, ...incomingBetasList]),
