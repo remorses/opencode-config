@@ -25,4 +25,10 @@ to know if some package needs publisihing you can use `npm show packagename vers
 
 if a package is inside a submodule the gh release should be done for that submodule. running gh command inside that folder.
 
+## output
+
 after publishing output in the message what you did and links for gh release.
+
+## merging versions
+
+if there are multiple versions since last publish merge teh changelog and only mention the latest one. only mention the state of the last version, for example if a feature was added and then removed don' mention it. if a feature was added and a bug fix applied to it in later release just mention the added feature. users could not have used the non published version so they don't care about the bug fix
