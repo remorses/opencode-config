@@ -1,6 +1,7 @@
 ---
 model: anthropic/claude-sonnet-4-6
 subtask: true
+model: anthropic/claude-sonnet-4-6
 ---
 
 # publishing an extension update
