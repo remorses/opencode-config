@@ -31,7 +31,7 @@ For monorepos, check each workspace package to identify which ones have unpublis
 ## Step 3: Bump Version and Update Changelog
 
 1. Bump the version in `package.json` (never do major bumps)
-2. Update or create `CHANGELOG.md` with bullet points under the new version heading
+2. Update or create `CHANGELOG.md` with bullet points under the new version heading. use rich markdown formatting. code snippets, diagrams. make it pleasant to read.
 
 ### Merging Unreleased Versions
 
