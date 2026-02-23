@@ -2,7 +2,6 @@
 description: Commit, update changelog, npm publish
 agent: build
 model: anthropic/claude-sonnet-4-6
-subtask: true
 ---
 
 # Publishing npm Packages
@@ -76,8 +75,15 @@ git push origin HEAD --tags
 
 ## Step 7: Create GitHub Release
 
+**Do NOT use `--notes-file CHANGELOG.md`** - that dumps the entire changelog (all versions) into the release body.
+
+Instead, manually extract only the current version's section from CHANGELOG.md and pass it via `--notes` with a heredoc:
+
 ```bash
-gh release create packagename@x.y.z --title "packagename@x.y.z" --notes-file CHANGELOG.md --latest
+gh release create packagename@x.y.z --title "packagename@x.y.z" --notes "$(cat <<'EOF'
+<paste only the current version's changelog section here>
+EOF
+)" --latest
 ```
 
 Include external contributors in the release notes: "thanks @username for the contribution"
