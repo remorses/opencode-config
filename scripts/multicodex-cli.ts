@@ -1,4 +1,14 @@
-// CLI for multicodex account management using the same OAuth browser flow as OpenCode Codex plugin.
+/**
+ * CLI for multicodex account management.
+ *
+ * Uses the same OAuth browser flow as OpenCode Codex plugin.
+ *
+ * Commands:
+ *   add           OAuth login and add or update account
+ *   list          List configured accounts
+ *   use <index>   Activate account by 1-based index
+ *   status        Show rate limit status for current account
+ */
 
 import fs from "node:fs/promises";
 import {
@@ -452,6 +462,63 @@ async function cmdUse(arg?: string) {
   );
 }
 
+async function cmdStatus() {
+  const p = authFilePath();
+  const data = await readJson<Record<string, unknown>>(p, {});
+  const openai = data.openai as {
+    access?: string;
+    email?: string;
+    accountId?: string;
+    expires?: number;
+  } | undefined;
+
+  if (!openai?.access) {
+    console.log("No OpenAI auth configured");
+    return;
+  }
+
+  // Extract email and plan from JWT
+  const claims = parseJwtClaims(openai.access);
+  const profile = claims?.["https://api.openai.com/profile"] as
+    | { email?: string }
+    | undefined;
+  const auth = claims?.["https://api.openai.com/auth"] as
+    | { chatgpt_plan_type?: string }
+    | undefined;
+
+  const email = openai.email ?? profile?.email;
+  const plan = auth?.chatgpt_plan_type ?? "unknown";
+  const expiresAt = openai.expires ? new Date(openai.expires) : null;
+
+  console.log(`Account: ${email ?? openai.accountId ?? "unknown"}`);
+  console.log(`Plan: ${plan}`);
+  if (expiresAt) {
+    const now = Date.now();
+    const expiresIn = openai.expires! - now;
+    if (expiresIn > 0) {
+      const hours = Math.floor(expiresIn / (1000 * 60 * 60));
+      const mins = Math.floor((expiresIn % (1000 * 60 * 60)) / (1000 * 60));
+      console.log(`Token expires: in ${hours}h ${mins}m`);
+    } else {
+      console.log(`Token expires: EXPIRED`);
+    }
+  }
+
+  // Show multicodex account info
+  const store = await loadStore();
+  const idx = store.accounts.findIndex(
+    (a) => a.email?.toLowerCase() === email?.toLowerCase() ||
+           a.accountId === openai.accountId
+  );
+  if (idx >= 0) {
+    console.log(`Multicodex: account #${idx + 1} of ${store.accounts.length}`);
+    console.log(`Active index: ${store.activeIndex + 1}`);
+  }
+
+  console.log("\nNote: ChatGPT Plus/Pro plans have daily usage limits that reset at midnight PT.");
+  console.log("The 'usage limit reached' error means you've hit the daily cap for heavy models.");
+}
+
 async function main() {
   const [command, arg] = process.argv.slice(2);
   if (!command || command === "help" || command === "--help") {
@@ -460,11 +527,13 @@ async function main() {
     console.log("  add           OAuth login and add or update account");
     console.log("  list          List configured accounts");
     console.log("  use <index>   Activate account by 1-based index");
+    console.log("  status        Show rate limit status for current account");
     return;
   }
   if (command === "add") return cmdAdd();
   if (command === "list") return cmdList();
   if (command === "use") return cmdUse(arg);
+  if (command === "status") return cmdStatus();
   throw new Error(`Unknown command: ${command}`);
 }
 
