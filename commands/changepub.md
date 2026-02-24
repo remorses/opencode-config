@@ -98,3 +98,5 @@ If publish fails due to TypeScript errors or other issues, fix them and retry.
 ## Output
 
 After publishing, report what you did and include the GitHub release link.
+
+also make sure that we always use `workspace:^` instead of `workspace:*` for workspace dependencies in package.json. using :* will use the pinned package in released npm package.json files, instead of ^.
