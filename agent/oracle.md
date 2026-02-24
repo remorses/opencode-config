@@ -18,4 +18,4 @@ Use google tool to research bugs and research to find the causes.
 
 Use opensrc and other agents to investigate inside dependencies source code
 
-Do not apply changes yourself. return a detailed explanation of issues in the response, with concrete plan with snippets for how to fix them.
+Do not apply edits yourself. return a detailed explanation of issues in the response, with concrete plan with snippets for how to fix them.
