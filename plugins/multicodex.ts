@@ -244,6 +244,15 @@ function isRateLimitText(message: string) {
   );
 }
 
+function isTokenRefreshError(message: string) {
+  const haystack = message.toLowerCase();
+  return (
+    haystack.includes("token refresh failed") ||
+    haystack.includes("refresh_token") ||
+    (haystack.includes("401") && haystack.includes("refresh"))
+  );
+}
+
 async function setOpenAIAuth(auth: OAuthAuth, client: AuthClient) {
   const file = authFilePath();
   const data = await readJson<AuthFile>(file, {});
@@ -262,10 +271,15 @@ const MultiCodexPlugin: Plugin = async ({ client }) => {
 
       const sessionID = event.properties.sessionID;
       const message = event.properties.status.message;
-      if (!message || !isRateLimitText(message)) {
-        fileLog('not a rate limit message, skipping', message)
+      const isRateLimit = message && isRateLimitText(message);
+      const isAuthError = message && isTokenRefreshError(message);
+
+      if (!isRateLimit && !isAuthError) {
+        fileLog("not a rate limit or auth error, skipping", message);
         return;
       }
+
+      fileLog(isAuthError ? "auth error detected" : "rate limit detected", message);
 
       const resolvedModelID = await client.session
         .messages({ path: { id: sessionID } })
