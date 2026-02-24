@@ -1,8 +1,8 @@
 ---
 description: ALWAYS use this agent to start the validation feedback loop after the first implementation is done. Pass as prompt the core idea of the code you added or updated. ALWAYS tell in prompt how to see diff of the changes made you want to review. like git diff if they are in working dir or commit hash if already committed. Be as detailed as possible, passing all information needed. This agent will start with a clean context. This is a smarter agent than you to use for debugging and bug fixing for complex tasks. This model is also great at fixing bugs in a feedback loop with minimal changes. use it for that use case.
 mode: subagent
-model: google/gemini-3.1-pro-preview
-# model: openai/gpt-5.3-codex
+# model: google/gemini-3.1-pro-preview
+model: openai/gpt-5.3-codex
 
 ---
 
