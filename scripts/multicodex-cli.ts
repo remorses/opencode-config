@@ -7,7 +7,8 @@
  *   add           OAuth login and add or update account
  *   list          List configured accounts
  *   use <index>   Activate account by 1-based index
- *   status        Show rate limit status for current account
+ *   status        Show info for current account (email, plan, token expiry)
+ *   check         Test all accounts for usage limits (makes minimal API call)
  */
 
 import fs from "node:fs/promises";
@@ -519,6 +520,137 @@ async function cmdStatus() {
   console.log("The 'usage limit reached' error means you've hit the daily cap for heavy models.");
 }
 
+async function refreshAccessToken(account: Account): Promise<string | null> {
+  try {
+    const response = await fetch(`${ISSUER}/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: account.refresh,
+        client_id: CLIENT_ID,
+      }).toString(),
+    });
+    if (!response.ok) return null;
+    const json = (await response.json()) as Tokens;
+    // Update account with new tokens
+    account.access = json.access_token;
+    account.expires = Date.now() + (json.expires_in ?? 3600) * 1000;
+    return json.access_token;
+  } catch {
+    return null;
+  }
+}
+
+async function checkAccountLimit(account: Account): Promise<{
+  limited: boolean;
+  error?: string;
+  resetInfo?: string;
+}> {
+  // Refresh token if expired
+  let accessToken = account.access;
+  if (account.expires < Date.now()) {
+    const refreshed = await refreshAccessToken(account);
+    if (!refreshed) {
+      return { limited: false, error: "Token expired, refresh failed" };
+    }
+    accessToken = refreshed;
+  }
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        max_tokens: 1,
+        messages: [{ role: "user", content: "hi" }],
+      }),
+    });
+
+    if (response.ok) {
+      return { limited: false };
+    }
+
+    const text = await response.text();
+    const isLimited =
+      text.includes("usage limit") ||
+      text.includes("rate limit") ||
+      text.includes("usage_limit") ||
+      response.status === 429;
+
+    // Try to extract reset info from error
+    let resetInfo: string | undefined;
+    try {
+      const json = JSON.parse(text);
+      if (json.error?.message) {
+        const match = json.error.message.match(/try again (after|in) ([^.]+)/i);
+        if (match) resetInfo = match[2];
+      }
+    } catch {}
+
+    if (isLimited) {
+      return { limited: true, resetInfo };
+    }
+
+    if (response.status === 401) {
+      return { limited: false, error: "Auth failed (token invalid)" };
+    }
+
+    return { limited: false, error: `${response.status}: ${text.slice(0, 100)}` };
+  } catch (err) {
+    return { limited: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function cmdCheck() {
+  const store = await loadStore();
+
+  if (store.accounts.length === 0) {
+    console.log("No accounts configured");
+    return;
+  }
+
+  console.log("Checking usage limits for all accounts...\n");
+
+  let tokensRefreshed = false;
+
+  for (let i = 0; i < store.accounts.length; i++) {
+    const account = store.accounts[i];
+    if (!account) continue;
+
+    const marker = i === store.activeIndex ? "*" : " ";
+    const label = account.email ?? account.accountId ?? "unknown";
+
+    process.stdout.write(`${marker} ${i + 1}. ${label}: `);
+
+    const oldExpires = account.expires;
+    const result = await checkAccountLimit(account);
+
+    // Track if we refreshed tokens
+    if (account.expires !== oldExpires) {
+      tokensRefreshed = true;
+    }
+
+    if (result.error) {
+      console.log(`ERROR - ${result.error}`);
+    } else if (result.limited) {
+      console.log(`LIMITED${result.resetInfo ? ` (resets ${result.resetInfo})` : ""}`);
+    } else {
+      console.log("OK");
+    }
+  }
+
+  // Save store if we refreshed any tokens
+  if (tokensRefreshed) {
+    await saveStore(store);
+    console.log("\n(Refreshed expired tokens)");
+  }
+}
+
 async function main() {
   const [command, arg] = process.argv.slice(2);
   if (!command || command === "help" || command === "--help") {
@@ -527,13 +659,15 @@ async function main() {
     console.log("  add           OAuth login and add or update account");
     console.log("  list          List configured accounts");
     console.log("  use <index>   Activate account by 1-based index");
-    console.log("  status        Show rate limit status for current account");
+    console.log("  status        Show info for current account");
+    console.log("  check         Test all accounts for usage limits");
     return;
   }
   if (command === "add") return cmdAdd();
   if (command === "list") return cmdList();
   if (command === "use") return cmdUse(arg);
   if (command === "status") return cmdStatus();
+  if (command === "check") return cmdCheck();
   throw new Error(`Unknown command: ${command}`);
 }
 
