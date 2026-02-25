@@ -31,9 +31,47 @@ For monorepos, check each workspace package to identify which ones have unpublis
 ## Step 3: Bump Version and Update Changelog
 
 1. Bump the version in `package.json` (never do major bumps)
-2. Update or create `CHANGELOG.md` with bullet points under the new version heading. use rich markdown formatting. code snippets, diagrams. make it pleasant to read.
+2. Update or create `CHANGELOG.md` with a **numbered list** under the new version heading
 
-### Merging Unreleased Versions
+### Changelog format
+
+Use numbered lists, not bullets. Each item describes a **user-facing outcome**:
+
+```md
+## 0.5.0
+
+1. **Added `--dry-run` flag** — preview publish without uploading
+2. **Fixed timeout on large uploads** — uploads over 50MB no longer hang
+3. **Changed default retry count from 3 to 5** — improves reliability on flaky networks
+```
+
+Include code snippets when they help users understand the change:
+
+```md
+3. **New `onProgress` callback** — track upload progress:
+   ```ts
+   await upload(file, {
+     onProgress: (pct) => console.log(`${pct}% done`)
+   })
+   ```
+```
+
+### What NOT to include
+
+Exclude anything users don't directly experience:
+
+- "added tests for X" — internal quality, not user-facing
+- "improved test flakiness" — CI stability, users don't see this
+- "refactored internals" — no behavior change
+- "updated CI config" — internal tooling
+- "bumped dev dependencies" — doesn't affect published package
+
+**Transform internal work into user-facing impact when relevant:**
+
+- bad: "fixed race condition in retry logic"
+- good: "fixed intermittent upload failures under high concurrency"
+
+### Merging unreleased versions
 
 If multiple versions accumulated since last publish, merge them into one changelog entry. Only describe the final state:
 - If a feature was added then removed, don't mention it
@@ -76,18 +114,61 @@ git push origin HEAD --tags
 
 ## Step 7: Create GitHub Release
 
-**Do NOT use `--notes-file CHANGELOG.md`** - that dumps the entire changelog (all versions) into the release body.
+**Do NOT use `--notes-file CHANGELOG.md`** — that dumps the entire changelog into the release body.
 
-Instead, manually extract only the current version's section from CHANGELOG.md and pass it via `--notes` with a heredoc:
+Extract only the current version's section and pass via `--notes`:
 
 ```bash
 gh release create packagename@x.y.z --title "packagename@x.y.z" --notes "$(cat <<'EOF'
-<paste only the current version's changelog section here>
+1. **Added `--dry-run` flag** — preview publish without uploading
+2. **Fixed timeout on large uploads** — uploads over 50MB no longer hang
+3. **Changed default retry count from 3 to 5** — improves reliability on flaky networks
+
+Thanks @contributor for #42!
 EOF
 )" --latest
 ```
 
-Include external contributors in the release notes: "thanks @username for the contribution"
+### Release notes decision flow
+
+```
+┌─────────────────────────────────────┐
+│  For each commit/PR since last tag  │
+└──────────────┬──────────────────────┘
+               │
+               v
+       ┌───────────────┐
+       │ User notices  │──no──> exclude
+       │ this change?  │
+       └───────┬───────┘
+               │ yes
+               v
+       ┌───────────────┐
+       │ Behavior or   │──behavior──> describe what changed
+       │ new feature?  │
+       └───────┬───────┘
+               │ feature
+               v
+         describe what users
+         can now do + example
+```
+
+### What belongs in release notes
+
+- **New flags/options** — "Added `--format json` for machine-readable output"
+- **Bug fixes users hit** — "Fixed crash when config file missing"
+- **Behavior changes** — "Default timeout increased from 30s to 60s"
+- **Breaking changes** — "Renamed `--old` to `--new` — update your scripts"
+- **Performance users feel** — "Startup time reduced from 2s to 200ms"
+
+### What does NOT belong
+
+- "Added unit tests" / "Improved test coverage"
+- "Refactored X module" (no behavior change)
+- "Fixed CI flakiness" / "Updated GitHub Actions"
+- "Bumped internal dependencies"
+
+Include external contributors: "Thanks @username for #42!"
 
 **Submodule packages:** Run `gh release` from inside the submodule directory.
 
