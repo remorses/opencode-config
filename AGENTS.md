@@ -8,6 +8,12 @@ always use kebab case for new filenames. never use uppercase letters in filename
 
 ALWAYS use the right package manager for ts repos. you can see the right one based on lock files like bun.lock. for example bun publish instead of npm publish.
 
+## pnpm/bun workspaces
+
+always prefer root folders for all packages and setting workspaces: ./*. without a parent packages/ folder
+
+instead of using workspace:* use workspace:^ for local packages versions. so if published they won't use the pinned version.
+
 ## scripts
 
 if you need to create scripts always prefer typescript over bash or js. never create new files in js unless strictly required.
