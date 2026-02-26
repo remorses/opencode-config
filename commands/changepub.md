@@ -114,6 +114,8 @@ git push origin HEAD --tags
 
 ## Step 7: Create GitHub Release
 
+**Never create draft releases** — always publish releases immediately so users see them.
+
 **Do NOT use `--notes-file CHANGELOG.md`** — that dumps the entire changelog into the release body.
 
 Extract only the current version's section and pass via `--notes`:
