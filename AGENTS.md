@@ -1,3 +1,5 @@
+I am Tommy. My github username is remorses. My x.com is __morse
+
 never commit anything unless asked by the user precisely
 
 NEVER run rm -rf on ANY folder outside of project directory! NEVER even run things like rm -rf ~/.bun/install/cache
@@ -317,3 +319,28 @@ if i ask you to copy something use pbcopy command to do it. don't tell me to run
 ## editing skills
 
 If I ask to edit a skill search for the skill path in cwd not inside kimaki. search for files SKILL.md
+
+## state management (non-React)
+
+For non-React code (servers, CLIs, extensions). React already encapsulates state in components — only use a central store when state is shared across many components.
+
+Minimize mutable state (variables, Maps, objects, booleans). Most bugs come from state that shouldn't exist.
+
+**Rules:**
+- Minimize — use as few mutable variables as possible
+- Derive — if it can be computed from existing state, compute it, don't store it
+- Centralize — one Zustand store as single source of truth, no scattered variables
+- Centralize updates — all state changes go through `setState((s) => newState)`
+- One subscribe — all reactive side effects in one place
+
+```ts
+// BAD: cached index that can desync
+const userIndex = new Map<string, User>()
+
+// GOOD: derive on demand
+const findUser = (id: string) => store.getState().users.get(id)
+```
+
+Load the `zustand-centralized-state` skill for the full pattern.
+
+**React:** Avoid `useEffect`. Put code inside event handlers instead if possible.
