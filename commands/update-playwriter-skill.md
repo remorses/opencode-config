@@ -1,9 +1,6 @@
 ---
 description: learn new things about playwriter and store them to skill.md
-model: anthropic/claude-sonnet-4-6
-permission:
-  "external_directory":
-    "/Users/morse/Documents/GitHub/playwriter/*": "allow"
+agent: playwriter-updater
 ---
 
 based on your past interactions with playwriter think deeply:
