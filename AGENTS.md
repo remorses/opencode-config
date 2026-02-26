@@ -343,4 +343,4 @@ const findUser = (id: string) => store.getState().users.get(id)
 
 Load the `zustand-centralized-state` skill for the full pattern.
 
-**React:** Avoid `useEffect`. Put code inside event handlers instead if possible.
+**React:** Avoid `useEffect`. Put code inside event handlers instead if possible .
