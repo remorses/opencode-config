@@ -12,7 +12,7 @@ ALWAYS use the right package manager for ts repos. you can see the right one bas
 
 always prefer root folders for all packages and setting workspaces: ./*. without a parent packages/ folder
 
-instead of using workspace:* use workspace:^ for local packages versions. so if published they won't use the pinned version.
+instead of using workspace:* use workspace:^ for local packages versions. so if published they won't use the pinned version but the ^ version.
 
 ## scripts
 
