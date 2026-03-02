@@ -81,11 +81,9 @@ git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '1,500p'
 # Page 2: lines 501-1000
 git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '501,1000p'
 
-# Page 3: lines 1001-1500
-git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '1001,1500p'
 ```
 
-Continue incrementing by 500 until output is empty.
+Continue incrementing by 500 until output is empty. This is needed to see large diffs without tools truncating the output.
 
 
 ### searching past commits
