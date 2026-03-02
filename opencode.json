@@ -1,12 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "theme": "opencode",
-
-  // "layout": "stretch",
-  // "small_model": "claudecode/haiku",
-  // "model": "google/gemini-3-flash-preview",
-  // "model": "anthropic/claude-opus-4-5",
-  "tui": { "scroll_speed": 6, "scroll_acceleration": { "enabled": true } },
   "lsp": false,
 
   // "mode": {
