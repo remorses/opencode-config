@@ -64,6 +64,30 @@ always write very detailed commit messages. Feel free to include diagrams, markd
 
 NEVER use `chore: commit remaining workspace updates`. read the diff and analyze it to commit with descriptive message. splitting in many commits to split changes by goal.
 
+## diff
+
+use `git diff` to see changes being made. do this at start of sessions. to see if we are working on a dirty branch with existing changes from a previous session
+
+also use `git status -s -u` to add newly added files, not shown in git diff.
+
+## Paginating Large Diffs
+
+For large diffs, paginate using `sed` to view specific line ranges with no overlap:
+
+```bash
+# Page 1: lines 1-500
+git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '1,500p'
+
+# Page 2: lines 501-1000
+git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '501,1000p'
+
+# Page 3: lines 1001-1500
+git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '1001,1500p'
+```
+
+Continue incrementing by 500 until output is empty.
+
+
 ### searching past commits
 
 use 3 approaches to find commits that updated certain code
