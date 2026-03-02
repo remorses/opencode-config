@@ -48,13 +48,13 @@ This shows files changed and lines added/removed. Use this to:
 ## Step 4: View Full Diff
 
 ```bash
-git diff $BASE_REF...HEAD --color=always -U20
+git diff $BASE_REF...HEAD -U20
 ```
 
 always exclude noisy files, use pathspec excludes. Add patterns as needed based on the project:
 
 ```bash
-git diff $BASE_REF...HEAD --color=always -U20 -- \
+git diff $BASE_REF...HEAD -U20 -- \
   ':!*.lock' \
   ':!package-lock.json' \
   ':!pnpm-lock.yaml'
@@ -81,13 +81,13 @@ For large diffs, paginate using `sed` to view specific line ranges with no overl
 
 ```bash
 # Page 1: lines 1-500
-git diff $BASE_REF...HEAD --color=always -U20 -- ':!*.lock' | sed -n '1,500p'
+git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '1,500p'
 
 # Page 2: lines 501-1000
-git diff $BASE_REF...HEAD --color=always -U20 -- ':!*.lock' | sed -n '501,1000p'
+git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '501,1000p'
 
 # Page 3: lines 1001-1500
-git diff $BASE_REF...HEAD --color=always -U20 -- ':!*.lock' | sed -n '1001,1500p'
+git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '1001,1500p'
 ```
 
 Continue incrementing by 500 until output is empty.
