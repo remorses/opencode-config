@@ -1,5 +1,5 @@
 ---
-description: Fix ASCII diagrams in markdown, code comments, and documentation. Replaces gap-prone ASCII characters with Unicode box-drawing equivalents that render seamlessly in monospaced fonts. Also validates and fixes alignment by counting characters precisely.
+description: Fix ASCII diagrams in markdown, code comments, and documentation. Replaces gap-prone ASCII characters with Unicode box-drawing equivalents that render seamlessly in monospaced fonts. Also validates and fixes alignment by counting characters precisely. ALWAYS use this after creating a .md document with a diagram.
 mode: subagent
 model: anthropic/claude-sonnet-4-6
 
