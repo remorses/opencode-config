@@ -23,6 +23,17 @@
       }
     },
 
+    "openai": {
+      "models": {
+        "gpt-5.3-codex": {
+          "limit": {
+            "context": 250000,
+            "output": 65536
+          }
+        }
+      }
+    },
+
     // "claudecode": {
     //   "npm": "file:///Users/morse/Documents/GitHub/ai-sdk-provider-claude-code/src/claude-code-provider.ts",
 
