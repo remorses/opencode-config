@@ -188,11 +188,7 @@
         }
       }
     },
-    "oracle": {
-      "mode": "subagent",
-      "model": "openai/gpt-5.3-codex",
-      "prompt": "{file:./agent/oracle.md}"
-    }
+
     // "plan": {
     //   "mode": "primary",
     //   "prompt": "{file:./prompts/PLAN.md}",
