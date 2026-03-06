@@ -4,5 +4,8 @@
   "scroll_speed": 6,
   "scroll_acceleration": {
     "enabled": true
+  },
+  "keybinds": {
+    "input_undo": "ctrl+-,super+z,option+z"
   }
 }
