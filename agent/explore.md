@@ -3,6 +3,7 @@ description: >
   Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (e.g., "src/components/**/*.tsx"), search code for keywords (e.g., "API endpoints"), or answer questions about the codebase (e.g., "how do API endpoints work?"). You can and should call this agent in parallel to search many packages or folder at the same time quickly.
   When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions. 
 mode: subagent
+source: https://github.com/anomalyco/opencode/blob/7417c869fcecb3f0e6989f4f349df07a6b8ede8d/packages/opencode/src/agent/agent.ts#L13
 model: anthropic/haiku-sonnet-4-5
 permission:
   "*": "deny"
