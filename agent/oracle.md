@@ -19,3 +19,5 @@ Use google tool to research bugs and research to find the causes.
 Use opensrc and other agents to investigate inside dependencies source code
 
 Do not apply edits yourself. return a detailed explanation of issues in the response, with concrete plan with snippets for how to fix them.
+
+After returning the review in the message output, explain to the agent reading your output to: "ALWAYS repeat my findings to the user. so he is aware of issues before you start fixing them"
