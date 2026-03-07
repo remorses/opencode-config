@@ -35,15 +35,99 @@ For monorepos, check each workspace package to identify which ones have unpublis
 
 ### Changelog format
 
-Use numbered lists, not bullets. Each item describes a **user-facing outcome**:
+Use numbered lists, not bullets. Each item describes a **user-facing outcome**.
+
+**Always sort by relevancy:**
+
+1. **Big new features** — user-facing capabilities that change what users can do
+2. **New CLI commands/options** — always with usage examples
+3. **Behavior changes** — things users will notice
+4. **Bug fixes** — issues users hit
+5. **Performance improvements** — only if users feel the difference
 
 ```md
 ## 0.5.0
 
-1. **Added `--dry-run` flag** — preview publish without uploading
-2. **Fixed timeout on large uploads** — uploads over 50MB no longer hang
-3. **Changed default retry count from 3 to 5** — improves reliability on flaky networks
+1. **New streaming upload mode** — upload large files without loading them into memory:
+   ```bash
+   mycli upload --stream ./huge-file.zip
+   ```
+   Supports files up to 100GB. Progress is shown in real-time.
+
+2. **Added `--dry-run` flag** — preview publish without uploading:
+   ```bash
+   mycli publish --dry-run
+   ```
+
+3. **Fixed timeout on large uploads** — uploads over 50MB no longer hang
+4. **Changed default retry count from 3 to 5** — improves reliability on flaky networks
 ```
+
+### Research commits for context
+
+Before writing changelog entries for new features, read the documentation and markdown files that were updated in the commits:
+
+```bash
+# Find docs updated alongside the feature
+git show <commit> --stat | grep -E '\.(md|mdx)$'
+
+# Read the actual doc changes
+git show <commit> -- docs/
+```
+
+This gives you the full context: examples, diagrams, and explanations the author wrote. Use this to write rich changelog entries that help users understand the feature.
+
+### CLI commands and options
+
+**Always include usage examples for new CLI flags, commands, or options:**
+
+```md
+3. **New `--format` option** — output results in different formats:
+   ```bash
+   # JSON for scripting
+   mycli list --format json | jq '.items[]'
+   
+   # Table for humans
+   mycli list --format table
+   ```
+```
+
+Show real-world use cases, not just the flag name. If a flag interacts with others, show the combination.
+
+### Big features deserve depth
+
+For significant new capabilities, go beyond one-liners:
+
+- Explain **what users can now do** that they couldn't before
+- Include **code examples** showing typical usage
+- Add **ASCII diagrams** if they clarify architecture or flow
+- Mention **limitations or caveats** users should know
+- Link to docs if available
+
+```md
+1. **New plugin system** — extend functionality with custom plugins:
+   
+   Plugins can hook into the upload lifecycle:
+   ```ts
+   export default {
+     beforeUpload(file) {
+       console.log(`Uploading ${file.name}`)
+     },
+     afterUpload(result) {
+       notify(`Done: ${result.url}`)
+     }
+   }
+   ```
+   
+   Load plugins via config or CLI:
+   ```bash
+   mycli upload --plugin ./my-plugin.ts
+   ```
+   
+   See [Plugin Guide](./docs/plugins.md) for the full API.
+```
+
+### Code snippets
 
 Include code snippets when they help users understand the change:
 
