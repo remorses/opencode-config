@@ -4,7 +4,7 @@
   "compilerOptions": {},
   "include": [
     "plugins",
-    "scripts",
+    "scripts", "disabled-plugins/branch-injector.ts",
     // "disabled-plugins/session-lock.ts",
     // "disabled-plugins/prune.ts",
     // "disabled-plugins/chat-finished.ts",
