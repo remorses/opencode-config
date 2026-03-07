@@ -8,6 +8,5 @@ permission:
   plan_enter: allow
   task:
     "*": allow
-    explore: deny
     oracle: deny
 ---
