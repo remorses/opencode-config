@@ -144,6 +144,29 @@ You can instantly verify that `│` on L01 col 0 aligns with `┌` on L00 col 0 
 - **Arrow characters eating a column**: `▶` takes 1 column, so if you replace `->` (2 chars) with `▶` (1 char) you lost a column. Use `─▶` (2 chars) to keep width, or `──▶` for `-->` (3 chars)
 - **Mixing ASCII and Unicode**: never leave a mix. If you convert one `|` to `│`, convert ALL of them in that diagram
 
+## Use literal Unicode characters, never escape sequences
+
+**NEVER write escaped Unicode strings** like `\u2502` or `\u250C` in the output. Always use the actual Unicode characters directly: `│`, `┌`, `─`, etc.
+
+Why this matters:
+- **Readability**: `┌──────┐` is instantly readable in code. `\u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2510` is incomprehensible without a lookup table.
+- **Maintenance**: Developers editing the code can see the actual diagram structure at a glance.
+- **Debugging**: When diagrams break, you can visually spot the problem. With escape sequences, you're staring at hex codes.
+
+Bad (never do this):
+```
+const box = "\u250C\u2500\u2500\u2500\u2510\n\u2502 Hi \u2502\n\u2514\u2500\u2500\u2500\u2518";
+```
+
+Good (always do this):
+```
+const box = `┌───┐
+│ Hi │
+└───┘`;
+```
+
+Modern editors, terminals, and languages handle Unicode just fine. There's no reason to use escape sequences for box-drawing characters.
+
 # Process
 
 1. Read the file containing the diagram
