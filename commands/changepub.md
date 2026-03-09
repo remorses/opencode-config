@@ -45,23 +45,27 @@ Use numbered lists, not bullets. Each item describes a **user-facing outcome**.
 4. **Bug fixes** — issues users hit
 5. **Performance improvements** — only if users feel the difference
 
-```md
+````md
 ## 0.5.0
 
 1. **New streaming upload mode** — upload large files without loading them into memory:
    ```bash
    mycli upload --stream ./huge-file.zip
    ```
-   Supports files up to 100GB. Progress is shown in real-time.
+````
+
+Supports files up to 100GB. Progress is shown in real-time.
 
 2. **Added `--dry-run` flag** — preview publish without uploading:
+
    ```bash
    mycli publish --dry-run
    ```
 
 3. **Fixed timeout on large uploads** — uploads over 50MB no longer hang
 4. **Changed default retry count from 3 to 5** — improves reliability on flaky networks
-```
+
+````
 
 ### Research commits for context
 
@@ -73,7 +77,7 @@ git show <commit> --stat | grep -E '\.(md|mdx)$'
 
 # Read the actual doc changes
 git show <commit> -- docs/
-```
+````
 
 This gives you the full context: examples, diagrams, and explanations the author wrote. Use this to write rich changelog entries that help users understand the feature.
 
@@ -81,16 +85,19 @@ This gives you the full context: examples, diagrams, and explanations the author
 
 **Always include usage examples for new CLI flags, commands, or options:**
 
-```md
+````md
 3. **New `--format` option** — output results in different formats:
+
    ```bash
    # JSON for scripting
    mycli list --format json | jq '.items[]'
-   
+
    # Table for humans
    mycli list --format table
    ```
-```
+````
+
+````
 
 Show real-world use cases, not just the flag name. If a flag interacts with others, show the combination.
 
@@ -106,7 +113,7 @@ For significant new capabilities, go beyond one-liners:
 
 ```md
 1. **New plugin system** — extend functionality with custom plugins:
-   
+
    Plugins can hook into the upload lifecycle:
    ```ts
    export default {
@@ -117,15 +124,17 @@ For significant new capabilities, go beyond one-liners:
        notify(`Done: ${result.url}`)
      }
    }
-   ```
-   
-   Load plugins via config or CLI:
-   ```bash
-   mycli upload --plugin ./my-plugin.ts
-   ```
-   
-   See [Plugin Guide](./docs/plugins.md) for the full API.
+````
+
+Load plugins via config or CLI:
+
+```bash
+mycli upload --plugin ./my-plugin.ts
 ```
+
+See [Plugin Guide](./docs/plugins.md) for the full API.
+
+````
 
 ### Code snippets
 
@@ -137,8 +146,9 @@ Include code snippets when they help users understand the change:
    await upload(file, {
      onProgress: (pct) => console.log(`${pct}% done`)
    })
-   ```
-```
+````
+
+````
 
 ### What NOT to include
 
@@ -166,11 +176,12 @@ If multiple versions accumulated since last publish, merge them into one changel
 ```bash
 git add .
 git commit -m "release: packagename@x.y.z"
-```
+````
 
 ## Step 5: Publish to npm
 
 Use the correct package manager based on the lockfile:
+
 - `pnpm-lock.yaml` → `pnpm publish`
 - `bun.lock` or `bun.lockb` → `bun publish`
 - `package-lock.json` → `npm publish` (last resort)
@@ -266,4 +277,26 @@ If publish fails due to TypeScript errors or other issues, fix them and retry.
 
 After publishing, report what you did and include the GitHub release link.
 
-also make sure that we always use `workspace:^` instead of `workspace:*` for workspace dependencies in package.json. using :* will use the pinned package in released npm package.json files, instead of ^.
+also make sure that we always use `workspace:^` instead of `workspace:*` for workspace dependencies in package.json. using :\* will use the pinned package in released npm package.json files, instead of ^.
+
+## .changeset based changelogs
+
+some packages use the changeset convention for changelogs. so instead of updating the changelog directly they create .md files inside `.changeset` folder. with shape
+
+```md
+---
+"packagename": minor
+---
+
+Changelog item entry here. with examples
+```
+
+For packages that contain these `.md` files we should
+
+- read the .md files inside .changelog if any (also check in all parent folders if this is a workspace. sometimes this .changelog is nested)
+- update the CHANGELOG.md for the packages, adding each one of these .md entries content as a list item for the new version
+- if any of them has a minor change use a minor bump, else patch
+- then delete these .md files
+- publish as normal
+
+NEVER use the changesets cli to publish or update changeset based packages. always do these steps manually.
