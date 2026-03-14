@@ -1,4 +1,4 @@
-I am Tommy. My github username is remorses. My x.com is __morse
+I am Tommy. My github username is remorses. My x.com is \_\_morse
 
 never commit anything unless asked by the user precisely
 
@@ -10,9 +10,9 @@ ALWAYS use the right package manager for ts repos. you can see the right one bas
 
 ## pnpm/bun workspaces
 
-always prefer root folders for all packages and setting workspaces: ./*. without a parent packages/ folder
+always prefer root folders for all packages and setting workspaces: ./\*. without a parent packages/ folder
 
-instead of using workspace:* use workspace:^ for local packages versions. so if published they won't use the pinned version but the ^ version.
+instead of using workspace:\* use workspace:^ for local packages versions. so if published they won't use the pinned version but the ^ version.
 
 ## scripts
 
@@ -84,7 +84,6 @@ git diff $BASE_REF...HEAD -U20 -- ':!*.lock' | sed -n '501,1000p'
 ```
 
 Continue incrementing by 500 until output is empty. This is needed to see large diffs without tools truncating the output.
-
 
 ### searching past commits
 
@@ -262,11 +261,23 @@ if you want to add some knowledge about the overall codebase write it in a ./doc
 
 ## testing
 
-.toMatchInlineSnapshot is the preferred way to write tests. Place it before any expect call, leaving it empty the first time, then update with -u. Check the git diff for the test file every time you update with -u to make sure the snapshots are expected and correct.
+vitest or bun are the preferred frameworks for testing ts code.
+
+`.toMatchInlineSnapshot` is the preferred way to write tests. Place it before an expect call, leaving it empty the first time, then update with -u. Check the git diff for the test file every time you update with -u to make sure the snapshots are expected and correct.
+
+Snapshots are great because they let you discover the behaviour of the code, you can use them to discover the results of functions or their behaviour.
 
 for multiline inline snapshots always prefix them with \n with `.toMatchInlineSnapshot('\n' + content)` so they look good.
 
-NEVER use mocks in tests. NEVER mock modules.
+NEVER use mocks in tests. NEVER mock modules. tests should try to test as much of the code as possible, and not mock parts of the code. for example if we are testing a NAPI js package you must not mock the native side with fake functions. instead you must test the end to end flow of the code.
+
+## test driven development
+
+you should write failing tests first, make sure they fail, then write the code or fixes that will make them pass. refactoring them if needed
+
+if you have difficulties making some tests pass in some edge cases do not apply workarounds in the tests, instead aks help to the user or oracle agent if present. for example if we are developing a NAPI module and tests do not pass in linux you should not change the tests to make them pass in linux or skip them.
+
+leave them failing instead and report to the user the issues faced as a last resort
 
 # opensrc
 
@@ -343,7 +354,6 @@ after that drive will sync it automatically
 
 if i ask you to copy something use pbcopy command to do it. don't tell me to run the command to copy. you must run the pbcopy command yourself.
 
-
 ## editing skills
 
 If I ask to edit a skill search for the skill path in cwd not inside kimaki. search for files SKILL.md
@@ -355,6 +365,7 @@ For non-React code (servers, CLIs, extensions). React already encapsulates state
 Minimize mutable state (variables, Maps, objects, booleans). Most bugs come from state that shouldn't exist.
 
 **Rules:**
+
 - Minimize — use as few mutable variables as possible
 - Derive — if it can be computed from existing state, compute it, don't store it
 - Centralize — one Zustand store as single source of truth, no scattered variables
@@ -363,10 +374,10 @@ Minimize mutable state (variables, Maps, objects, booleans). Most bugs come from
 
 ```ts
 // BAD: cached index that can desync
-const userIndex = new Map<string, User>()
+const userIndex = new Map<string, User>();
 
 // GOOD: derive on demand
-const findUser = (id: string) => store.getState().users.get(id)
+const findUser = (id: string) => store.getState().users.get(id);
 ```
 
 Load the `zustand-centralized-state` skill for the full pattern.
