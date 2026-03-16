@@ -86,7 +86,7 @@ async function exchange(
   }
   const json = await result.json();
   return {
-    type: "oauth",
+    type: "success",
     refresh: json.refresh_token,
     access: json.access_token,
     expires: Date.now() + json.expires_in * 1000,
