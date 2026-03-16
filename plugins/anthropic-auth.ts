@@ -51,7 +51,7 @@ async function authorize(mode: "max" | "console") {
   );
   url.searchParams.set(
     "scope",
-    "org:create_api_key user:profile user:inference",
+    "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload",
   );
   url.searchParams.set("code_challenge", pkce.challenge);
   url.searchParams.set("code_challenge_method", "S256");
@@ -67,7 +67,7 @@ async function exchange(
   verifier: string,
 ): Promise<OAuthCredentials | FailedCredentials> {
   const splits = code.split("#");
-  const result = await fetch("https://console.anthropic.com/v1/oauth/token", {
+  const result = await fetch("https://platform.claude.com/v1/oauth/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -89,7 +89,7 @@ async function exchange(
     type: "success",
     refresh: json.refresh_token,
     access: json.access_token,
-    expires: Date.now() + json.expires_in * 1000,
+    expires: Date.now() + json.expires_in * 1000 - 5 * 60 * 1000,
   };
 }
 
@@ -136,7 +136,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
               // Refresh token if expired
               if (!auth.access || auth.expires < Date.now()) {
                 const response = await fetch(
-                  "https://console.anthropic.com/v1/oauth/token",
+                  "https://platform.claude.com/v1/oauth/token",
                   {
                     method: "POST",
                     headers: {
@@ -150,7 +150,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
                   },
                 );
                 if (!response.ok) {
-                  throw new Error(`Token refresh failed: ${response.status}`);
+                  throw new Error(`Token refresh failed: ${response.status} ${await response.text()}`);
                 }
                 const json = await response.json();
                 await client.auth.set({
@@ -159,7 +159,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
                     type: "oauth",
                     refresh: json.refresh_token,
                     access: json.access_token,
-                    expires: Date.now() + json.expires_in * 1000,
+                    expires: Date.now() + json.expires_in * 1000 - 5 * 60 * 1000,
                   },
                 });
                 auth.access = json.access_token;
