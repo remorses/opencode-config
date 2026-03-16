@@ -18,23 +18,32 @@ import { generatePKCE } from "@openauthjs/openauth/pkce";
 
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 
-type OAuthCredentials = {
+type OAuthStored = {
   type: "oauth";
   refresh: string;
   access: string;
   expires: number;
 };
 
-type ApiKeyCredentials = {
+type OAuthSuccess = {
   type: "success";
+  provider?: string;
+  refresh: string;
+  access: string;
+  expires: number;
+};
+
+type ApiKeySuccess = {
+  type: "success";
+  provider?: string;
   key: string;
 };
 
-type FailedCredentials = {
+type FailedResult = {
   type: "failed";
 };
 
-type AuthResult = OAuthCredentials | ApiKeyCredentials | FailedCredentials;
+type AuthResult = OAuthSuccess | ApiKeySuccess | FailedResult;
 
 async function authorize(mode: "max" | "console") {
   const pkce = await generatePKCE();
@@ -65,7 +74,7 @@ async function authorize(mode: "max" | "console") {
 async function exchange(
   code: string,
   verifier: string,
-): Promise<OAuthCredentials | FailedCredentials> {
+): Promise<OAuthSuccess | FailedResult> {
   const splits = code.split("#");
   const result = await fetch("https://platform.claude.com/v1/oauth/token", {
     method: "POST",
@@ -84,7 +93,11 @@ async function exchange(
   if (!result.ok) {
     return { type: "failed" };
   }
-  const json = await result.json();
+  const json = (await result.json()) as {
+    refresh_token: string;
+    access_token: string;
+    expires_in: number;
+  };
   return {
     type: "success",
     refresh: json.refresh_token,
@@ -95,7 +108,7 @@ async function exchange(
 
 const AnthropicAuthPlugin: Plugin = async ({ client }) => {
   return {
-    "experimental.chat.system.transform": (
+    "experimental.chat.system.transform": async (
       input: { model?: { providerID?: string } },
       output: { system: string[] },
     ) => {
@@ -111,7 +124,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
     auth: {
       provider: "anthropic",
       async loader(
-        getAuth: () => Promise<OAuthCredentials | { type: string }>,
+        getAuth: () => Promise<OAuthStored | { type: string }>,
         provider: { models: Record<string, { cost?: unknown }> },
       ) {
         const auth = await getAuth();
@@ -129,8 +142,8 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
           }
           return {
             apiKey: "",
-            async fetch(input: RequestInfo | URL, init?: RequestInit) {
-              const auth = (await getAuth()) as OAuthCredentials;
+            async fetch(input: Request | string | URL, init?: RequestInit) {
+              const auth = (await getAuth()) as OAuthStored;
               if (auth.type !== "oauth") return fetch(input, init);
 
               // Refresh token if expired
@@ -152,7 +165,11 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
                 if (!response.ok) {
                   throw new Error(`Token refresh failed: ${response.status} ${await response.text()}`);
                 }
-                const json = await response.json();
+                const json = (await response.json()) as {
+                  refresh_token: string;
+                  access_token: string;
+                  expires_in: number;
+                };
                 await client.auth.set({
                   path: { id: "anthropic" },
                   body: {
@@ -180,7 +197,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
                     requestHeaders.set(key, value);
                   });
                 } else if (Array.isArray(requestInit.headers)) {
-                  for (const [key, value] of requestInit.headers) {
+                  for (const [key, value] of requestInit.headers as [string, string][]) {
                     if (typeof value !== "undefined") {
                       requestHeaders.set(key, String(value));
                     }
@@ -284,7 +301,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
               }
 
               // Add ?beta=true to /v1/messages endpoint
-              let requestInput: RequestInfo | URL = input;
+              let requestInput: Request | string | URL = input;
               let requestUrl: URL | null = null;
               try {
                 if (typeof input === "string" || input instanceof URL) {
@@ -388,7 +405,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
                       authorization: `Bearer ${credentials.access}`,
                     },
                   },
-                ).then((r) => r.json());
+                ).then((r) => r.json() as Promise<{ raw_key: string }>);
                 return { type: "success", key: result.raw_key };
               },
             };
