@@ -14,6 +14,10 @@ always prefer root folders for all packages and setting workspaces: ./\*. withou
 
 instead of using workspace:\* use workspace:^ for local packages versions. so if published they won't use the pinned version but the ^ version.
 
+## type checking
+
+to type check typescript projects try to use their typecheck package.json script if present. if not try build. this is preferable than `tsc`. also try to never pass --noEmit. so that our typechecking path does both things: check and emit the compiled assets. otherwise the dist folders would remain stale even after our changes.
+
 ## scripts
 
 if you need to create scripts always prefer typescript over bash or js. never create new files in js unless strictly required.
