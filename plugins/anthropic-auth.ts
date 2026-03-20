@@ -8,6 +8,10 @@
  * This plugin rebuilds the Anthropic login and refresh flow around that
  * working pi-mono implementation, then adapts the request/response shaping
  * needed for OpenCode's Anthropic provider integration.
+ *
+ * Login is intentionally remote-first: OpenCode always asks for the pasted
+ * callback URL or raw code, while still running the localhost callback server
+ * in parallel for environments where the browser can reach it directly.
  */
 
 import type { Plugin } from "@opencode-ai/plugin";
@@ -65,26 +69,6 @@ const OPENCODE_TO_CLAUDE_CODE_TOOL_NAME: Record<string, string> = {
   write: "Write",
 };
 
-const AUTH_MODE_PROMPTS = [
-  {
-    type: "select" as const,
-    key: "mode",
-    message: "Where will you finish the Anthropic login?",
-    options: [
-      {
-        label: "This machine browser",
-        value: "auto",
-        hint: "OpenCode catches the localhost callback automatically",
-      },
-      {
-        label: "Different machine / SSH",
-        value: "manual",
-        hint: "Paste the final callback URL from the browser",
-      },
-    ],
-  },
-];
-
 let pendingRefresh:
   | Promise<OAuthStored>
   | undefined;
@@ -137,8 +121,6 @@ type AuthorizationInput = {
   code?: string;
   state?: string;
 };
-
-type AuthMode = "auto" | "manual";
 
 type OAuthStored = {
   type: "oauth";
@@ -690,16 +672,8 @@ function mergeBetas(existingValue: string | null, required: string[]) {
   ].join(",");
 }
 
-function getAuthMode(inputs?: Record<string, string>): AuthMode {
-  return inputs?.mode === "manual" ? "manual" : "auto";
-}
-
-function getAutoInstructions() {
-  return "Complete login in your browser on this machine. OpenCode will catch the localhost callback automatically.";
-}
-
-function getManualInstructions() {
-  return "Complete login in any browser, then paste the final redirect URL from the address bar. Pasting just the authorization code also works.";
+function getRemoteFirstInstructions() {
+  return "Complete login in your browser, then paste the final redirect URL from the address bar here. Pasting just the authorization code also works. If this browser can reach localhost directly, finish the redirect and then press Enter here to use the captured callback.";
 }
 
 function toClaudeCodeToolName(name: string) {
@@ -926,10 +900,10 @@ async function getRequestBody(input: Request | string | URL, init?: RequestInit)
   return undefined;
 }
 
-async function beginAuthorizationFlow(authMode: AuthMode) {
+async function beginAuthorizationFlow() {
   const pkce = await generatePKCE();
-  const callbackServer = authMode === "auto" ? await startCallbackServer(pkce.verifier) : undefined;
-  const redirectUri = callbackServer?.redirectUri ?? REDIRECT_URI;
+  const callbackServer = await startCallbackServer(pkce.verifier);
+  const redirectUri = callbackServer.redirectUri;
 
   const authParams = new URLSearchParams({
     code: "true",
@@ -965,32 +939,67 @@ async function exchangeManualInput(
   return exchangeAuthorizationCode(parsed.code, parsed.state ?? verifier, verifier, redirectUri);
 }
 
-async function runAutoAuthorization(
+async function tryReadLocalAuthorization(callbackServer: CallbackServerInfo) {
+  return Promise.race([
+    callbackServer.waitForCode(),
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 50);
+    }),
+  ]);
+}
+
+async function resolveAuthorizationCode(
+  input: string,
   verifier: string,
   callbackServer: CallbackServerInfo,
 ): Promise<OAuthSuccess> {
   try {
-    const result = await Promise.race([
-      callbackServer.waitForCode(),
-      new Promise<null>((resolve) => {
-        setTimeout(() => resolve(null), OAUTH_TIMEOUT_MS);
-      }),
-    ]);
+    const localResult = await tryReadLocalAuthorization(callbackServer);
 
-    if (!result?.code) {
-      throw new Error("Timed out waiting for localhost OAuth callback");
+    if (localResult?.code) {
+      return exchangeAuthorizationCode(
+        localResult.code,
+        localResult.state,
+        verifier,
+        callbackServer.redirectUri,
+      );
     }
 
-    return exchangeAuthorizationCode(
-      result.code,
-      result.state,
-      verifier,
-      callbackServer.redirectUri,
-    );
+    const trimmed = input.trim();
+    if (!trimmed) {
+      const delayedLocalResult = await Promise.race([
+        callbackServer.waitForCode(),
+        new Promise<null>((resolve) => {
+          setTimeout(() => resolve(null), OAUTH_TIMEOUT_MS);
+        }),
+      ]);
+
+      if (!delayedLocalResult?.code) {
+        throw new Error("Missing authorization code in pasted input");
+      }
+
+      return exchangeAuthorizationCode(
+        delayedLocalResult.code,
+        delayedLocalResult.state,
+        verifier,
+        callbackServer.redirectUri,
+      );
+    }
+
+    return exchangeManualInput(trimmed, verifier, callbackServer.redirectUri);
   } finally {
     callbackServer.cancelWait();
     await closeServer(callbackServer.server);
   }
+}
+
+async function createApiKeyFromAuthorizationCode(
+  input: string,
+  verifier: string,
+  callbackServer: CallbackServerInfo,
+): Promise<ApiKeySuccess> {
+  const credentials = await resolveAuthorizationCode(input, verifier, callbackServer);
+  return createApiKey(credentials.access);
 }
 
 function failedResult(error: unknown): FailedResult {
@@ -1104,42 +1113,15 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
         {
           label: "Claude Pro/Max",
           type: "oauth",
-          prompts: AUTH_MODE_PROMPTS,
-          authorize: async (inputs) => {
-            const authMode = getAuthMode(inputs);
-            const auth = await beginAuthorizationFlow(authMode);
-
-            if (authMode === "manual") {
-              return {
-                url: auth.url,
-                instructions: getManualInstructions(),
-                method: "code" as const,
-                callback: async (input: string): Promise<AuthResult> => {
-                  try {
-                    return await exchangeManualInput(input, auth.verifier, auth.redirectUri);
-                  } catch (error) {
-                    return failedResult(error);
-                  }
-                },
-              };
-            }
-
-            if (!auth.callbackServer) {
-              return {
-                url: auth.url,
-                instructions: getAutoInstructions(),
-                method: "auto" as const,
-                callback: async (): Promise<AuthResult> => ({ type: "failed" }),
-              };
-            }
-
+          authorize: async () => {
+            const auth = await beginAuthorizationFlow();
             return {
               url: auth.url,
-              instructions: getAutoInstructions(),
-              method: "auto" as const,
-              callback: async (): Promise<AuthResult> => {
+              instructions: getRemoteFirstInstructions(),
+              method: "code" as const,
+              callback: async (input: string): Promise<AuthResult> => {
                 try {
-                  return await runAutoAuthorization(auth.verifier, auth.callbackServer!);
+                  return await resolveAuthorizationCode(input, auth.verifier, auth.callbackServer);
                 } catch (error) {
                   return failedResult(error);
                 }
@@ -1150,51 +1132,19 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
         {
           label: "Create an API Key",
           type: "oauth",
-          prompts: AUTH_MODE_PROMPTS,
-          authorize: async (inputs) => {
-            const authMode = getAuthMode(inputs);
-            const auth = await beginAuthorizationFlow(authMode);
-
-            if (authMode === "manual") {
-              return {
-                url: auth.url,
-                instructions: getManualInstructions(),
-                method: "code" as const,
-                callback: async (input: string): Promise<AuthResult> => {
-                  try {
-                    const credentials = await exchangeManualInput(
-                      input,
-                      auth.verifier,
-                      auth.redirectUri,
-                    );
-                    return await createApiKey(credentials.access);
-                  } catch (error) {
-                    return failedResult(error);
-                  }
-                },
-              };
-            }
-
-            if (!auth.callbackServer) {
-              return {
-                url: auth.url,
-                instructions: getAutoInstructions(),
-                method: "auto" as const,
-                callback: async (): Promise<AuthResult> => ({ type: "failed" }),
-              };
-            }
-
+          authorize: async () => {
+            const auth = await beginAuthorizationFlow();
             return {
               url: auth.url,
-              instructions: getAutoInstructions(),
-              method: "auto" as const,
-              callback: async (): Promise<AuthResult> => {
+              instructions: getRemoteFirstInstructions(),
+              method: "code" as const,
+              callback: async (input: string): Promise<AuthResult> => {
                 try {
-                  const credentials = await runAutoAuthorization(
+                  return await createApiKeyFromAuthorizationCode(
+                    input,
                     auth.verifier,
-                    auth.callbackServer!,
+                    auth.callbackServer,
                   );
-                  return await createApiKey(credentials.access);
                 } catch (error) {
                   return failedResult(error);
                 }
