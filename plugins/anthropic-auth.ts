@@ -9,9 +9,9 @@
  * working pi-mono implementation, then adapts the request/response shaping
  * needed for OpenCode's Anthropic provider integration.
  *
- * Login is intentionally remote-first: OpenCode always asks for the pasted
- * callback URL or raw code, while still running the localhost callback server
- * in parallel for environments where the browser can reach it directly.
+ * Login mode is chosen from environment:
+ * - `KIMAKI` set: remote-first pasted callback URL/raw code flow
+ * - otherwise: standard localhost auto-complete flow
  */
 
 import type { Plugin } from "@opencode-ai/plugin";
@@ -672,6 +672,14 @@ function mergeBetas(existingValue: string | null, required: string[]) {
   ].join(",");
 }
 
+function useKimakiRemoteFirstAuth() {
+  return Boolean(process.env.KIMAKI);
+}
+
+function getAutoInstructions() {
+  return "Complete login in your browser on this machine. OpenCode will catch the localhost callback automatically.";
+}
+
 function getRemoteFirstInstructions() {
   return "Complete login in your browser, then paste the final redirect URL from the address bar here. Pasting just the authorization code also works. If this browser can reach localhost directly, finish the redirect and then press Enter here to use the captured callback.";
 }
@@ -1002,6 +1010,42 @@ async function createApiKeyFromAuthorizationCode(
   return createApiKey(credentials.access);
 }
 
+async function runAutoAuthorization(
+  verifier: string,
+  callbackServer: CallbackServerInfo,
+): Promise<OAuthSuccess> {
+  try {
+    const result = await Promise.race([
+      callbackServer.waitForCode(),
+      new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), OAUTH_TIMEOUT_MS);
+      }),
+    ]);
+
+    if (!result?.code) {
+      throw new Error("Timed out waiting for localhost OAuth callback");
+    }
+
+    return exchangeAuthorizationCode(
+      result.code,
+      result.state,
+      verifier,
+      callbackServer.redirectUri,
+    );
+  } finally {
+    callbackServer.cancelWait();
+    await closeServer(callbackServer.server);
+  }
+}
+
+async function createApiKeyFromAutoAuthorization(
+  verifier: string,
+  callbackServer: CallbackServerInfo,
+): Promise<ApiKeySuccess> {
+  const credentials = await runAutoAuthorization(verifier, callbackServer);
+  return createApiKey(credentials.access);
+}
+
 function failedResult(error: unknown): FailedResult {
   console.error(`[anthropic-auth] ${formatErrorDetails(error)}`);
   return { type: "failed" };
@@ -1115,6 +1159,21 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
           type: "oauth",
           authorize: async () => {
             const auth = await beginAuthorizationFlow();
+            if (!useKimakiRemoteFirstAuth()) {
+              return {
+                url: auth.url,
+                instructions: getAutoInstructions(),
+                method: "auto" as const,
+                callback: async (): Promise<AuthResult> => {
+                  try {
+                    return await runAutoAuthorization(auth.verifier, auth.callbackServer);
+                  } catch (error) {
+                    return failedResult(error);
+                  }
+                },
+              };
+            }
+
             return {
               url: auth.url,
               instructions: getRemoteFirstInstructions(),
@@ -1134,6 +1193,24 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
           type: "oauth",
           authorize: async () => {
             const auth = await beginAuthorizationFlow();
+            if (!useKimakiRemoteFirstAuth()) {
+              return {
+                url: auth.url,
+                instructions: getAutoInstructions(),
+                method: "auto" as const,
+                callback: async (): Promise<AuthResult> => {
+                  try {
+                    return await createApiKeyFromAutoAuthorization(
+                      auth.verifier,
+                      auth.callbackServer,
+                    );
+                  } catch (error) {
+                    return failedResult(error);
+                  }
+                },
+              };
+            }
+
             return {
               url: auth.url,
               instructions: getRemoteFirstInstructions(),
