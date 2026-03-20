@@ -10,13 +10,114 @@
  * - Token refresh when expired
  * - System prompt sanitization (OpenCode -> Claude Code)
  * - Tool name prefixing (mcp_) for compatibility
+ * - Configurable Anthropic User-Agent for OAuth/API requests
  * - Zero cost display for OAuth users (Pro/Max plan)
  */
 
 import type { Plugin } from "@opencode-ai/plugin";
+import { createServer, type Server } from "node:http";
 import { generatePKCE } from "@openauthjs/openauth/pkce";
 
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+const OAUTH_BETA = "oauth-2025-04-20";
+const OAUTH_CALLBACK_PORT = 50751;
+const OAUTH_CALLBACK_PATH = "/callback";
+const OAUTH_REDIRECT_URI = `http://localhost:${OAUTH_CALLBACK_PORT}${OAUTH_CALLBACK_PATH}`;
+const DEFAULT_ANTHROPIC_USER_AGENT = "claude-code/2.1.80";
+const ANTHROPIC_HOSTS = new Set([
+  "api.anthropic.com",
+  "console.anthropic.com",
+  "claude.ai",
+  "platform.claude.com",
+]);
+const OAUTH_TIMEOUT_MS = 5 * 60 * 1000;
+
+type CallbackResult = {
+  code: string;
+  state: string;
+};
+
+type CallbackServerInfo = {
+  server: Server;
+  redirectUri: string;
+  cancelWait: () => void;
+  waitForCode: () => Promise<CallbackResult | null>;
+};
+
+function getAnthropicUserAgent() {
+  return process.env.OPENCODE_ANTHROPIC_USER_AGENT || DEFAULT_ANTHROPIC_USER_AGENT;
+}
+
+function resolveUrl(input: Request | string | URL) {
+  try {
+    if (typeof input === "string" || input instanceof URL) {
+      return new URL(input.toString());
+    }
+    if (input instanceof Request) {
+      return new URL(input.url);
+    }
+  } catch {
+    // ignore URL parse errors
+  }
+  return null;
+}
+
+function buildHeaders(input: Request | string | URL, init?: RequestInit) {
+  const headers = new Headers();
+
+  if (input instanceof Request) {
+    input.headers.forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+
+  if (init?.headers instanceof Headers) {
+    init.headers.forEach((value, key) => {
+      headers.set(key, value);
+    });
+  } else if (Array.isArray(init?.headers)) {
+    for (const [key, value] of init.headers as [string, string][]) {
+      if (typeof value !== "undefined") {
+        headers.set(key, String(value));
+      }
+    }
+  } else if (init?.headers) {
+    for (const [key, value] of Object.entries(init.headers)) {
+      if (typeof value !== "undefined") {
+        headers.set(key, String(value));
+      }
+    }
+  }
+
+  return headers;
+}
+
+async function anthropicFetch(input: Request | string | URL, init?: RequestInit) {
+  const url = resolveUrl(input);
+  if (!url || !ANTHROPIC_HOSTS.has(url.hostname)) {
+    return fetch(input, init);
+  }
+
+  const headers = buildHeaders(input, init);
+  const incomingBeta = headers.get("anthropic-beta") || "";
+  const mergedBetas = [
+    ...new Set([
+      OAUTH_BETA,
+      ...incomingBeta
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ]),
+  ].join(",");
+
+  headers.set("anthropic-beta", mergedBetas);
+  headers.set("user-agent", getAnthropicUserAgent());
+
+  return fetch(input, {
+    ...(init ?? {}),
+    headers,
+  });
+}
 
 type OAuthStored = {
   type: "oauth";
@@ -45,19 +146,89 @@ type FailedResult = {
 
 type AuthResult = OAuthSuccess | ApiKeySuccess | FailedResult;
 
+function closeServer(server: Server) {
+  return new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+}
+
+async function startCallbackServer(expectedState: string): Promise<CallbackServerInfo> {
+  return new Promise((resolve, reject) => {
+    let settleWait: ((value: CallbackResult | null) => void) | undefined;
+    const waitForCodePromise = new Promise<CallbackResult | null>((resolveWait) => {
+      let settled = false;
+      settleWait = (value) => {
+        if (settled) return;
+        settled = true;
+        resolveWait(value);
+      };
+    });
+
+    const server = createServer((req, res) => {
+      try {
+        const url = new URL(req.url || "", OAUTH_REDIRECT_URI);
+        if (url.pathname !== OAUTH_CALLBACK_PATH) {
+          res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("OAuth callback route not found.");
+          return;
+        }
+
+        const error = url.searchParams.get("error");
+        const code = url.searchParams.get("code");
+        const state = url.searchParams.get("state");
+
+        if (error) {
+          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end(`Anthropic authentication failed: ${error}`);
+          settleWait?.(null);
+          return;
+        }
+
+        if (!code || !state) {
+          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Missing code or state parameter.");
+          settleWait?.(null);
+          return;
+        }
+
+        if (state !== expectedState) {
+          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("OAuth state mismatch.");
+          settleWait?.(null);
+          return;
+        }
+
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Anthropic authentication completed. You can close this window.");
+        settleWait?.({ code, state });
+      } catch {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("Internal OAuth callback error.");
+        settleWait?.(null);
+      }
+    });
+
+    server.once("error", reject);
+    server.listen(OAUTH_CALLBACK_PORT, "127.0.0.1", () => {
+      resolve({
+        server,
+        redirectUri: OAUTH_REDIRECT_URI,
+        cancelWait: () => settleWait?.(null),
+        waitForCode: () => waitForCodePromise,
+      });
+    });
+  });
+}
+
 async function authorize(mode: "max" | "console") {
   const pkce = await generatePKCE();
+  const callbackServer = await startCallbackServer(pkce.verifier);
 
-  const url = new URL(
-    `https://${mode === "console" ? "console.anthropic.com" : "claude.ai"}/oauth/authorize`,
-  );
+  const url = new URL("https://claude.ai/oauth/authorize");
   url.searchParams.set("code", "true");
   url.searchParams.set("client_id", CLIENT_ID);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set(
-    "redirect_uri",
-    "https://console.anthropic.com/oauth/code/callback",
-  );
+  url.searchParams.set("redirect_uri", callbackServer.redirectUri);
   url.searchParams.set(
     "scope",
     "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload",
@@ -68,29 +239,40 @@ async function authorize(mode: "max" | "console") {
   return {
     url: url.toString(),
     verifier: pkce.verifier,
+    callbackServer,
   };
 }
 
 async function exchange(
   code: string,
+  state: string,
   verifier: string,
+  redirectUri: string,
 ): Promise<OAuthSuccess | FailedResult> {
-  const splits = code.split("#");
-  const result = await fetch("https://platform.claude.com/v1/oauth/token", {
+  if (state !== verifier) {
+    console.error("[anthropic-auth] OAuth state mismatch in callback");
+    return { type: "failed" };
+  }
+
+  const result = await anthropicFetch("https://platform.claude.com/v1/oauth/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      code: splits[0],
-      state: splits[1],
+      code,
+      state,
       grant_type: "authorization_code",
       client_id: CLIENT_ID,
-      redirect_uri: "https://console.anthropic.com/oauth/code/callback",
+      redirect_uri: redirectUri,
       code_verifier: verifier,
     }),
   });
   if (!result.ok) {
+    const details = await result.text().catch(() => "");
+    console.error(
+      `[anthropic-auth] Token exchange failed: ${result.status} ${result.statusText}${details ? ` - ${details}` : ""}`,
+    );
     return { type: "failed" };
   }
   const json = (await result.json()) as {
@@ -148,7 +330,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
 
               // Refresh token if expired
               if (!auth.access || auth.expires < Date.now()) {
-                const response = await fetch(
+                const response = await anthropicFetch(
                   "https://platform.claude.com/v1/oauth/token",
                   {
                     method: "POST",
@@ -185,33 +367,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
               const requestInit = init ?? {};
 
               // Build headers
-              const requestHeaders = new Headers();
-              if (input instanceof Request) {
-                input.headers.forEach((value, key) => {
-                  requestHeaders.set(key, value);
-                });
-              }
-              if (requestInit.headers) {
-                if (requestInit.headers instanceof Headers) {
-                  requestInit.headers.forEach((value, key) => {
-                    requestHeaders.set(key, value);
-                  });
-                } else if (Array.isArray(requestInit.headers)) {
-                  for (const [key, value] of requestInit.headers as [string, string][]) {
-                    if (typeof value !== "undefined") {
-                      requestHeaders.set(key, String(value));
-                    }
-                  }
-                } else {
-                  for (const [key, value] of Object.entries(
-                    requestInit.headers,
-                  )) {
-                    if (typeof value !== "undefined") {
-                      requestHeaders.set(key, String(value));
-                    }
-                  }
-                }
-              }
+              const requestHeaders = buildHeaders(input, requestInit);
 
               // Merge beta headers - preserve incoming + add required ones
               const incomingBeta = requestHeaders.get("anthropic-beta") || "";
@@ -221,7 +377,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
                 .filter(Boolean);
 
               const requiredBetas = [
-                "oauth-2025-04-20",
+                OAUTH_BETA,
                 "interleaved-thinking-2025-05-14",
                 // "context-1m-2025-08-07", // 1M context window for Opus 4.6
               ];
@@ -233,7 +389,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
               requestHeaders.set("anthropic-beta", mergedBetas);
               requestHeaders.set(
                 "user-agent",
-                "claude-cli/2.1.2 (external, cli)",
+                getAnthropicUserAgent(),
               );
               requestHeaders.delete("x-api-key");
 
@@ -325,7 +481,7 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
                     : requestUrl;
               }
 
-              const response = await fetch(requestInput, {
+              const response = await anthropicFetch(requestInput, {
                 ...requestInit,
                 body,
                 headers: requestHeaders,
@@ -373,13 +529,30 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
           label: "Claude Pro/Max",
           type: "oauth",
           authorize: async () => {
-            const { url, verifier } = await authorize("max");
+            const { url, verifier, callbackServer } = await authorize("max");
             return {
               url,
-              instructions: "Paste the authorization code here: ",
-              method: "code",
-              callback: async (code: string): Promise<AuthResult> => {
-                return exchange(code, verifier);
+              instructions: "Complete login in your browser. The localhost callback will finish automatically.",
+              method: "auto",
+              callback: async (): Promise<AuthResult> => {
+                try {
+                  const result = await Promise.race([
+                    callbackServer.waitForCode(),
+                    new Promise<null>((resolve) => {
+                      setTimeout(() => resolve(null), OAUTH_TIMEOUT_MS);
+                    }),
+                  ]);
+
+                  if (!result) {
+                    console.error("[anthropic-auth] Timed out waiting for localhost OAuth callback");
+                    return { type: "failed" };
+                  }
+
+                  return exchange(result.code, result.state, verifier, callbackServer.redirectUri);
+                } finally {
+                  callbackServer.cancelWait();
+                  await closeServer(callbackServer.server);
+                }
               },
             };
           },
@@ -388,25 +561,47 @@ const AnthropicAuthPlugin: Plugin = async ({ client }) => {
           label: "Create an API Key",
           type: "oauth",
           authorize: async () => {
-            const { url, verifier } = await authorize("console");
+            const { url, verifier, callbackServer } = await authorize("console");
             return {
               url,
-              instructions: "Paste the authorization code here: ",
-              method: "code",
-              callback: async (code: string): Promise<AuthResult> => {
-                const credentials = await exchange(code, verifier);
-                if (credentials.type === "failed") return credentials;
-                const result = await fetch(
-                  `https://api.anthropic.com/api/oauth/claude_cli/create_api_key`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      authorization: `Bearer ${credentials.access}`,
+              instructions: "Complete login in your browser. The localhost callback will finish automatically.",
+              method: "auto",
+              callback: async (): Promise<AuthResult> => {
+                try {
+                  const result = await Promise.race([
+                    callbackServer.waitForCode(),
+                    new Promise<null>((resolve) => {
+                      setTimeout(() => resolve(null), OAUTH_TIMEOUT_MS);
+                    }),
+                  ]);
+
+                  if (!result) {
+                    console.error("[anthropic-auth] Timed out waiting for localhost OAuth callback");
+                    return { type: "failed" };
+                  }
+
+                  const credentials = await exchange(
+                    result.code,
+                    result.state,
+                    verifier,
+                    callbackServer.redirectUri,
+                  );
+                  if (credentials.type === "failed") return credentials;
+                  const apiKeyResult = await anthropicFetch(
+                    `https://api.anthropic.com/api/oauth/claude_cli/create_api_key`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        authorization: `Bearer ${credentials.access}`,
+                      },
                     },
-                  },
-                ).then((r) => r.json() as Promise<{ raw_key: string }>);
-                return { type: "success", key: result.raw_key };
+                  ).then((r) => r.json() as Promise<{ raw_key: string }>);
+                  return { type: "success", key: apiKeyResult.raw_key };
+                } finally {
+                  callbackServer.cancelWait();
+                  await closeServer(callbackServer.server);
+                }
               },
             };
           },
