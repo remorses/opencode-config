@@ -42,7 +42,6 @@ const SCOPES =
   "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 const OAUTH_TIMEOUT_MS = 5 * 60 * 1000;
 const CLAUDE_CODE_VERSION = "2.1.75";
-const OAUTH_HTTP_USER_AGENT = "claude-code/2.1.80";
 const CLAUDE_CODE_IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude.";
 const OPENCODE_IDENTITY = "You are OpenCode, the best coding agent on the planet.";
 const CLAUDE_CODE_BETA = "claude-code-20250219";
@@ -194,10 +193,8 @@ async function postJson(url: string, body: Record<string, string | number>): Pro
     method: "POST",
     headers: {
       Accept: "application/json",
-      "anthropic-beta": OAUTH_BETA,
       "Content-Length": String(Buffer.byteLength(requestBody)),
       "Content-Type": "application/json",
-      "user-agent": OAUTH_HTTP_USER_AGENT,
     },
     body: requestBody,
   });
@@ -292,10 +289,8 @@ async function createApiKey(accessToken: string): Promise<ApiKeySuccess> {
     method: "POST",
     headers: {
       Accept: "application/json",
-      "anthropic-beta": OAUTH_BETA,
       authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      "user-agent": OAUTH_HTTP_USER_AGENT,
     },
   });
   const json = JSON.parse(responseText) as { raw_key: string };

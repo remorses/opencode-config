@@ -17,6 +17,7 @@
 
 import type { Plugin } from "@opencode-ai/plugin";
 import { generatePKCE } from "@openauthjs/openauth/pkce";
+import { spawn } from "node:child_process";
 import * as fs from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { homedir } from "node:os";
@@ -97,18 +98,107 @@ type AuthResult = OAuthSuccess | ApiKeySuccess | { type: "failed" };
 
 // --- HTTP helpers ---
 
-async function postJson(url: string, body: Record<string, string | number>): Promise<unknown> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30_000),
+async function requestText(
+  urlString: string,
+  options: {
+    method: string;
+    headers?: Record<string, string>;
+    body?: string;
+  },
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({
+      body: options.body,
+      headers: options.headers,
+      method: options.method,
+      url: urlString,
+    });
+    const child = spawn(
+      "node",
+      [
+        "-e",
+        `
+const input = JSON.parse(process.argv[1]);
+(async () => {
+  const response = await fetch(input.url, {
+    method: input.method,
+    headers: input.headers,
+    body: input.body,
   });
+  const text = await response.text();
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`HTTP ${response.status} from ${url}: ${text}`);
+    console.error(JSON.stringify({ status: response.status, body: text }));
+    process.exit(1);
   }
-  return response.json();
+  process.stdout.write(text);
+})().catch((error) => {
+  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+  process.exit(1);
+});
+        `.trim(),
+        payload,
+      ],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Request timed out. url=${urlString}`));
+    }, 30_000);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        let details = stderr.trim();
+        try {
+          const parsed = JSON.parse(details) as { status?: number; body?: string };
+          if (typeof parsed.status === "number") {
+            reject(
+              new Error(
+                `HTTP ${parsed.status} from ${urlString}: ${parsed.body ?? ""}`,
+              ),
+            );
+            return;
+          }
+        } catch {
+          // fall back to raw stderr
+        }
+        reject(new Error(details || `Node helper exited with code ${code}`));
+        return;
+      }
+      resolve(stdout);
+    });
+  });
+}
+
+async function postJson(url: string, body: Record<string, string | number>): Promise<unknown> {
+  const requestBody = JSON.stringify(body);
+  const responseText = await requestText(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Length": String(Buffer.byteLength(requestBody)),
+      "Content-Type": "application/json",
+    },
+    body: requestBody,
+  });
+  return JSON.parse(responseText) as unknown;
 }
 
 // --- File lock for token refresh ---
@@ -195,20 +285,15 @@ async function refreshAnthropicToken(refreshToken: string): Promise<OAuthStored>
 }
 
 async function createApiKey(accessToken: string): Promise<ApiKeySuccess> {
-  const response = await fetch(CREATE_API_KEY_URL, {
+  const responseText = await requestText(CREATE_API_KEY_URL, {
     method: "POST",
     headers: {
       Accept: "application/json",
       authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`HTTP ${response.status} creating API key: ${text}`);
-  }
-  const json = (await response.json()) as { raw_key: string };
+  const json = JSON.parse(responseText) as { raw_key: string };
   return { type: "success", key: json.raw_key };
 }
 
