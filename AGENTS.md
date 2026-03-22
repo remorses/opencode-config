@@ -195,6 +195,8 @@ NEVER use git to revert files to previous state if you did not create those file
 
 Never submit pending reviews with placeholder messages like "Reviewing suggestions". If a pending review blocks comment replies, dismiss it instead of submitting with generic text comment.
 
+NEVER fabricate GitHub GraphQL node IDs. Always query them from the API or capture them from the creation mutation's return fields.
+
 NEVER use we or our in messages. Write as if you were me, making the body personal. Write casually and concisely, not like a robot. Focus on telling information quickly without stupid fluff and corporate idioms.
 
 ## github releases
