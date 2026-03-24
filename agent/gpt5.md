@@ -9,4 +9,5 @@ permission:
   task:
     "*": allow
     oracle: deny
+    image-understanding: deny
 ---
