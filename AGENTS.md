@@ -239,16 +239,6 @@ for web searches use `googlesearch` tool (which uses Gemini with Google Search g
 
 when possible, ask the search to retrieve and include relevant GitHub project URLs in the results.
 
-## reading images
-
-ALWAYS use the task tool for reading/analyzing images. never read images directly with the read tool as images consume a lot of context window space.
-
-when analyzing an image, pass a detailed description in the task prompt of what you want to know. be specific about what aspects to examine and what information to return.
-
-example: if detecting clipping issues in a screenshot, ask the task to describe in detail whether any UI elements are clipped, cut off, or overflowing their containers, and to report the specific locations and severity of any issues found.
-
-the subagent will read the image and return only the relevant textual findings, saving significant context.
-
 ## docs .md files
 
 if user asks you to create .md files with findings always put them in a docs folder and not at root level or in src
