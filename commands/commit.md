@@ -7,7 +7,7 @@ model: anthropic/claude-sonnet-4-6
 
 see git diff. if there are submodules also see their diff too.
 
-if there are files that should not be tracked (like opensrc, node_modules, tsbuildinfo files) add them to .gitignore first
+if there are files that should not be tracked (like gitchamber output, node_modules, tsbuildinfo files) add them to .gitignore first
 
 understand the diff by also reading relevant files if the diff are from files you did not touch
 
