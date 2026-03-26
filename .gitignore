@@ -6,5 +6,6 @@ antigravity-accounts.json
 multicodex-accounts.json
 tmp
 
-# opensrc - source code for packages
-opensrc/
+# gitchamber - source code for packages
+node_modules/.gitchamber/
+opensrc

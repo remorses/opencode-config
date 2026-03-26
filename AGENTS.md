@@ -275,20 +275,20 @@ if you have difficulties making some tests pass in some edge cases do not apply 
 
 leave them failing instead and report to the user the issues faced as a last resort
 
-# opensrc
+# gitchamber
 
 to read source code of npm packages or repos you can do:
 
 ```sh
-bunx opensrc npmpackagename
-opensrc github:owner/repo
-opensrc owner/repo@v1.0.0
-opensrc owner/repo#main
+bunx gitchamber npmpackagename
+gitchamber github:owner/repo
+gitchamber owner/repo@v1.0.0
+gitchamber owner/repo#main
 ```
 
-this will download them in a local ./opensrc folder
+this will download them in `node_modules/.gitchamber/`
 
-this is preferable over manually cloning repos in tmp or using gitchamber
+this is preferable over manually cloning repos in tmp
 
 # git worktrees
 
