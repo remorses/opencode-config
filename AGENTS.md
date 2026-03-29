@@ -277,7 +277,7 @@ leave them failing instead and report to the user the issues faced as a last res
 
 # gitchamber
 
-gitchamber is an alternative to opensrc with the same interface. When the user refers to opensrc, always use gitchamber instead.
+gitchamber (aka chamber) is an alternative to opensrc with the same interface. When the user refers to opensrc, always use gitchamber instead.
 
 to read source code of npm packages or repos you can do:
 
