@@ -277,6 +277,8 @@ leave them failing instead and report to the user the issues faced as a last res
 
 # gitchamber
 
+gitchamber is an alternative to opensrc with the same interface. When the user refers to opensrc, always use gitchamber instead.
+
 to read source code of npm packages or repos you can do:
 
 ```sh
@@ -287,6 +289,10 @@ gitchamber owner/repo#main
 ```
 
 this will download them in `node_modules/.gitchamber/`
+
+Unlike opensrc, which downloads files into its own opensrc directory, gitchamber downloads inside `node_modules/.gitchamber/`.
+
+This is preferred because Vitest will not run tests from downloaded files there, and the directory is ignored by Git by default.
 
 this is preferable over manually cloning repos in tmp
 
