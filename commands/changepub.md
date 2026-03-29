@@ -26,6 +26,13 @@ Check the last published version:
 npm show packagename version
 ```
 
+**Compare the npm version against `package.json`.** If `package.json` is already ahead (e.g. npm has 0.0.89 but package.json says 0.0.101), those intermediate versions were never published. The changelog and GitHub release MUST cover everything since the last **published** npm version, not just the latest changelog section.
+
+Use the npm version (not the package.json version) as the baseline for:
+- `git log` to find all commits that need covering
+- changelog content to include in GitHub release notes
+- determining what features are "new" to users
+
 For monorepos, check each workspace package to identify which ones have unpublished changes.
 
 ## Step 3: Bump Version and Update Changelog
@@ -212,6 +219,12 @@ git push origin HEAD --tags
 **Never create draft releases** — always publish releases immediately so users see them.
 
 **Do NOT use `--notes-file CHANGELOG.md`** — that dumps the entire changelog into the release body.
+
+### Merging unpublished versions into release notes
+
+If `package.json` was bumped multiple times without publishing (e.g. npm has 0.0.89, package.json has 0.0.101, you're publishing 0.0.102), the GitHub release notes must merge ALL changelog entries from 0.0.90 through 0.0.102 into a single release. Users jumping from 0.0.89 to 0.0.102 need to see everything that changed.
+
+Sort merged entries by impact — big new features first, bug fixes last. Remove duplicates where a feature was added then refined across versions (only describe the final state).
 
 Extract only the current version's section and pass via `--notes`:
 
