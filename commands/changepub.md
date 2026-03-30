@@ -319,3 +319,7 @@ NEVER use the changesets cli to publish or update changeset based packages. alwa
 if a `package.json` version has a version like `1.18.0-rsc.0` you MUST add the option --tag rsc. rsc is for the tag used in the version.
 
 example: `pnpm publish --tag next` for `1.0.0-next.0`. the `.0` does not matter in what `--tag` name you would use.
+
+## working directory
+
+do not change cwd if there are git diff that don't let you publish, instead just commit them with the appropriate message. do this before starting the publish.
