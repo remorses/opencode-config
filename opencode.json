@@ -118,7 +118,6 @@
   },
   "plugin": [
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
-    "/Users/morse/.config/opencode/plugins/anthropic-auth.ts",
     "kitty-graphics-agent"
     // "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
     // "@tarquinen/opencode-dcp", SHIT. breaks claude rules of thinking
