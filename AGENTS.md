@@ -267,6 +267,14 @@ for multiline inline snapshots always prefix them with \n with `.toMatchInlineSn
 
 NEVER use mocks in tests. NEVER mock modules. tests should try to test as much of the code as possible, and not mock parts of the code. for example if we are testing a NAPI js package you must not mock the native side with fake functions. instead you must test the end to end flow of the code.
 
+## linting
+
+always run `lintcn lint` at the end of an editing session to catch errors or warnings introduced by the changes.
+
+if `lintcn lint` reports issues for your new changed files fix them 
+
+do not add a local lintcn config just to make it run. there is a global lintcn config shared across all my projects.
+
 ## test driven development
 
 you should write failing tests first, make sure they fail, then write the code or fixes that will make them pass. refactoring them if needed
