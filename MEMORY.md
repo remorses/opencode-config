@@ -4,6 +4,9 @@
 
 ## Anthropic OAuth plugin
 
+- In this setup, the active OpenCode Anthropic plugin is a wrapper at `plugins/anthropic-auth.ts` that imports `kimakivoice/discord/src/anthropic-auth-plugin.ts`. Changes to Anthropic OAuth behavior should usually go in the Kimaki repo plugin, not the stale copy under `disabled-plugins/anthropic-auth.ts`.
+- For Anthropic multi-account UX, adding a new account should happen through the normal login flow with a different Claude account. Management commands should stay minimal and focus on listing and removing stored accounts instead of a separate `add` command.
+- Anthropic multi-account state now uses a separate XDG/home-based store file (`anthropic-oauth-accounts.json`) while `auth.json` keeps only the currently active `anthropic` credential. Normal OAuth login implicitly enrolls the account into that pool.
 - Working Claude Pro/Max OAuth needs `https://claude.ai/oauth/authorize` and token exchange at `https://platform.claude.com/v1/oauth/token`.
 - The working `pi-mono` implementation uses `http://localhost:53692/callback` as the redirect URI and still keeps that same localhost redirect URI even when the user manually pastes back the final callback URL or raw code.
 - `pi-mono` is not a separate pure device/code-auth flow for Anthropic. It is a localhost callback flow with a manual fallback path that parses the pasted callback URL or code when the browser cannot reach the local server.
