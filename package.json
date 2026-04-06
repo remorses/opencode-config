@@ -1,19 +1,21 @@
 {
+  "type": "module",
   "dependencies": {
-    "@ai-sdk/google": "^2.0.38",
-    "@ai-sdk/google-vertex": "^4.0.11",
+    "@ai-sdk/google": "^2.0.67",
+    "@ai-sdk/google-vertex": "^4.0.102",
     "@openauthjs/openauth": "^0.4.3",
     "@opencode-ai/plugin": "1.3.17",
-    "ai": "^5.0.95",
+    "ai": "^6.0.146",
+    "kimaki": "^0.4.90",
     "proper-lockfile": "^4.1.2",
     "tree-sitter-bash": "^0.25.0",
-    "web-tree-sitter": "^0.25.10"
+    "web-tree-sitter": "^0.26.8"
   },
   "devDependencies": {
     "@tsconfig/bun": "^1.0.10",
-    "@types/bun": "^1.2.8",
-    "@types/node": "^25.1.0",
+    "@types/bun": "^1.3.11",
+    "@types/node": "^25.5.2",
     "@types/proper-lockfile": "^4.1.4",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }
