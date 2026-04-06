@@ -3,15 +3,89 @@
 // documentation links, and GitHub repos. Optimized for coding agent queries.
 
 import { tool } from "@opencode-ai/plugin";
-import {
-  createGoogleGenerativeAI,
-  type GoogleGenerativeAIProviderOptions,
-} from "@ai-sdk/google";
-import { generateText } from "ai";
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY!,
-});
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{ text?: string }>;
+    };
+  }>;
+  error?: {
+    message?: string;
+  };
+};
+
+function buildPrompt(query: string) {
+  return `You are a research assistant for a coding agent. Search the web thoroughly and return findings.
+
+**Query:** ${JSON.stringify(query)}
+
+**Instructions:**
+1. Search multiple times with varied terms to get comprehensive coverage
+2. Read and synthesize the most relevant results
+3. Structure your response with:
+   - Key findings as concise bullet points
+   - Code snippets (properly formatted) when available
+   - Links to official docs, GitHub repos, and authoritative sources
+   - Version numbers and dates when relevant
+
+**Important:**
+- Quote directly from sources rather than paraphrasing
+- Do not fabricate information - only report what you found
+- Be concise
+- Prioritize official documentation and well-maintained repos
+- Include URLs for all referenced resources`;
+}
+
+async function runGroundedGoogleSearch(query: string, abort: AbortSignal) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is missing.");
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: buildPrompt(query) }] }],
+        tools: [{ googleSearch: {} }],
+      }),
+      signal: abort,
+    },
+  );
+
+  const raw = await response.text();
+  if (!response.ok) {
+    throw new Error(`Google search request failed (${response.status}): ${raw}`);
+  }
+
+  let parsed: GeminiResponse;
+  try {
+    parsed = JSON.parse(raw) as GeminiResponse;
+  } catch {
+    throw new Error("Google search response was not valid JSON.");
+  }
+
+  const text =
+    parsed.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text?.trim())
+      .filter((part): part is string => Boolean(part))
+      .join("\n\n") ?? "";
+
+  if (text) {
+    return text;
+  }
+
+  if (parsed.error?.message) {
+    throw new Error(parsed.error.message);
+  }
+
+  throw new Error("Google search response did not include text output.");
+}
 
 const googlesearch = tool({
   description: `Search the web using Google via Gemini. Returns in-depth research summaries with code examples, documentation links, and GitHub repos.
@@ -41,42 +115,7 @@ const googlesearch = tool({
   },
 
   async execute(args, { abort }) {
-    const { text } = await generateText({
-      model: google("gemini-2.5-flash-lite"),
-      providerOptions: {
-        google: {
-          // thinkingConfig: {
-          //   thinkingLevel: "low",
-          // },
-        } satisfies GoogleGenerativeAIProviderOptions,
-      },
-      abortSignal: abort,
-      tools: {
-        google_search: google.tools.googleSearch({}),
-      },
-      stopWhen: () => false,
-      prompt: `You are a research assistant for a coding agent. Search the web thoroughly and return findings.
-
-**Query:** ${JSON.stringify(args.query)}
-
-**Instructions:**
-1. Search multiple times with varied terms to get comprehensive coverage
-2. Read and synthesize the most relevant results
-3. Structure your response with:
-   - Key findings as concise bullet points
-   - Code snippets (properly formatted) when available
-   - Links to official docs, GitHub repos, and authoritative sources
-   - Version numbers and dates when relevant
-
-**Important:**
-- Quote directly from sources rather than paraphrasing
-- Do not fabricate information - only report what you found
-- Be concise
-- Prioritize official documentation and well-maintained repos
-- Include URLs for all referenced resources`,
-    });
-
-    return text;
+    return runGroundedGoogleSearch(args.query, abort);
   },
 });
 
