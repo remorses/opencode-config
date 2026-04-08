@@ -12,6 +12,9 @@
   //   }
   // },
   "provider": {
+    "cursor": {
+      "name": "Cursor"
+    },
     "opencode": {
       "models": {
         "glm-4.6": {
@@ -118,7 +121,9 @@
   },
   "plugin": [
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
-    "kitty-graphics-agent"
+    "/Users/morse/Documents/GitHub/kimakivoice/cli/src/anthropic-auth-plugin.ts",
+    // "kitty-graphics-agent",
+     // "opencode-cursor-oauth"
     // "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
     // "@tarquinen/opencode-dcp", SHIT. breaks claude rules of thinking
     // "/Users/morse/kimaki/codex-multi-auth/index.ts", SHIT. breaks everything. codex 5.3 does not work.probably uses the API for some reason! spent a lot of money on API for no reason
