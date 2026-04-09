@@ -122,6 +122,7 @@
   "plugin": [
     "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
     "/Users/morse/Documents/GitHub/kimakivoice/cli/src/anthropic-auth-plugin.ts",
+    "/Users/morse/.config/opencode/plugins/systemprompt-debug.ts"
     // "kitty-graphics-agent",
      // "opencode-cursor-oauth"
     // "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
