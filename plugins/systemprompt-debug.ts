@@ -4,7 +4,11 @@ import os from "os";
 import fs from "fs/promises";
 
 const systemPromptDriftPlugin: Plugin = async ({ client, directory }) => {
-  const dataDir = path.resolve(os.homedir(), ".opencode-prompts");
+  const dataDir = path.resolve(
+    os.homedir(),
+    ".config/opencode",
+    ".opencode-prompts",
+  );
 
   // Create data directory if it doesn't exist
   await fs.mkdir(dataDir, { recursive: true });
