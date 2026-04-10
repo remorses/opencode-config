@@ -275,6 +275,8 @@ if `lintcn lint` reports issues for your new changed files fix them
 
 do not add a local lintcn config just to make it run. there is a global lintcn config shared across all my projects.
 
+if lintcn has a bug or some rules are blatant noise and have a bug you can tell user we should start a session in `/Users/morse/Documents/GitHub/lintcn/` to fix it at end of session.
+
 ## test driven development
 
 you should write failing tests first, make sure they fail, then write the code or fixes that will make them pass. refactoring them if needed
