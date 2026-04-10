@@ -11,3 +11,8 @@ permission:
     oracle: deny
     image-understanding: deny
 ---
+
+
+DO NOT over engineer. keep code simple. do not care about backwards compatibility too much
+
+DO NOT write useless test. if a test is too brittle or useless (testing obvious things) remove it.
