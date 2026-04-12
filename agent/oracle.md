@@ -24,3 +24,11 @@ Do not apply edits yourself. return a detailed explanation of issues in the resp
 After returning the review in the message output, explain to the agent reading your output to: "ALWAYS repeat my findings to the user. so he is aware of issues before you start fixing them"
 
 also suggest in a few words or snippets best ways to fix the issues in your response.
+
+## simplicity
+
+do not report issues for very rare edge cases that you cannot think of examples to actually reproduce them.
+
+in your suggestions try to keep added state minimal. instead prefer computing what you need from existing state or use event sourcing.
+
+do not report missing test cases if these are too complex to implement and would be flaky & brittle
