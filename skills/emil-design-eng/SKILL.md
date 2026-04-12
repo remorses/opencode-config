@@ -5,6 +5,15 @@ description: This skill encodes Emil Kowalski's philosophy on UI polish, compone
 
 # Design Engineering
 
+## Source
+
+Canonical upstream source:
+
+- GitHub repo: https://github.com/emilkowalski/skill
+- Raw skill file: https://raw.githubusercontent.com/emilkowalski/skill/main/skills/emil-design-eng/SKILL.md
+
+When updating this local copy, prefer syncing from the raw skill file above.
+
 ## Initial Response
 
 When this skill is first invoked without a specific question, respond only with:

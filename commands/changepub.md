@@ -40,6 +40,20 @@ For monorepos, check each workspace package to identify which ones have unpublis
 1. Bump the version in `package.json` (never do major bumps)
 2. Update or create `CHANGELOG.md` with a **numbered list** under the new version heading
 
+### Semver bump rules
+
+- **minor** when users get a **new feature, new command, new flag, new option, or new capability**
+- **patch** only when the release is **only fixes, small behavior adjustments, or performance improvements**
+- Never default to patch when there are new user-facing features
+
+Examples:
+
+- new `build --watch` command → **minor**
+- new `--format json` option → **minor**
+- support for a new config field or API callback → **minor**
+- fix crash on invalid config with no new capability → **patch**
+- faster startup with no new behavior → **patch**
+
 ### Changelog format
 
 Use numbered lists, not bullets. Each item describes a **user-facing outcome**.
@@ -87,6 +101,8 @@ git show <commit> -- docs/
 ````
 
 This gives you the full context: examples, diagrams, and explanations the author wrote. Use this to write rich changelog entries that help users understand the feature.
+
+If a feature ships in this release, the version bump should usually be **minor**, not patch.
 
 ### CLI commands and options
 
@@ -306,9 +322,10 @@ Changelog item entry here. with examples
 
 For packages that contain these `.md` files we should
 
-- read the .md files inside .changelog if any (also check in all parent folders if this is a workspace. sometimes this .changelog is nested)
+- read the .md files inside `.changeset` if any (also check in parent folders if this is a workspace. sometimes `.changeset` is at the repo root)
 - update the CHANGELOG.md for the packages, adding each one of these .md entries content as a list item for the new version
-- if any of them has a minor change use a minor bump, else patch
+- if any entry adds a **new feature or capability**, use a **minor** bump
+- use **patch** only when all entries are fixes or non-feature improvements
 - then delete these .md files
 - publish as normal
 
