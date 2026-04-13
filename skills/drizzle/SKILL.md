@@ -13,6 +13,15 @@ description: >
 
 Drizzle ORM conventions for all my TypeScript projects.
 
+## CRITICAL: Always use drizzle beta, NEVER v0
+
+Always install `drizzle-orm@beta` and `drizzle-kit@beta` (currently 1.0.0-beta.x). NEVER use `drizzle-orm@latest` which resolves to v0.x — it lacks `defineRelations`, 2-param `DrizzleSqliteDODatabase`, and other v1 features used throughout this skill.
+
+```bash
+pnpm install drizzle-orm@beta
+pnpm install drizzle-kit@beta --save-dev
+```
+
 **Docs reference:** https://orm.drizzle.team/llms.txt — full docs index for LLMs. Fetch this when you need to look up something not covered here.
 
 ## Project structure
