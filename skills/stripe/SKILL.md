@@ -22,7 +22,7 @@ Core rules, in priority order:
 3. **Every Price uses `currency_options` for EUR** on top of a USD base. Same integer value for both — see [Multi-currency](#multi-currency).
 4. **One active Subscription row per `Org`**. Before creating a checkout session, check the DB and redirect existing subscribers to the portal instead.
 5. **All Stripe-facing HTTP code lives inside spiceflow sub-apps** (`website/src/lib/spiceflow-*.tsx`). Not react-router actions. The webhook route is also a spiceflow route — spiceflow handlers receive a standard `Request` object, so `await request.text()` gives the raw body needed for Stripe's signature verification.
-6. **Return errors as values, never throw.** All Stripe/Prisma calls are wrapped with `.catch()` into tagged [errore](../errore/SKILL.md) errors (`StripeApiError`, `DbError`, `PriceNotFoundError`, etc.). `constructEvent` and other sync-throwing APIs go through `errore.try`. Handlers check `instanceof Error`, early-return, and map errors to HTTP responses via `errore.matchError` at the HTTP boundary only.
+6. **Return errors as values, never throw.** All Stripe/Drizzle calls are wrapped with `.catch()` into tagged errore errors (`StripeApiError`, `DbError`, `PriceNotFoundError`, etc.). `constructEvent` and other sync-throwing APIs go through `errore.try`. Handlers check `instanceof Error`, early-return, and map errors to HTTP responses via `errore.matchError` at the HTTP boundary only. **Always read the [errore skill](../errore/SKILL.md) before writing or modifying error handling code in Stripe routes** — it covers tagged errors, `.catch()` boundary rules, flat control flow, cause chains, and the `matchError` exhaustive handler.
 
 ## Env vars
 
@@ -306,7 +306,8 @@ The `z.enum(priceLookupKeys)` on the `/checkout` route also gives compile-time p
 
 ```ts
 // website/src/lib/stripe.ts
-import { prisma } from 'db'
+import * as orm from 'drizzle-orm'
+import { db, schema } from 'db'
 import * as errore from 'errore'
 import {
   stripe,
@@ -335,14 +336,11 @@ export async function getOrCreateStripeCustomer({
   orgId: string
   email: string | null | undefined
 }) {
-  const org = await prisma.org
-    .findUnique({
-      where: { orgId },
-      select: { stripeCustomerId: true },
-    })
-    .catch((e) => new DbError({ operation: 'org.findUnique', cause: e }))
+  const org = await db.query.orgs
+    .findFirst({ where: { orgId } })
+    .catch((e) => new DbError({ operation: 'orgs.findFirst', cause: e }))
   if (org instanceof Error) return org
-  if (org === null) return new OrgNotFoundError({ orgId })
+  if (!org) return new OrgNotFoundError({ orgId })
 
   if (org.stripeCustomerId) return org.stripeCustomerId
 
@@ -354,12 +352,11 @@ export async function getOrCreateStripeCustomer({
     .catch((e) => new StripeApiError({ operation: 'customers.create', cause: e }))
   if (customer instanceof Error) return customer
 
-  const updated = await prisma.org
-    .update({
-      where: { orgId },
-      data: { stripeCustomerId: customer.id },
-    })
-    .catch((e) => new DbError({ operation: 'org.update', cause: e }))
+  const updated = await db
+    .update(schema.orgs)
+    .set({ stripeCustomerId: customer.id })
+    .where(orm.eq(schema.orgs.orgId, orgId))
+    .catch((e) => new DbError({ operation: 'orgs.update', cause: e }))
   if (updated instanceof Error) return updated
 
   return customer.id
@@ -384,7 +381,7 @@ All Stripe endpoints — including the webhook — live inside a single spiceflo
 import { Spiceflow } from 'spiceflow'
 import * as errore from 'errore'
 import { z } from 'zod'
-import { prisma } from 'db'
+import { db } from 'db'
 import { env } from 'website/src/lib/env'
 import {
   stripe,
@@ -432,7 +429,7 @@ export const billingApp = new Spiceflow({ basePath: '/billing' })
       if (customerId instanceof Error) return errorToResponse(customerId)
 
       // 1. If already subscribed, short-circuit to the portal
-      const existing = await prisma.subscription
+      const existing = await db.query.subscriptions
         .findFirst({
           where: {
             orgId,
@@ -441,7 +438,7 @@ export const billingApp = new Spiceflow({ basePath: '/billing' })
         })
         .catch(
           (e) =>
-            new DbError({ operation: 'subscription.findFirst', cause: e }),
+            new DbError({ operation: 'subscriptions.findFirst', cause: e }),
         )
       if (existing instanceof Error) return errorToResponse(existing)
 
@@ -522,7 +519,7 @@ export const billingApp = new Spiceflow({ basePath: '/billing' })
 
       // Find the most recent active sub for the upgrade flow, if requested.
       const sub = body.forSubscriptionUpgrade
-        ? await prisma.subscription
+        ? await db.query.subscriptions
             .findFirst({
               where: {
                 orgId,
@@ -533,7 +530,7 @@ export const billingApp = new Spiceflow({ basePath: '/billing' })
             .catch(
               (e) =>
                 new DbError({
-                  operation: 'subscription.findFirst',
+                  operation: 'subscriptions.findFirst',
                   cause: e,
                 }),
             )
@@ -578,7 +575,7 @@ Notes on the pattern:
 
 - **`errorToResponse`** is a single `matchError` call that maps tagged domain errors to HTTP status codes. Add a new case whenever you introduce a new tagged error. The required `Error` fallback handles untagged `Error` instances.
 - **Happy path at root**: every `instanceof Error` check is followed by an early return. The successful `return { url, mode }` is at the top indentation level, never buried inside an `if`.
-- **Never use `try/catch`** for Stripe or Prisma calls. `.catch()` converts the thrown error into a typed domain error at the boundary. Your handler logic becomes a sequence of `const x = await ...; if (x instanceof Error) return ...`.
+- **Never use `try/catch`** for Stripe or Drizzle calls. `.catch()` converts the thrown error into a typed domain error at the boundary. Your handler logic becomes a sequence of `const x = await ...; if (x instanceof Error) return ...`.
 - **`.catch()` always wraps in a tagged error with `cause`** — never `.catch((e) => e as Error)`. The original error is preserved in `cause` for debugging.
 
 Type-safe client usage from other parts of the app. The spiceflow client is a proxy-style typed client from `spiceflow/client` — access routes as `client.path.method(body)` and destructure `{ data, error }` from the response. Combine with errore's "wrap the error in a tagged domain error" pattern for a full errors-as-values flow.
@@ -707,8 +704,9 @@ And the dispatchers in `website/src/lib/stripe.ts`, following the same errore co
 ```ts
 // website/src/lib/stripe.ts
 import Stripe from 'stripe'
+import * as orm from 'drizzle-orm'
 import * as errore from 'errore'
-import { prisma, Prisma } from 'db'
+import { db, schema } from 'db'
 import { stripe, StripeApiError, DbError } from 'website/src/lib/stripe'
 
 export class OrgResolutionError extends errore.createTaggedError({
@@ -735,6 +733,7 @@ export async function handleCheckoutSessionCompleted(
 
   const orgId = await resolveStripeOrgId({
     metadataOrgId: latest.metadata?.orgId,
+    customerId: typeof latest.customer === 'string' ? latest.customer : latest.customer?.id ?? null,
     customerEmail,
     context: `checkout.session.completed (${latest.id})`,
   })
@@ -744,7 +743,7 @@ export async function handleCheckoutSessionCompleted(
   const item = latest.line_items?.data[0]
   if (!item || !item.price?.id) return null // nothing to record
 
-  const record: Prisma.PaymentForCreditsCreateManyInput = {
+  const record: typeof schema.paymentForCredits.$inferInsert = {
     id: latest.id,
     email: customerEmail || '',
     variantName: item.description || '',
@@ -756,11 +755,12 @@ export async function handleCheckoutSessionCompleted(
     metadata: latest.metadata || {},
   }
 
-  const upsertResult = await prisma.paymentForCredits
-    .upsert({
-      where: { id: latest.id },
-      create: record,
-      update: record,
+  const upsertResult = await db
+    .insert(schema.paymentForCredits)
+    .values(record)
+    .onConflictDoUpdate({
+      target: schema.paymentForCredits.id,
+      set: record,
     })
     .catch(
       (e) => new DbError({ operation: 'paymentForCredits.upsert', cause: e }),
@@ -787,6 +787,7 @@ export async function handleSubscriptionChange(
   const metadataEmail = latest.metadata?.email || null
   const orgId = await resolveStripeOrgId({
     metadataOrgId: latest.metadata?.orgId,
+    customerId: typeof latest.customer === 'string' ? latest.customer : null,
     customerEmail: metadataEmail,
     context: `customer.subscription event (${latest.id})`,
   })
@@ -800,7 +801,7 @@ export async function handleSubscriptionChange(
     })
   }
 
-  const record: Prisma.SubscriptionCreateManyInput = {
+  const record: typeof schema.subscriptions.$inferInsert = {
     orgId,
     orderId: latest.id,
     productId: firstItem.price.product.toString(),
@@ -815,19 +816,15 @@ export async function handleSubscriptionChange(
     customerId: latest.customer.toString(),
   }
 
-  const upsertResult = await prisma.subscription
-    .upsert({
-      where: {
-        subscriptionId_variantId: {
-          subscriptionId: latest.id,
-          variantId: firstItem.price.id,
-        },
-      },
-      create: record,
-      update: record,
+  const upsertResult = await db
+    .insert(schema.subscriptions)
+    .values(record)
+    .onConflictDoUpdate({
+      target: [schema.subscriptions.subscriptionId, schema.subscriptions.variantId],
+      set: record,
     })
     .catch(
-      (e) => new DbError({ operation: 'subscription.upsert', cause: e }),
+      (e) => new DbError({ operation: 'subscriptions.upsert', cause: e }),
     )
   if (upsertResult instanceof Error) return upsertResult
 
@@ -836,36 +833,60 @@ export async function handleSubscriptionChange(
 
 async function resolveStripeOrgId({
   metadataOrgId,
+  customerId,
   customerEmail,
   context,
 }: {
   metadataOrgId: string | undefined
+  customerId: string | null
   customerEmail: string | null
   context: string
 }) {
-  // 1. Primary path — metadata orgId set by the checkout session
+  // 1. Primary path — metadata.orgId from the checkout session or subscription
   if (!metadataOrgId) {
     console.warn(`No orgId in Stripe metadata for ${context}`)
   }
   if (metadataOrgId) {
-    const org = await prisma.org
-      .findUnique({
-        where: { orgId: metadataOrgId },
-        select: { orgId: true },
-      })
-      .catch((e) => new DbError({ operation: 'org.findUnique', cause: e }))
+    const org = await db.query.orgs
+      .findFirst({ where: { orgId: metadataOrgId } })
+      .catch((e) => new DbError({ operation: 'orgs.findFirst', cause: e }))
     if (org instanceof Error) return org
     if (org) return org.orgId
     console.warn(`Stripe webhook unknown orgId ${metadataOrgId} for ${context}`)
   }
 
-  // 2. Fallback — match the customer email to a known user's first org
+  // 2. Fallback — metadata.orgId on the Stripe customer object itself.
+  //    getOrCreateStripeCustomer writes orgId into the customer's metadata
+  //    at creation time, so this is always set for customers we created.
+  if (customerId) {
+    const customer = await stripe.customers
+      .retrieve(customerId)
+      .catch(
+        (e) =>
+          new StripeApiError({ operation: 'customers.retrieve', cause: e }),
+      )
+    if (customer instanceof Error) return customer
+    if (!customer.deleted) {
+      const customerOrgId = customer.metadata?.orgId
+      if (customerOrgId) {
+        const org = await db.query.orgs
+          .findFirst({ where: { orgId: customerOrgId } })
+          .catch(
+            (e) => new DbError({ operation: 'orgs.findFirst', cause: e }),
+          )
+        if (org instanceof Error) return org
+        if (org) return org.orgId
+      }
+    }
+  }
+
+  // 3. Last resort — match customer email to a known user's first org
   if (!customerEmail) return null
 
-  const user = await prisma.users
+  const user = await db.query.users
     .findFirst({
       where: { email: customerEmail },
-      include: { orgs: true },
+      with: { orgs: true },
     })
     .catch((e) => new DbError({ operation: 'users.findFirst', cause: e }))
   if (user instanceof Error) return user
@@ -907,12 +928,13 @@ const latest = await stripe.subscriptions.retrieve(subscription.id)
 
 Always write `metadata.orgId` on **both** the Checkout Session and its `subscription_data.metadata`. Webhooks need it on both because `checkout.session.completed` exposes session metadata, while `customer.subscription.*` exposes subscription metadata.
 
-Fallback chain:
+Fallback chain (three layers, from most reliable to least):
 
-1. `metadata.orgId` on the event object
-2. Email lookup: find the user by `customer_details.email` and return their first org
+1. `metadata.orgId` on the event object (checkout session or subscription)
+2. `metadata.orgId` on the **Stripe customer** — `getOrCreateStripeCustomer` writes `orgId` into the customer's metadata at creation time, so every customer we created has it. This survives even if session/subscription metadata is lost.
+3. Email lookup: find the user by `customer_details.email` and return their first org
 
-Never rely only on email. It's a fallback because users can change email in Stripe Checkout and break the mapping.
+Never rely only on email — it's the last resort because users can change email in Stripe Checkout and break the mapping. The customer metadata (step 2) is the strongest fallback because `getOrCreateStripeCustomer` is the single place that creates customers and it always sets `metadata: { orgId }`.
 
 ### Mounting the billing sub-app
 
@@ -936,10 +958,10 @@ The webhook is publicly reachable — it does not need session auth. Stripe auth
 
 Two layers of defense, both required:
 
-**Layer 1 — DB check before checkout.** Inside the `/checkout` route, query `prisma.subscription` for an active row for this `orgId`. If one exists, return the portal URL instead of creating a new Checkout Session. This is the primary guard.
+**Layer 1 — DB check before checkout.** Inside the `/checkout` route, query `db.query.subscriptions` for an active row for this `orgId`. If one exists, return the portal URL instead of creating a new Checkout Session. This is the primary guard.
 
 ```ts
-const existing = await prisma.subscription
+const existing = await db.query.subscriptions
   .findFirst({
     where: {
       orgId,
@@ -947,7 +969,7 @@ const existing = await prisma.subscription
     },
   })
   .catch(
-    (e) => new DbError({ operation: 'subscription.findFirst', cause: e }),
+    (e) => new DbError({ operation: 'subscriptions.findFirst', cause: e }),
   )
 if (existing instanceof Error) return errorToResponse(existing)
 if (existing) return openPortal(existing.customerId)
@@ -968,7 +990,7 @@ rg "stripe\.customers\.create" website/src
 
 If you find a second call site, delete it and route through `getOrCreateStripeCustomer` instead.
 
-The `Org.stripeCustomerId` column in `db/schema.prisma` is the single source of truth. It is set exactly once per org, the first time that org interacts with Stripe, and never updated afterward except on acquisition-style migrations.
+The `Org.stripeCustomerId` column in `db/src/schema.ts` is the single source of truth. It is set exactly once per org, the first time that org interacts with Stripe, and never updated afterward except on acquisition-style migrations.
 
 ## Portal configuration
 
@@ -1031,34 +1053,52 @@ If the command fails because any of the `$PRODUCT_ID`, `$PRO_MONTHLY`, or `$PRO_
 
 ## DB reference
 
-From `db/schema.prisma`:
+From `db/src/schema.ts` (drizzle). Table names use snake_case, accessed via `schema.orgs`, `schema.subscriptions`:
 
-```prisma
-model Org {
-  orgId            String          @id @default(cuid())
-  stripeCustomerId String?         // ← single source of truth for the customer
-  subscriptions    Subscription[]
-  payments         PaymentForCredits[]
+```ts
+// db/src/schema.ts
+import * as pgCore from 'drizzle-orm/pg-core'
+import { defineRelations } from 'drizzle-orm'
+
+export const orgs = pgCore.pgTable('orgs', {
+  orgId:            pgCore.text('org_id').primaryKey().notNull(),
+  stripeCustomerId: pgCore.text('stripe_customer_id'),  // ← single source of truth for the customer
+  name:             pgCore.text('name'),
   // ...
-}
+})
 
-model Subscription {
-  subscriptionId String
-  variantId      String              // ← Stripe price id (rename target: stripePriceId)
-  productId      String              // ← Stripe product id
-  customerId     String?             // ← Stripe customer id, denormalized from Org
-  orgId          String
-  status         SubscriptionStatus  // active, trialing, canceled, past_due, ...
-  provider       PaymentProvider     // stripe | lemonsqueezy (legacy)
-  metadata       Json?
-  org            Org                 @relation(fields: [orgId], references: [orgId])
+export const subscriptions = pgCore.pgTable('subscriptions', {
+  subscriptionId: pgCore.text('subscription_id').notNull(),
+  variantId:      pgCore.text('variant_id').notNull(),       // ← Stripe price id (historical name from LemonSqueezy)
+  productId:      pgCore.text('product_id').notNull(),       // ← Stripe product id
+  customerId:     pgCore.text('customer_id'),                // ← Stripe customer id, denormalized from Org
+  orgId:          pgCore.text('org_id').notNull().references(() => orgs.orgId),
+  status:         pgCore.text('status').notNull(),           // active, trialing, canceled, past_due, ...
+  provider:       pgCore.text('provider').notNull(),         // stripe | lemonsqueezy (legacy)
+  metadata:       pgCore.jsonb('metadata'),
+  email:          pgCore.text('email'),
+  orderId:        pgCore.text('order_id'),
+  variantName:    pgCore.text('variant_name'),
+  createdAt:      pgCore.timestamp('created_at').defaultNow(),
+}, (table) => [
+  pgCore.primaryKey({ columns: [table.subscriptionId, table.variantId] }),  // idempotent upsert key for webhooks
+  pgCore.index('subscriptions_org_id_idx').on(table.orgId),
+])
 
-  @@id([subscriptionId, variantId])  // idempotent upsert key for webhooks
-  @@index([orgId])
-}
+export const relations = defineRelations({ orgs, subscriptions }, (r) => ({
+  orgs: {
+    subscriptions: r.many.subscriptions(),
+  },
+  subscriptions: {
+    org: r.one.orgs({
+      from: r.subscriptions.orgId,
+      to: r.orgs.orgId,
+    }),
+  },
+}))
 ```
 
-The composite primary key `(subscriptionId, variantId)` lets a single subscription carry multiple line items (e.g. base plan + add-on) without the upsert colliding.
+The composite primary key `(subscriptionId, variantId)` lets a single subscription carry multiple line items (e.g. base plan + add-on) without the upsert colliding. Use `onConflictDoUpdate({ target: [schema.subscriptions.subscriptionId, schema.subscriptions.variantId], set: record })` for idempotent webhook writes.
 
 ## Common gotchas
 
@@ -1071,4 +1111,4 @@ The composite primary key `(subscriptionId, variantId)` lets a single subscripti
 - **Webhook raw body**: call `await request.text()` exactly once in the webhook handler. Calling `request.json()` first (or letting a Zod `body` schema parse the request) consumes the stream and breaks signature verification. Do not add a `body:` schema on the webhook route.
 - **`Subscription.variantId` is the Stripe price id.** The name is historical from the LemonSqueezy days. Do not confuse it with the lookup key.
 - **Price cache invalidates on error.** `priceCachePromise` stores the in-flight Promise so concurrent calls share one API request. When it resolves to an error, the module resets `priceCachePromise = null` so the next call retries. Don't "fix" this by keeping the error cached — it would permanently break price lookups until a process restart.
-- **Errors as values.** Every Stripe/Prisma call in this codebase returns `Error | T` via `.catch((e) => new TaggedError({ cause: e }))`. Never throw from a helper function. Never use `try/catch` around Stripe calls — it just replaces one early return with two nested blocks. See the [errore skill](../errore/SKILL.md) for the full pattern.
+- **Errors as values.** Every Stripe/Drizzle call in this codebase returns `Error | T` via `.catch((e) => new TaggedError({ cause: e }))`. Never throw from a helper function. Never use `try/catch` around Stripe calls — it just replaces one early return with two nested blocks. See the [errore skill](../errore/SKILL.md) for the full pattern.
