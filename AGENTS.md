@@ -370,6 +370,8 @@ if i ask you to copy something use pbcopy command to do it. don't tell me to run
 
 If I ask to edit a skill search for the skill path in cwd not inside kimaki. search for files SKILL.md
 
+if after following a SKILL.md content you get errors or find the skill to be wrong always tell about it to the user, asking if we should update the skill content next.
+
 ## state management (non-React)
 
 For non-React code (servers, CLIs, extensions). React already encapsulates state in components — only use a central store when state is shared across many components.
