@@ -20,6 +20,26 @@ Doppler is the secret store this workspace uses across every package. All
 target (Cloudflare Workers, Fly, GitHub Actions) instead of committing
 `.env` files.
 
+## Shell env var ordering
+
+When a command needs both shell env vars and Doppler secrets, put the shell env vars **before** `doppler run`, never after.
+
+```bash
+# GOOD
+CLOUDFLARE_ENV=preview doppler run -c preview -- vite dev
+CLOUDFLARE_ENV=preview doppler run -c preview -- vite build
+
+# BAD
+doppler run -c preview -- CLOUDFLARE_ENV=preview vite dev
+doppler run -c preview -- CLOUDFLARE_ENV=preview vite build
+```
+
+Why:
+
+- tooling like Wrangler and `@cloudflare/vite-plugin` reads some env vars from the outer process setup
+- this keeps scripts consistent and easy to scan
+- it avoids subtle scope confusion about which process sees which env var
+
 **Always run `doppler --help` and `doppler <command> --help` first.** The
 help output is the source of truth. Do not pipe it through `head`/`tail` —
 read it in full.
@@ -260,6 +280,15 @@ Cloudflare Workers store their own copy of secrets via `wrangler secret
 put`. We sync from Doppler → Wrangler using the `--mount` flag so
 wrangler sees a temporary `.env` file on disk, then `wrangler secret
 bulk` uploads everything at once.
+
+For local development, prefer `doppler run` directly instead of `.env` files:
+
+```bash
+doppler run -c development -- wrangler dev
+CLOUDFLARE_ENV=preview doppler run -c preview -- vite dev
+```
+
+Use `.env` only as a temporary mounted file for `wrangler secret bulk`, not as the main local-development source of truth.
 
 This is the exact pattern used in `plugin-mcp/package.json`:
 

@@ -15,26 +15,78 @@ description: >
 
 Conventions for Cloudflare Workers and Durable Objects in TypeScript projects.
 
-## Framework: Spiceflow with Vite
+## Framework: Spiceflow with Vite + @cloudflare/vite-plugin
 
 Always use Spiceflow as the web framework for Workers. Load the `spiceflow` skill first — it has the full API reference and conventions.
 
 ```ts
 // vite.config.ts
+import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { spiceflowPlugin } from 'spiceflow/vite'
 
 export default defineConfig({
-  plugins: [react(), spiceflowPlugin({ entry: './src/app.tsx' })],
+  plugins: [
+    react(),
+    spiceflowPlugin({ entry: './src/app.tsx' }),
+    cloudflare({
+      viteEnvironment: {
+        name: 'rsc',
+        childEnvironments: ['ssr'],
+      },
+    }),
+  ],
 })
 ```
 
-Entry file is always `src/app.tsx` — uses JSX for `.page()` routes.
+Entry file is always `src/app.tsx` — uses JSX for `.page()` routes. The entry file also exports the Cloudflare Worker `default` fetch handler and any DO class re-exports. **No separate `worker.ts` file** — the app.tsx IS the worker entry.
+
+```jsonc
+// wrangler.jsonc — main points to spiceflow's entrypoint, NOT dist/
+{
+  "main": "spiceflow/cloudflare-entrypoint"
+}
+```
+
+```tsx
+// src/app.tsx — export DO classes and default fetch handler alongside the app
+import { Spiceflow } from 'spiceflow'
+import { env } from 'cloudflare:workers'
+
+export { MyStore } from './my-store.ts'
+
+export const app = new Spiceflow()
+  .page('/', async () => <h1>Home</h1>)
+  // ... routes
+
+// Access env via `import { env } from 'cloudflare:workers'` anywhere — no need
+// for .state('env') or threading env through handle(). The import works in any
+// file, not just the fetch handler.
+export default {
+  async fetch(request: Request): Promise<Response> {
+    return app.handle(request)
+  },
+} satisfies ExportedHandler<Env>
+```
 
 ## Configuration: wrangler.jsonc
 
 Always use `wrangler.jsonc` (not `wrangler.toml`). Newer features are exclusive to the JSON format.
+
+### compatibility_date: ALWAYS use today's date
+
+**MUST:** Always set `compatibility_date` to today's date (or the most recent date possible) when creating a new worker or updating an existing one. Old dates disable newer runtime features like `WeakRef`, `FinalizationRegistry`, and other JS globals — causing cryptic "X is not defined" errors at runtime. There is no benefit to using an old date unless you are pinning behavior for a production worker you cannot test.
+
+```jsonc
+{
+  // GOOD — use today's date (2026-04-14 or later)
+  "compatibility_date": "2026-04-14",
+
+  // BAD — disables WeakRef, FinalizationRegistry, and other modern APIs
+  // "compatibility_date": "2025-01-01"
+}
+```
 
 ## Type-safe environment
 
@@ -98,18 +150,20 @@ import { env } from 'cloudflare:workers'
 All other types are available globally from the generated file — `DurableObjectState`, `DurableObjectStorage`, `KVNamespace`, `ExecutionContext`, `ExportedHandler`, `DurableObjectNamespace`, `DurableObjectStub`, etc. No imports needed.
 
 ```ts
-// These are all global — no import required
+import { env } from 'cloudflare:workers'
+
+// Access env from the cloudflare:workers import — no function params needed.
 // Note: wrangler generates DurableObjectNamespace without a generic param,
 // so do NOT annotate the return type with DurableObjectStub<MyDO> — just
-// let TypeScript infer it.
-function getStub(env: Env) {
+// let TypeScript infer it. Fix with env.d.ts augmentation (see below).
+function getStub() {
   const id = env.MY_STORE.idFromName('main')
   return env.MY_STORE.get(id)
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const stub = getStub(env)
+  async fetch(request: Request): Promise<Response> {
+    const stub = getStub()
     // Call named RPC methods — do NOT use stub.fetch()
     return stub.handleRequest(request)
   },
@@ -138,20 +192,22 @@ The worker calls `stub.handleRequest(request)` or `stub.hranaHandler(request)` d
 
 ### Fixing DurableObjectNamespace generics
 
-`wrangler types` generates `DurableObjectNamespace` without the generic type param, so the stub type is `DurableObjectStub<undefined>` — RPC methods are invisible. Fix this with a `src/env.d.ts` that augments the global `Env`:
+`wrangler types` generates `DurableObjectNamespace` without the generic type param, so the stub type is `DurableObjectStub<undefined>` — RPC methods are invisible. Interface augmentation doesn't work because the existing property type wins in the intersection.
+
+Fix with a typed helper that casts the stub return:
 
 ```ts
-// src/env.d.ts
+// src/get-stub.ts
+import { env } from 'cloudflare:workers'
 import type { MyStore } from './my-store.ts'
 
-declare global {
-  interface Env {
-    MY_STORE: DurableObjectNamespace<MyStore>
-  }
+export function getStub() {
+  const id = env.MY_STORE.idFromName('main')
+  return env.MY_STORE.get(id) as DurableObjectStub<MyStore>
 }
 ```
 
-This re-declares the binding with the correct generic, making RPC methods type-safe on the stub. The `declare global` merges with the wrangler-generated `Env` interface.
+Import and call `getStub()` instead of accessing `env.MY_STORE` directly.
 
 ## Secrets
 
@@ -178,18 +234,99 @@ interface Env {
 }
 ```
 
-### Setting secret values
+### Local development: use Doppler, not `.env`
+
+Do **not** use checked-in `.env` files for Worker local development in this workspace. Use Doppler to inject local env vars and secrets into `wrangler dev` / `vite dev` instead.
+
+Wrangler local dev now loads local dev vars from `.env` files or the process environment, so `doppler run` works fine for local Worker runtime bindings. Keep `secrets.required` in `wrangler.jsonc` so local dev only loads the keys the Worker actually expects.
+
+```bash
+# Local wrangler dev
+doppler run -c development -- wrangler dev
+
+# Local vite dev against preview env
+CLOUDFLARE_ENV=preview doppler run -c preview -- vite dev
+
+# Preview build + deploy
+CLOUDFLARE_ENV=preview doppler run -c preview -- vite build && wrangler deploy --env preview
+```
+
+Rules:
+
+- **Prefer Doppler over `.env` / `.dev.vars`** for local development.
+- **Put shell env vars before `doppler run`, never after.**
+- Read runtime values from `import { env } from 'cloudflare:workers'`, not `process.env`, even though `process.env` may be populated under `nodejs_compat`.
+
+### Upload secrets from Doppler to Cloudflare
+
+Cloudflare Workers store their own deployed secret values. Local `doppler run` is only for local development — it does **not** upload secrets to Cloudflare. Sync them explicitly with `wrangler secret bulk`.
+
+```json
+{
+  "scripts": {
+    "secrets:preview": "doppler run -c preview --mount .env.preview --mount-format env -- wrangler secret bulk --env preview .env.preview",
+    "secrets:prod": "doppler run -c production --mount .env.prod --mount-format env -- wrangler secret bulk .env.prod"
+  }
+}
+```
+
+Run these whenever Worker secrets change:
+
+```bash
+pnpm secrets:preview
+pnpm secrets:prod
+```
+
+Do **not** loop over `wrangler secret put` one key at a time. It is interactive and hangs in scripts. Always use `wrangler secret bulk`.
+
+### Production / preview secret values
 
 ```bash
 # Set for production
 wrangler secret put API_KEY
 wrangler secret put API_KEY --env preview
-
-# For local development, create .dev.vars
-echo 'API_KEY=dev-key-here' >> .dev.vars
 ```
 
-`.dev.vars` is gitignored and only used by `wrangler dev` / `vite dev`.
+Prefer the bulk upload scripts above over manual `secret put` commands.
+
+## Importing non-JS files as text
+
+For things like `.txt`, `.md`, and `.sql`, tell Wrangler/Vite to import them as text with `rules`, then add a TypeScript declaration file. Do **not** silence the import with `// @ts-expect-error`.
+
+```jsonc
+{
+  "rules": [
+    { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true },
+    { "type": "Text", "globs": ["**/*.md", "**/*.txt"], "fallthrough": true }
+  ]
+}
+```
+
+```ts
+// src/import-text.d.ts
+declare module '*.sql' {
+  const content: string
+  export default content
+}
+
+declare module '*.md' {
+  const content: string
+  export default content
+}
+
+declare module '*.txt' {
+  const content: string
+  export default content
+}
+```
+
+```ts
+import schemaSql from './schema.sql'
+import promptMd from './prompt.md'
+import fixtureTxt from './fixture.txt'
+```
+
+Use a real `declare module` file so TypeScript understands the import shape. Never paper over missing module types with `@ts-expect-error`.
 
 ## Routing: prefer custom_domain
 
@@ -225,9 +362,9 @@ Only `vars` values need to differ between environments. Everything else (binding
 ```jsonc
 {
   "name": "my-worker",
-  "compatibility_date": "2025-01-01",
+  "compatibility_date": "2026-04-14",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "dist/server/index.js",
+  "main": "spiceflow/cloudflare-entrypoint",
 
   // ── Production (top-level) ──────────────────────────────────
   "durable_objects": {
@@ -273,17 +410,19 @@ Only `vars` values need to differ between environments. Everything else (binding
 
 ### Deploy scripts
 
+The `@cloudflare/vite-plugin` resolves and flattens your `wrangler.jsonc` at **build time** and writes it into `dist/rsc/wrangler.json`. Set `CLOUDFLARE_ENV` during `vite build` so the plugin resolves the correct environment section:
+
 ```json
 {
   "scripts": {
-    "deploy": "wrangler deploy --env preview",
-    "deploy:prod": "wrangler deploy"
+    "deploy": "CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "vite build && wrangler deploy"
   }
 }
 ```
 
-- `pnpm deploy` → deploys to **preview** (safe default, use for testing)
-- `pnpm deploy:prod` → deploys to **production**
+- `pnpm deploy` → builds for preview env, deploys to **preview** (safe default)
+- `pnpm deploy:prod` → builds for production, deploys to **production**
 
 **Preview is the default deploy target.** This prevents accidental production deploys. Production deploys should be deliberate.
 
@@ -366,8 +505,8 @@ Standard scripts for a Worker package:
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "types": "wrangler types",
-    "deploy": "wrangler deploy --env preview",
-    "deploy:prod": "wrangler deploy"
+    "deploy": "CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "vite build && wrangler deploy"
   }
 }
 ```
