@@ -5,8 +5,9 @@ description: >
   Covers namespace imports, Prisma-like query API, object-style where
   filters, schema design (ULIDs, cascade deletes, indexes, enums over bools),
   Zod schema generation, type inference, transactions, migrations, and
-  driver setup for Cloudflare Durable Objects, libSQL/Turso, and Postgres
-  via Hyperdrive. ALWAYS load this skill when a repo uses drizzle-orm.
+  driver setup for Cloudflare Durable Objects (via sqlite-proxy),
+  libSQL/Turso, and Postgres via Hyperdrive.
+  ALWAYS load this skill when a repo uses drizzle-orm.
 ---
 
 # Drizzle ORM
@@ -108,8 +109,6 @@ Always use namespace imports to avoid polluting local scope with generic names l
 import * as orm from 'drizzle-orm'
 import * as sqliteCore from 'drizzle-orm/sqlite-core'
 import * as pgCore from 'drizzle-orm/pg-core'
-import * as durable from 'drizzle-orm/durable-sqlite'
-import * as migrator from 'drizzle-orm/durable-sqlite/migrator'
 
 // use orm.eq, orm.and, sqliteCore.sqliteTable, etc.
 ```
@@ -142,11 +141,6 @@ export const relations = defineRelations({ accounts, boards }, (r) => ({
 ```
 
 Pass both `schema` and `relations` to `drizzle()`:
-
-```ts
-import * as schema from './schema.ts'
-const db = durable.drizzle(ctx.storage, { schema, relations: schema.relations })
-```
 
 **Many-to-many** — use a junction table with cascade deletes on both FKs, and `through` in relations:
 
@@ -215,9 +209,9 @@ Docs: https://orm.drizzle.team/docs/rqb-v2 | Filters: https://orm.drizzle.team/d
 
 ```ts
 // Simple equality — just pass the value
-const user = db.query.accounts.findFirst({
+const user = await db.query.accounts.findFirst({
   where: { refreshToken: someToken },
-}).sync()
+})
 
 // Multiple conditions (implicit AND)
 const accounts = await db.query.accounts.findMany({
@@ -271,10 +265,9 @@ const usersWithPosts = await db.query.users.findMany({
 
 ```ts
 // For write .where() clauses, use orm.eq since there is no object-style where for writes
-db.update(schema.accounts)
+await db.update(schema.accounts)
   .set({ accessToken: newToken, updatedAt: Date.now() })
   .where(orm.eq(schema.accounts.id, accountId))
-  .run()
 ```
 
 ## CRUD examples
@@ -306,12 +299,6 @@ await db.insert(schema.accounts)
   .returning()
 ```
 
-**SQLite Durable Objects — synchronous:**
-
-```ts
-db.insert(schema.accounts).values({ name: 'John' }).run()  // no await, .run() is sync
-```
-
 ### Read with relations
 
 ```ts
@@ -341,15 +328,6 @@ const accounts = await db.query.accounts.findMany({
 })
 ```
 
-**SQLite Durable Objects — synchronous:**
-
-```ts
-const row = this.db.query.accounts.findFirst({
-  where: { id: someId },
-  with: { boards: true },
-}).sync()
-```
-
 ### Update
 
 ```ts
@@ -363,15 +341,6 @@ const [updated] = await db.update(schema.accounts)
   .set({ status: 'archived' })
   .where(orm.eq(schema.accounts.id, accountId))
   .returning()
-```
-
-**SQLite DO — synchronous:**
-
-```ts
-db.update(schema.accounts)
-  .set({ name: 'New Name' })
-  .where(orm.eq(schema.accounts.id, accountId))
-  .run()
 ```
 
 ### Delete
@@ -393,14 +362,6 @@ With `onDelete: 'cascade'` on foreign keys, deleting a parent automatically dele
 // Deleting an account cascades to all its boards
 await db.delete(schema.accounts)
   .where(orm.eq(schema.accounts.id, accountId))
-```
-
-**SQLite DO — synchronous:**
-
-```ts
-db.delete(schema.boards)
-  .where(orm.eq(schema.boards.id, boardId))
-  .run()
 ```
 
 ### Upsert (insert or update on conflict)
@@ -714,16 +675,14 @@ export const db = drizzle({
 
 ### Cloudflare (D1, Durable Objects)
 
-No URL needed — bindings in `wrangler.json`. The driver gets the binding from the worker env:
+No URL needed — bindings in `wrangler.json`.
 
 ```ts
-// Durable Objects — import schema from db package
-import * as schema from 'db/schema'
-this.db = durable.drizzle(ctx.storage, { schema, relations: schema.relations })
-
 // D1
 import { drizzle } from 'drizzle-orm/d1'
 const db = drizzle(env.DB, { schema, relations: schema.relations })
+
+// Durable Objects — see "Driver setup > Cloudflare Durable Objects" below
 ```
 
 ### Cloudflare Hyperdrive (Postgres)
@@ -789,16 +748,29 @@ In the db package's `package.json`:
 
 Docs: Durable Objects https://orm.drizzle.team/docs/connect-cloudflare-do | Turso https://orm.drizzle.team/docs/connect-turso | D1 https://orm.drizzle.team/docs/connect-cloudflare-d1 | All drivers https://orm.drizzle.team/docs/connect-overview
 
-### Cloudflare Durable Objects (SQLite)
+### Cloudflare Durable Objects (SQLite via sqlite-proxy)
+
+The DO is a **thin SQL proxy** — it only owns the SQLite database, runs migrations, and exposes an `executeSql()` RPC method. All business logic (auth, CRUD, encryption) runs in the worker and uses `drizzle-orm/sqlite-proxy` to route queries to the DO via RPC.
+
+**Why not `drizzle-orm/durable-sqlite` directly?** Using the durable-sqlite driver means your drizzle client lives inside the DO class, forcing all business logic (auth libraries, encryption, CRUD) into RPC methods. This causes problems:
+- Passing `Request` objects over RPC can lock `ReadableStream` bodies
+- The DO becomes a monolith — every query requires a separate RPC method
+- Libraries like BetterAuth that need a drizzle instance must run inside the DO
+
+With sqlite-proxy, the drizzle client lives in the worker. Only raw SQL strings cross the RPC boundary.
+
+**Step 1 — Thin DO (migrations + executeSql):**
 
 ```ts
+// src/store.ts — the Durable Object
 import { DurableObject } from 'cloudflare:workers'
 import * as durable from 'drizzle-orm/durable-sqlite'
 import * as migrator from 'drizzle-orm/durable-sqlite/migrator'
+// @ts-expect-error — migrations.js is generated by drizzle-kit
 import migrations from '../drizzle/migrations.js'
 import * as schema from './schema.ts'
 
-export class UserStore extends DurableObject<Env> {
+export class Store extends DurableObject<Env> {
   db: durable.DrizzleSqliteDODatabase<typeof schema, typeof schema.relations>
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -808,7 +780,67 @@ export class UserStore extends DurableObject<Env> {
       await migrator.migrate(this.db, migrations)
     })
   }
+
+  // RPC: execute SQL on the DO's SQLite database.
+  // Called by drizzle-orm/sqlite-proxy in the worker.
+  async executeSql(sql: string, params: unknown[], method: string) {
+    const stmt = this.ctx.storage.sql.exec(sql, ...params)
+    const columnNames = stmt.columnNames
+    const rawRows = stmt.toArray()
+
+    if (method === 'get') {
+      const row = rawRows[0]
+      if (!row) return { rows: [] }
+      return { rows: columnNames.map((col) => (row as Record<string, unknown>)[col]) }
+    }
+
+    const rows = rawRows.map((row) =>
+      columnNames.map((col) => (row as Record<string, unknown>)[col]),
+    )
+    return { rows }
+  }
 }
+```
+
+**Step 2 — Worker-level drizzle client via sqlite-proxy:**
+
+```ts
+// src/db.ts — runs in the worker, NOT in the DO
+import { env } from 'cloudflare:workers'
+import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import * as schema from './schema.ts'
+import type { Store } from './store.ts'
+
+function getStub() {
+  const id = env.MY_STORE.idFromName('main')
+  return env.MY_STORE.get(id) as DurableObjectStub<Store>
+}
+
+export function getDb() {
+  const stub = getStub()
+  return drizzle(async (sql, params, method) => {
+    return stub.executeSql(sql, params, method)
+  }, { schema, relations: schema.relations })
+}
+```
+
+**Step 3 — Use the drizzle client anywhere in the worker:**
+
+```ts
+// src/app.ts — worker routes, server actions, etc.
+import { getDb } from './db.ts'
+import * as schema from './schema.ts'
+
+// Reads — use db.query (async, NOT .sync())
+const user = await db.query.users.findFirst({
+  where: { id: userId },
+  with: { orgs: true },
+})
+
+// Writes — use db.insert/update/delete
+const [project] = await db.insert(schema.project)
+  .values({ name: 'My Project', orgId })
+  .returning({ id: schema.project.id })
 ```
 
 **drizzle.config.ts:**
@@ -832,10 +864,10 @@ export default defineConfig({
     { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }
   ],
   "durable_objects": {
-    "bindings": [{ "name": "USER_STORE", "class_name": "UserStore" }]
+    "bindings": [{ "name": "MY_STORE", "class_name": "Store" }]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["UserStore"] }
+    { "tag": "v1", "new_sqlite_classes": ["Store"] }
   ]
 }
 ```
@@ -944,14 +976,6 @@ const [newUsers, updatedPosts, allComments] = await db.batch([
 
 Statements execute **in order** inside one transaction, so statement 2 sees data that statement 1 inserted. The only limitation is you can't use the **return value** of statement 1 to build statement 2 in your TS code (all queries are defined upfront as an array). If you truly need to chain return values, do two separate batch calls — still better than holding a transaction open.
 
-For SQLite Durable Objects operations are already local (in-process SQLite), so latency is not an issue. Use `.sync()` for synchronous execution:
-
-```ts
-const row = this.db.query.accounts.findFirst({
-  where: { id: someId },
-}).sync()
-```
-
 ## Migrations & SQL export
 
 Docs: Overview https://orm.drizzle.team/docs/kit-overview | Generate https://orm.drizzle.team/docs/drizzle-kit-generate | Migrate https://orm.drizzle.team/docs/drizzle-kit-migrate | Push https://orm.drizzle.team/docs/drizzle-kit-push | Export https://orm.drizzle.team/docs/drizzle-kit-export | Config https://orm.drizzle.team/docs/drizzle-config-file
@@ -989,15 +1013,21 @@ This is useful for:
 
 ### Durable Objects migrations
 
-For DO, drizzle-kit generates a `migrations.js` bundle that imports all `.sql` files. Apply in the DO constructor:
+For DO, drizzle-kit generates a `migrations.js` bundle that imports all `.sql` files. Apply in the thin DO constructor (see "Driver setup > Cloudflare Durable Objects" above for the full pattern):
 
 ```ts
+import * as durable from 'drizzle-orm/durable-sqlite'
+import * as migrator from 'drizzle-orm/durable-sqlite/migrator'
 import migrations from '../drizzle/migrations.js'
 
+// Inside DO constructor:
+this.db = durable.drizzle(ctx.storage, { schema, relations: schema.relations })
 ctx.blockConcurrencyWhile(async () => {
   await migrator.migrate(this.db, migrations)
 })
 ```
+
+The `durable-sqlite` driver is only used inside the DO for migrations. All query execution goes through the `executeSql()` RPC method and `drizzle-orm/sqlite-proxy` in the worker.
 
 The wrangler `rules` config must import `.sql` as text for this to work:
 
