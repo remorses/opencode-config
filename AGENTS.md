@@ -370,9 +370,13 @@ if i ask you to copy something use pbcopy command to do it. don't tell me to run
 
 ## editing skills
 
-If I ask to edit a skill search for the skill path in cwd not inside kimaki. search for files SKILL.md
+If I ask to edit a skill search for the skill path in cwd not inside kimaki folder if the skill references it. search for files SKILL.md
 
-if after following a SKILL.md content you get errors or find the skill to be wrong always tell about it to the user, asking if we should update the skill content next.
+other skills can be inside ~/.config/opencode/skills
+
+`~/.config/opencode/` is a git repo. you can commit skills and other files there, also run the critique command inside it to show diffs.
+
+if after following a SKILL.md content you get errors or find the skill to be wrong always tell about it to the user, proposing we should update the skill content
 
 ## state management (non-React)
 
