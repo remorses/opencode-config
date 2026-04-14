@@ -134,68 +134,16 @@ export const app = new Spiceflow()
 
 This handles ALL better-auth endpoints (sign-in, sign-up, OAuth callback, session, etc.). The middleware short-circuits for auth paths and returns the auth response directly. Non-auth paths and unmatched auth paths fall through to `next()`.
 
-### Session middleware
+### Session state + loader
 
-Use `.state()` to store the full session object so downstream handlers can access it. The session type comes from better-auth:
+Use `.state()` to resolve the session once in middleware, then expose it to all pages and client components via a `/*` loader. This is the recommended pattern — it's fully type-safe and avoids prop drilling:
 
 ```ts
-import { Spiceflow } from 'spiceflow'
+import { Spiceflow, redirect } from 'spiceflow'
 import { auth } from './lib/auth'
-import type { Session } from 'better-auth/types'
 
-type AuthSession = {
-  session: Session
-  user: {
-    id: string
-    email: string
-    name: string
-    image?: string | null
-    emailVerified: boolean
-    createdAt: Date
-    updatedAt: Date
-  }
-} | null
-
-export const app = new Spiceflow({ basePath: '/api' })
-  .state('session', null as AuthSession)
-  .use(async ({ request, state }) => {
-    const sessionData = await auth.api.getSession({
-      headers: request.headers,
-    })
-    state.session = sessionData
-  })
-  .get('/me', ({ state }) => {
-    if (!state.session) {
-      return new Response('Unauthorized', { status: 401 })
-    }
-    return state.session.user
-  })
-```
-
-### Protecting routes
-
-For routes that require auth, check `state.session` and throw/return early:
-
-```ts
-.post('/posts', async ({ request, state }) => {
-  if (!state.session) {
-    return new Response('Unauthorized', { status: 401 })
-  }
-  const userId = state.session.session.userId
-  const body = await request.json()
-  // ... create post
-  return { id: '1', authorId: userId }
-})
-```
-
-### Full Spiceflow app example
-
-```ts
-import { Spiceflow } from 'spiceflow'
-import { auth } from './lib/auth'
-import { z } from 'zod'
-
-type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>>
+// Session type — includes both session and user, with plugin-extended fields
+type AuthSession = typeof auth.$Infer.Session | null
 
 export const app = new Spiceflow()
   // 1. Auth middleware — forward /api/auth/* to better-auth
@@ -203,44 +151,144 @@ export const app = new Spiceflow()
     const url = new URL(request.url)
     if (url.pathname.startsWith('/api/auth')) {
       const response = await auth.handler(request)
-      if (response.status === 404) {
-        return next()
-      }
+      if (response.status === 404) return next()
       return response
     }
     return next()
   })
-  // 2. Session middleware — populate state for all routes
+
+  // 2. Session state — resolved once per request via middleware
   .state('session', null as AuthSession)
   .use(async ({ request, state }) => {
-    const sessionData = await auth.api.getSession({
-      headers: request.headers,
-    })
-    state.session = sessionData
+    state.session = await auth.api.getSession({ headers: request.headers })
   })
-  // 3. Your API routes
-  .get('/api/me', ({ state }) => {
+
+  // 3. Session loader — exposes session to all pages and client components
+  // Matched by every page/layout via wildcard. Loader data is merged,
+  // so pages can add their own loaders and session is always available.
+  .loader('/*', ({ state }) => {
+    return { session: state.session }
+  })
+```
+
+This runs on every request including landing pages — that's fine. When no session cookie is present, `getSession` just parses the cookie header and returns `null` immediately. No database query, no crypto, no async work. It's as cheap as a `Map.get()` call.
+
+Now **every page, layout, and client component** can access the session type-safely:
+
+**In server components (pages/layouts)** — via `loaderData`:
+
+```tsx
+.layout('/*', async ({ loaderData, children }) => {
+  return (
+    <html>
+      <body>
+        {loaderData.session && <nav>{loaderData.session.user.name}</nav>}
+        {children}
+      </body>
+    </html>
+  )
+})
+
+.page('/dashboard', async ({ loaderData }) => {
+  if (!loaderData.session) return redirect('/login')
+  return <Dashboard user={loaderData.session.user} />
+})
+```
+
+**In client components** — via `useLoaderData` hook from `spiceflow/react`:
+
+```tsx
+'use client'
+
+import { useLoaderData } from 'spiceflow/react'
+import type { App } from '../main'
+
+export function UserMenu() {
+  // Type-safe: session field is inferred from the /* loader return type
+  const { session } = useLoaderData<App>('/*')
+
+  if (!session) return <a href="/login">Sign in</a>
+
+  return (
+    <div>
+      <span>{session.user.name}</span>
+      <a href="/api/auth/sign-out">Sign out</a>
+    </div>
+  )
+}
+```
+
+The `/*` loader matches all pages, so `session` is always available in `useLoaderData`. When multiple loaders match (e.g. `/*` and `/dashboard`), their return values are merged into a single flat object — more specific loaders override less specific ones on key conflicts.
+
+### Protecting API routes
+
+For API routes (not pages), use `state.session` directly since loaders only run for pages:
+
+```ts
+.route({
+  method: 'POST',
+  path: '/api/posts',
+  request: z.object({
+    title: z.string(),
+    content: z.string(),
+  }),
+  async handler({ request, state }) {
     if (!state.session) {
       return new Response('Unauthorized', { status: 401 })
     }
+    const body = await request.json()
+    // use state.session.user.id or state.session.session.userId
+    return { id: '1', authorId: state.session.user.id }
+  },
+})
+```
+
+### Full Spiceflow app example
+
+```ts
+import { Spiceflow, redirect } from 'spiceflow'
+import { auth } from './lib/auth'
+import { z } from 'zod'
+
+type AuthSession = typeof auth.$Infer.Session | null
+
+export const app = new Spiceflow()
+  // Auth middleware
+  .use(async ({ request }, next) => {
+    const url = new URL(request.url)
+    if (url.pathname.startsWith('/api/auth')) {
+      const response = await auth.handler(request)
+      if (response.status === 404) return next()
+      return response
+    }
+    return next()
+  })
+  // Session state
+  .state('session', null as AuthSession)
+  .use(async ({ request, state }) => {
+    state.session = await auth.api.getSession({ headers: request.headers })
+  })
+  // Session loader — available to all pages and client components
+  .loader('/*', ({ state }) => {
+    return { session: state.session }
+  })
+  // Pages
+  .page('/login', async ({ loaderData }) => {
+    if (loaderData.session) return redirect('/')
+    const { LoginButton } = await import('./components/login-button')
+    return <LoginButton />
+  })
+  .page('/dashboard', async ({ loaderData }) => {
+    if (!loaderData.session) return redirect('/login')
+    return <div>Hello, {loaderData.session.user.name}</div>
+  })
+  // API routes use state.session directly
+  .get('/api/me', ({ state }) => {
+    if (!state.session) return new Response('Unauthorized', { status: 401 })
     return state.session.user
   })
-  .route({
-    method: 'POST',
-    path: '/api/posts',
-    request: z.object({
-      title: z.string(),
-      content: z.string(),
-    }),
-    async handler({ request, state }) {
-      if (!state.session) {
-        return new Response('Unauthorized', { status: 401 })
-      }
-      const body = await request.json()
-      // create post with state.session.session.userId
-      return { id: '1', title: body.title }
-    },
-  })
+
+export type App = typeof app
 ```
 
 ## Client setup
@@ -283,13 +331,15 @@ export const { signIn, signUp, signOut, useSession } = authClient
 import { createAuthClient } from 'better-auth/client'
 
 export const authClient = createAuthClient({
-  baseURL: 'http://localhost:3000',
+  
 })
 ```
 
 ## Client usage patterns
 
 ### useSession — reactive session in components
+
+This is discouraged. Prefer passing down session via spiceflow loaders or props instead.
 
 ```tsx
 import { useSession } from '@/lib/auth-client'
@@ -366,38 +416,39 @@ await signOut({
 })
 ```
 
-### Using with Spiceflow typed client
+### Using with Spiceflow typed fetch client
 
-When calling authenticated Spiceflow API routes from the client, pass `credentials: 'include'` so cookies are sent:
+When calling authenticated Spiceflow API routes from the client, use `createSpiceflowFetch` with `credentials: 'include'` so cookies are sent:
 
 ```ts
-import { createSpiceflowClient } from 'spiceflow/client'
-import type { App } from './server'
+import { createSpiceflowFetch } from 'spiceflow/client'
+import type { App } from './main'
 
-const client = createSpiceflowClient<App>('http://localhost:3000')
+const safeFetch = createSpiceflowFetch<App>('http://localhost:3000')
 
-const me = await client.api.me.get({
+const me = await safeFetch('/api/me', {
   fetch: { credentials: 'include' },
 })
+if (me instanceof Error) {
+  console.error(me.message)
+  return
+}
+console.log(me.name, me.email) // fully typed from the route handler return type
 ```
 
 ## Server-side session checks
 
-For server components, loaders, or any server code that needs the session without the middleware:
+With the `/*` loader pattern above, session is already available in `loaderData` for all pages. For standalone server code that needs a session outside of Spiceflow (scripts, cron jobs, etc.):
 
 ```ts
-import { auth } from '@/lib/auth'
+import { auth } from './lib/auth'
 
-// In a Spiceflow loader or page handler
-.loader('/*', async ({ request }) => {
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  })
-  if (!session) {
-    throw redirect('/login')
-  }
-  return { user: session.user }
+const session = await auth.api.getSession({
+  headers: request.headers,
 })
+if (!session) {
+  // handle unauthenticated
+}
 ```
 
 ## Session caching
@@ -476,20 +527,14 @@ See https://better-auth.com/llms.txt for full plugin docs.
 
 ### Login page
 
-A standalone login page that redirects to the dashboard if already authenticated. The sign-in button is a client component that triggers the OAuth flow:
+A standalone login page that redirects to the dashboard if already authenticated. Uses `loaderData.session` from the `/*` loader — no need to call `getSession` again:
 
 ```tsx
-// src/app.tsx
-import { Spiceflow, redirect } from 'spiceflow'
-import { auth } from './lib/auth'
-import { LoginButton } from './components/login-button'
+// In your app entry (src/main.tsx or src/app.tsx)
+// Assumes auth middleware + session state + /* loader are registered (see above)
 
-export const app = new Spiceflow()
-  // ... auth middleware (see above) ...
-
-  .page('/login', async ({ request }) => {
-    const session = await auth.api.getSession({ headers: request.headers })
-    if (session) return redirect('/')
+  .page('/login', async ({ loaderData }) => {
+    if (loaderData.session) return redirect('/')
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="text-center max-w-sm">
@@ -530,55 +575,28 @@ export function LoginButton() {
 }
 ```
 
-### Auth helpers for pages vs API routes
-
-Define two helper functions: one for pages (redirects to login) and one for API routes (returns 401 JSON):
-
-```ts
-import { redirect } from 'spiceflow'
-import { auth } from './lib/auth'
-
-async function requirePageSession(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session) throw redirect('/login')
-  return session
-}
-
-async function requireApiSession(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session) {
-    throw new Response(JSON.stringify({ error: 'unauthorized' }), {
-      status: 401,
-      headers: { 'content-type': 'application/json' },
-    })
-  }
-  return session
-}
-```
-
 ### Root redirect for authenticated users
 
 ```ts
-.get('/', async ({ request }) => {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session) return redirect('/login')
-  // redirect to the user's default page
+.get('/', async ({ state }) => {
+  if (!state.session) return redirect('/login')
   return redirect('/dashboard')
 })
 ```
 
 ### Protected layout with session
 
-Use a layout to enforce auth for a group of pages. The session check happens once in the layout, and all child pages inherit it:
+Use a layout to enforce auth for a group of pages. The session is available from `loaderData` (provided by the `/*` loader), so the layout just checks it and renders:
 
 ```tsx
-.layout('/app/*', async ({ children, request }) => {
-  const session = await requirePageSession(request)
+.layout('/app/*', async ({ loaderData, children }) => {
+  if (!loaderData.session) return redirect('/login')
+  const { user } = loaderData.session
 
   return (
     <div className="flex min-h-screen">
       <aside className="w-64 border-r p-4">
-        <div className="text-sm text-muted-foreground">{session.user.email}</div>
+        <div className="text-sm text-muted-foreground">{user.email}</div>
         <nav>{/* sidebar links */}</nav>
         <a href="/api/auth/sign-out" className="text-sm text-muted-foreground mt-auto">
           Sign out
@@ -592,21 +610,23 @@ Use a layout to enforce auth for a group of pages. The session check happens onc
 
 ### Protected page
 
-Pages under a protected layout don't need to re-check auth — the layout already did it. But if you need the session data in the page handler, call `requirePageSession` again (it's cheap if cookie caching is on):
+Pages under a protected layout don't need to re-check auth — the layout already redirected unauthenticated users. Session data is still available via `loaderData`:
 
 ```tsx
-.page('/app/settings', async ({ request }) => {
-  const session = await requirePageSession(request)
+.page('/app/settings', async ({ loaderData }) => {
+  const { user } = loaderData.session!
   return (
     <div>
       <h1 className="text-2xl font-bold">Settings</h1>
-      <p>Signed in as {session.user.name} ({session.user.email})</p>
+      <p>Signed in as {user.name} ({user.email})</p>
     </div>
   )
 })
 ```
 
 ### Protected API route
+
+API routes don't use loaders — use `state.session` directly:
 
 ```ts
 .route({
@@ -616,11 +636,15 @@ Pages under a protected layout don't need to re-check auth — the layout alread
     title: z.string().min(1),
     content: z.string(),
   }),
-  async handler({ request }) {
-    const session = await requireApiSession(request)
+  async handler({ request, state }) {
+    if (!state.session) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
     const body = await request.json()
-    // use session.user.id, session.session.userId, etc.
-    const post = await createPost({ ...body, authorId: session.user.id })
+    const post = await createPost({ ...body, authorId: state.session.user.id })
     return { ok: true, id: post.id }
   },
 })
@@ -648,6 +672,23 @@ function SignOutButton() {
       Sign out
     </button>
   )
+}
+```
+
+### Reading session in any client component
+
+Any client component can read the session via `useLoaderData` without props — it's type-safe and always available from the `/*` loader:
+
+```tsx
+'use client'
+import { useLoaderData } from 'spiceflow/react'
+import type { App } from '../main'
+
+export function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { session } = useLoaderData<App>('/*')
+
+  if (!session) return <a href="/login">Please sign in</a>
+  return <>{children}</>
 }
 ```
 
@@ -717,16 +758,6 @@ socialProviders: {
 }
 ```
 
-### Discord
-
-```ts
-socialProviders: {
-  discord: {
-    clientId: process.env.DISCORD_CLIENT_ID!,
-    clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-  },
-}
-```
 
 Multiple providers can be enabled simultaneously. Each provider needs its own OAuth app credentials.
 
