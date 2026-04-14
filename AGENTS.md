@@ -6,6 +6,8 @@ NEVER run rm -rf on ANY folder outside of project directory! NEVER even run thin
 
 always use kebab case for new filenames. never use uppercase letters in filenames
 
+avoid creating tiny files. if a new file would be under 100 lines, prefer adding the code to an existing file or do a small refactor so related code stays together.
+
 ALWAYS use the right package manager for ts repos. you can see the right one based on lock files like bun.lock. for example bun publish instead of npm publish.
 
 ## pnpm/bun workspaces
