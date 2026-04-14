@@ -21,6 +21,7 @@ permission:
   websearch: "allow"
   codesearch: "allow"
   external_directory:
+    /tmp/*: "allow"
     "*": "ask"
 ---
 
