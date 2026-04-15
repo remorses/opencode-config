@@ -782,9 +782,9 @@ export class Store extends DurableObject<Env> {
     })
   }
 
-  // RPC: execute SQL on the DO's SQLite database.
-  // Called by drizzle-orm/sqlite-proxy in the worker.
-  async executeSql(sql: string, params: unknown[], method: string) {
+  // Shared logic for executing a single SQL statement and formatting the
+  // result for drizzle-orm/sqlite-proxy's expected { rows } shape.
+  private execOne(sql: string, params: unknown[], method: string) {
     const stmt = this.ctx.storage.sql.exec(sql, ...params)
     const columnNames = stmt.columnNames
     const rawRows = stmt.toArray()
@@ -805,10 +805,24 @@ export class Store extends DurableObject<Env> {
     )
     return { rows }
   }
+
+  // RPC: execute a single SQL query. Called by sqlite-proxy's execute callback.
+  async executeSql(sql: string, params: unknown[], method: string) {
+    return this.execOne(sql, params, method)
+  }
+
+  // RPC: execute multiple SQL statements in a single RPC round-trip.
+  // Called by sqlite-proxy's batchCallback. All statements run sequentially
+  // in the DO's local SQLite — one RPC instead of N worker↔DO round-trips.
+  async executeSqlBatch(batch: { sql: string; params: unknown[]; method: string }[]) {
+    return batch.map((q) => this.execOne(q.sql, q.params, q.method))
+  }
 }
 ```
 
-**Step 2 — Worker-level drizzle client via sqlite-proxy:**
+**Step 2 — Worker-level drizzle client via sqlite-proxy (with batch support):**
+
+The `drizzle()` function from `sqlite-proxy` accepts an optional second callback for batch operations. Without it, `db.batch()` will throw at runtime even though the type exists.
 
 ```ts
 // src/db.ts — runs in the worker, NOT in the DO
@@ -824,10 +838,23 @@ function getStub() {
 
 export function getDb() {
   const stub = getStub()
-  return drizzle(async (sql, params, method) => {
-    return stub.executeSql(sql, params, method)
-  }, { schema, relations: schema.relations })
+  return drizzle(
+    // Execute callback — one query per RPC call
+    async (sql, params, method) => {
+      return stub.executeSql(sql, params, method) as any
+    },
+    // Batch callback — N queries in one RPC call
+    async (batch) => {
+      return stub.executeSqlBatch(batch) as any
+    },
+    { schema, relations: schema.relations },
+  )
 }
+```
+
+The `drizzle()` overload signature is:
+```ts
+drizzle(callback: RemoteCallback, batchCallback: AsyncBatchRemoteCallback, config?: DrizzleConfig)
 ```
 
 **Step 3 — Use the drizzle client anywhere in the worker:**
@@ -981,6 +1008,88 @@ const [newUsers, updatedPosts, allComments] = await db.batch([
 ```
 
 Statements execute **in order** inside one transaction, so statement 2 sees data that statement 1 inserted. The only limitation is you can't use the **return value** of statement 1 to build statement 2 in your TS code (all queries are defined upfront as an array). If you truly need to chain return values, do two separate batch calls — still better than holding a transaction open.
+
+### Batch patterns
+
+**Parent + child inserts** — pre-generate the ULID so both inserts can go in one batch:
+
+```ts
+import { ulid } from 'ulid'
+
+const orgId = ulid()
+const [[org]] = await db.batch([
+  db.insert(schema.org).values({ id: orgId, name: 'Acme' })
+    .returning({ id: schema.org.id, name: schema.org.name }),
+  db.insert(schema.orgMember).values({ orgId, userId, role: 'admin' }),
+] as const)
+```
+
+This works because IDs use `$defaultFn(() => ulid())` — generated client-side, so we can pre-generate and share across inserts.
+
+**Parent + multiple children:**
+
+```ts
+const projectId = ulid()
+const [[proj]] = await db.batch([
+  db.insert(schema.project).values({ id: projectId, name, orgId })
+    .returning({ id: schema.project.id, name: schema.project.name }),
+  ...DEFAULT_ENVIRONMENTS.map((e) =>
+    db.insert(schema.environment).values({ projectId, name: e.name, slug: e.slug }),
+  ),
+] as const)
+```
+
+**Bulk writes after async prep** — encrypt/compute first, then batch all inserts:
+
+```ts
+const entries = Object.entries(secrets)
+const encrypted = await Promise.all(entries.map(([, value]) => encrypt(value)))
+await db.batch(
+  entries.map(([name], i) =>
+    db.insert(schema.secretEvent).values({
+      environmentId, name,
+      operation: 'set',
+      valueEncrypted: encrypted[i]!.encrypted,
+      iv: encrypted[i]!.iv,
+    }),
+  ) as [any, ...any[]],
+)
+```
+
+**Multiple reads in parallel:**
+
+```ts
+const results = await db.batch(
+  environmentIds.map((envId) =>
+    db.query.secretEvent.findMany({
+      where: { environmentId: envId },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ) as [any, ...any[]],
+)
+```
+
+### TypeScript tuple constraint
+
+`db.batch()` requires `Readonly<[U, ...U[]]>` — a non-empty tuple. `.map()` returns `T[]` which TypeScript can't narrow to a non-empty tuple, even after a `.length > 0` check. The standard workaround is a cast:
+
+```ts
+// Static arrays — use `as const`
+await db.batch([query1, query2] as const)
+
+// Dynamic arrays from .map() — cast to tuple
+await db.batch(items.map(makeQuery) as [any, ...any[]])
+
+// Or with typed items
+import type { BatchItem } from 'drizzle-orm/batch'
+const queries: BatchItem<'sqlite'>[] = []
+// ... push queries ...
+if (queries.length > 0) {
+  await db.batch(queries as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
+}
+```
+
+This is a known drizzle limitation (drizzle-team/drizzle-orm#1292). The cast is safe because we guard with a length check at runtime.
 
 ## Migrations & SQL export
 
