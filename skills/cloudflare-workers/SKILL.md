@@ -412,6 +412,8 @@ Only `vars` values need to differ between environments. Everything else (binding
 
 The `@cloudflare/vite-plugin` resolves and flattens your `wrangler.jsonc` at **build time** and writes it into `dist/rsc/wrangler.json`. Set `CLOUDFLARE_ENV` during `vite build` so the plugin resolves the correct environment section:
 
+`wrangler deploy` deploys **one environment at a time**. It does **not** deploy every configured `env.*` block. With no `--env` flag, Wrangler deploys the top-level/default config (usually production). Use `wrangler deploy --env preview` or another explicit env name when targeting a non-production environment.
+
 ```json
 {
   "scripts": {
