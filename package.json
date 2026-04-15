@@ -4,7 +4,7 @@
     "@ai-sdk/google": "^2.0.67",
     "@ai-sdk/google-vertex": "^4.0.102",
     "@openauthjs/openauth": "^0.4.3",
-    "@opencode-ai/plugin": "1.4.3",
+    "@opencode-ai/plugin": "1.4.6",
     "ai": "^6.0.146",
     "kimaki": "^0.4.90",
     "proper-lockfile": "^4.1.2",
