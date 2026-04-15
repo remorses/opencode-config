@@ -260,6 +260,7 @@ const usersWithPosts = await db.query.users.findMany({
 - Use `with` to include relations (like Prisma's `include`)
 - Use `orderBy` as object: `{ createdAt: 'desc' }`
 - Use `findFirst` (adds `LIMIT 1`) or `findMany`
+- **NEVER use `orm.inArray()`, `orm.eq()`, or other operator functions inside `db.query` `where`** — the query API only accepts object-style filters. `orm.inArray(schema.users.id, ids)` will fail with a type error. Instead, use `{ id: { in: ids } }` or loop with `findFirst` per ID.
 
 **Writes: use `db.insert`, `db.update`, `db.delete`** — no query API for writes.
 
@@ -790,7 +791,12 @@ export class Store extends DurableObject<Env> {
 
     if (method === 'get') {
       const row = rawRows[0]
-      if (!row) return { rows: [] }
+      // MUST return { rows: null } (falsy) when no row found.
+      // Returning { rows: [] } breaks rqb v2 (findFirst) because [] is truthy,
+      // causing drizzle to call JSON.parse([]) → SyntaxError.
+      // Use null instead of undefined because undefined gets dropped by
+      // Cloudflare RPC structured clone serialization.
+      if (!row) return { rows: null }
       return { rows: columnNames.map((col) => (row as Record<string, unknown>)[col]) }
     }
 
@@ -987,6 +993,43 @@ pnpm drizzle-kit generate
 ```
 
 Creates numbered `.sql` files in the `out` directory (e.g. `./drizzle/0000_dear_lord_tyger.sql`).
+
+### Non-interactive `drizzle-kit generate` (CI / agents)
+
+`drizzle-kit generate` prompts interactively when it detects a table/column rename vs. create+drop ambiguity (e.g. "Is `secret_event` created or renamed from `secret`?"). This fails in non-TTY environments (CI, piped shells, coding agents) with:
+
+```
+Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or process.stdout.isTTY is false)
+```
+
+**There is no official `--non-interactive` or `--auto-approve` flag yet** (tracked in drizzle-team/drizzle-orm#5307 and #4941). Workarounds:
+
+1. **Write migration SQL manually** — for simple changes (drop table + create table), write the `.sql` file and update `migrations.js` yourself. This is the most reliable approach for agents:
+
+```bash
+# Create the migration directory with a timestamp-based name
+mkdir -p drizzle/20260415130000_my_migration
+
+# Write the SQL file
+cat > drizzle/20260415130000_my_migration/migration.sql << 'SQL'
+DROP TABLE `old_table`;
+--> statement-breakpoint
+CREATE TABLE `new_table` ( ... );
+SQL
+
+# Add the import to migrations.js
+# (append the new import + entry to the migrations object)
+```
+
+2. **Use `expect` or `script`** — wrap drizzle-kit in a TTY simulator to auto-answer prompts. Fragile and not recommended.
+
+3. **Use `--name` to name migrations** — doesn't skip prompts but helps identify them:
+
+```bash
+pnpm drizzle-kit generate --name=event-sourced-secrets
+```
+
+When writing migrations manually for Durable Objects, remember to also update `migrations.js` with the new import entry so `migrator.migrate()` picks it up at runtime. The snapshot.json is only needed by drizzle-kit for computing future diffs — the migration will run fine without it, and the next interactive `drizzle-kit generate` will regenerate a fresh snapshot.
 
 ### Apply migrations
 
