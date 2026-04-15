@@ -14,6 +14,21 @@ better-auth is the most comprehensive authentication framework for TypeScript. I
 
 Full docs: https://better-auth.com/llms.txt
 
+## URL construction
+
+Always use `new URL(path, base)` instead of string concatenation or template literals for building URLs:
+
+```ts
+// GOOD
+const url = new URL('/api/auth', process.env.BETTER_AUTH_URL)
+
+// BAD
+const url = `${process.env.BETTER_AUTH_URL}/api/auth`
+const url = process.env.BETTER_AUTH_URL + '/api/auth'
+```
+
+`new URL` handles trailing slashes, normalizes paths, and avoids double-slash bugs.
+
 ## Installation
 
 With drizzle-orm v0 (stable):
@@ -424,7 +439,7 @@ When calling authenticated Spiceflow API routes from the client, use `createSpic
 import { createSpiceflowFetch } from 'spiceflow/client'
 import type { App } from './main'
 
-const safeFetch = createSpiceflowFetch<App>('http://localhost:3000')
+const safeFetch = createSpiceflowFetch<App>(new URL('/', process.env.NEXT_PUBLIC_URL!).href)
 
 const me = await safeFetch('/api/me', {
   fetch: { credentials: 'include' },
