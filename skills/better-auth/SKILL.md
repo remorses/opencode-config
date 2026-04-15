@@ -736,6 +736,55 @@ export const auth = betterAuth({
 })
 ```
 
+## Server-side API calls and cookies
+
+When calling `auth.api.*` methods server-side (e.g. `auth.api.signInSocial()`), the response cookies (state cookies, session cookies) are **not automatically sent to the browser**. If you extract just the URL and create your own `Response.redirect()`, all `Set-Cookie` headers are lost.
+
+This causes `state_mismatch` errors on OAuth callbacks because BetterAuth stores a signed state cookie for CSRF protection. Without it, the callback validation fails.
+
+**Always use `returnHeaders: true`** and manually forward cookies when the result is a browser redirect:
+
+```ts
+// BAD — cookies lost, causes state_mismatch on callback
+.get('/sign-in', async ({ request }) => {
+  const auth = getAuth()
+  const res = await auth.api.signInSocial({
+    body: { provider: 'google', callbackURL: request.url },
+  })
+  return Response.redirect(res.url, 302) // ← bare redirect, no cookies!
+})
+
+// GOOD — returnHeaders + manual cookie forwarding
+.get('/sign-in', async ({ request }) => {
+  const auth = getAuth()
+  // signInSocial returns JSON { url, redirect } on server calls.
+  // Use returnHeaders to get both the parsed body AND Set-Cookie headers.
+  const { response: result, headers } = await auth.api.signInSocial({
+    body: { provider: 'google', callbackURL: request.url },
+    headers: request.headers,
+    returnHeaders: true,
+  })
+  if (!result?.url) {
+    return new Response('Failed to initiate sign-in', { status: 500 })
+  }
+  const redirect = new Response(null, { status: 302, headers: { Location: result.url } })
+  for (const cookie of headers.getSetCookie()) {
+    redirect.headers.append('Set-Cookie', cookie)
+  }
+  return redirect
+})
+```
+
+**Do NOT use `asResponse: true`** for `signInSocial` — it returns a JSON Response with `{ url, redirect: true }` body, not a 302 redirect. The redirect is client-side behavior. On the server you must build the redirect yourself.
+
+**When to use each pattern:**
+
+- **`returnHeaders: true`** — when you need Set-Cookie headers from the response (OAuth redirects, sign-in flows that set state cookies). Returns `{ headers, response }` where `response` is the parsed body and `headers` is a `Headers` object with `getSetCookie()`.
+- **`asResponse: true`** — when you want the raw `Response` object (rarely useful for `signInSocial` since it returns JSON, not a redirect).
+- **Default (no flag)** — when you just need the data (e.g. `getSession`). Returns the parsed body directly. Cookies are not forwarded.
+
+**`headers` parameter** — always pass the original `request.headers` when the API call needs request context (cookies, user agent, IP). Without it, BetterAuth can't read existing cookies or set new ones with the correct domain.
+
 ## Cloudflare Workers
 
 better-auth uses AsyncLocalStorage. Enable it in `wrangler.jsonc`:
@@ -752,12 +801,14 @@ Or for just AsyncLocalStorage: `["nodejs_als"]`.
 
 ### Google
 
+Always set `prompt: 'select_account'` so Google shows the account picker every time. Without it, users with a single Google session are silently signed in with no way to switch accounts.
+
 ```ts
 socialProviders: {
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID!,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    // prompt: 'consent', // force consent screen
+    prompt: 'select_account', // always show account picker
   },
 }
 ```
