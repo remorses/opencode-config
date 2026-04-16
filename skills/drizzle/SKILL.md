@@ -484,10 +484,12 @@ function processAccount(account: typeof schema.accounts.$inferSelect) { ... }
 
 Docs: https://orm.drizzle.team/docs/zod
 
-Install `drizzle-zod` to generate runtime validation schemas from your Drizzle tables. Useful for API route input/output validation (e.g. spiceflow `request`/`response`):
+Always prefer generating Zod schemas from your Drizzle tables instead of duplicating the same fields by hand in API code. This keeps validation, OpenAPI output, and DB schema in sync.
+
+If the repo uses Drizzle v1 beta (`drizzle-orm@1.0.0-beta.x`), import from `drizzle-orm/zod` directly. Only use `drizzle-zod` on older Drizzle versions.
 
 ```ts
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-zod'
+import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-orm/zod'
 
 const insertAccountSchema = createInsertSchema(schema.accounts)
 const selectAccountSchema = createSelectSchema(schema.accounts)
@@ -506,6 +508,34 @@ app.route({
   async handler({ request }) { ... },
 })
 ```
+
+Prefer composition over duplication:
+
+```ts
+const projectSummarySchema = createSelectSchema(schema.project).pick({
+  id: true,
+  orgId: true,
+  name: true,
+  createdAt: true,
+  updatedAt: true,
+})
+
+const projectCreateSchema = createInsertSchema(schema.project).pick({
+  name: true,
+  orgId: true,
+})
+
+const projectListResponseSchema = z.object({
+  projects: z.array(projectSummarySchema),
+})
+```
+
+Rules:
+
+- Prefer `createSelectSchema(table).pick(...)` for response items derived from a table
+- Prefer `createInsertSchema(table).pick(...)` / `createUpdateSchema(table).pick(...)` for request bodies
+- Only hand-write Zod objects for envelopes, computed fields, or shapes that do not map 1:1 to a table row
+- If an API shape mostly mirrors a table, derive it from the table first and then `.extend()` with the extra fields
 
 ## Schema best practices
 
