@@ -340,24 +340,25 @@ if you have difficulties making some tests pass in some edge cases do not apply 
 
 leave them failing instead and report to the user the issues faced as a last resort
 
-# gitchamber
+# opensrc
 
-gitchamber (aka chamber) is an alternative to opensrc with the same interface. When the user refers to opensrc, always use gitchamber instead.
-
-to read source code of npm packages or repos you can do:
+use opensrc to read source code of npm packages, PyPI packages, crates, or GitHub repos. it downloads into a global cache at `~/.opensrc/`.
 
 ```sh
-bunx gitchamber npmpackagename
-gitchamber github:owner/repo
-gitchamber owner/repo@v1.0.0
-gitchamber owner/repo#main
+# fetch and print the cached path (fetches on cache miss)
+bunx opensrc path zod
+bunx opensrc path pypi:requests
+bunx opensrc path owner/repo
+bunx opensrc path owner/repo@v1.0.0
+
+# list all cached sources
+bunx opensrc list
+
+# remove cached source
+bunx opensrc remove zod
 ```
 
-this will download them in `node_modules/.gitchamber/`
-
-Unlike opensrc, which downloads files into its own opensrc directory, gitchamber downloads inside `node_modules/.gitchamber/`.
-
-This is preferred because Vitest will not run tests from downloaded files there, and the directory is ignored by Git by default.
+use `opensrc path <package>` to get the absolute path, then read/grep files from there.
 
 this is preferable over manually cloning repos in tmp
 
