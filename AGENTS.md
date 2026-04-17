@@ -42,6 +42,20 @@ ALWAYS use locally installed playwriter without npx or bunx. This ensures you us
 
 NEVER rewrite git history. NEVER amend commits unless asked. NEVER restore or revert unless specifically asked. NEVER call git reset. prefer merge over rebase or squash
 
+when continuing git operations in non-interactive shells, avoid commands that may open an editor and hang. use `GIT_EDITOR=true` for `git rebase --continue`, `git cherry-pick --continue`, and `git revert --continue`.
+
+examples:
+
+```bash
+GIT_EDITOR=true git rebase --continue
+GIT_EDITOR=true git cherry-pick --continue
+GIT_EDITOR=true git revert --continue
+```
+
+for commits, always use `git commit -m "message"` or a heredoc, never bare `git commit`.
+
+if a previous interactive git command was aborted and git mentions a stale lock, first make sure no git/editor process is still running, then retry the non-interactive command. only remove a stale `.git/.../index.lock` after confirming no git process is active.
+
 when creating a new branch, always check if you're in a fork (origin and upstream remotes are different). if so, switch to upstream's default branch first:
 
 ```bash
@@ -159,6 +173,33 @@ the `--` separator explicitly marks where paths begin, preventing git from confu
 
 before creating any gh pr or issue output the title and body in chat and ask for confirmation first
 
+when searching for working examples of a code pattern, always use `gh search code` and `gh search repos` first before guessing. search for the concrete api names, method names, and small string snippets from the pattern you want.
+
+for example, search both the method and the surrounding shape:
+
+```bash
+# search code usages of a concrete API or method
+gh search code 'std.process.Child.init "stdout_behavior = .Pipe" language:Zig' --limit 30
+
+# search for a bigger pattern with multiple clues
+gh search code 'std.process.Child.init "stdout_behavior = .Pipe" "stderr_behavior = .Pipe" "std.Thread.spawn" language:Zig' --limit 30
+
+# search repos first when you want better examples to inspect deeply
+gh search repos 'command runner stdout stderr streaming zig' --limit 30
+```
+
+then sort candidate repos by stars to bias toward higher quality examples. if `gh search code` returns repo names, run a repo search and sort those repos by stars before choosing which files to read in detail.
+
+prefer this workflow:
+
+1. search code for the exact method/pattern
+2. collect the repo names from promising hits
+3. search repos for those projects or that topic
+4. sort by stars / credibility
+5. read the best few examples, not just the first random hit
+
+when reporting findings, include the repo URLs and file paths for the best examples so they are easy to inspect later.
+
 if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. don't use headings in the body (it looks like AI slop), instead try to use bold text as headings which is more refined looking and less commonly done by AI.
 
 Never use `\n` in `--body` or `--message` flags; shells don't turn these into real newlines. For multiline content, always use a heredoc:
@@ -240,6 +281,18 @@ when using task tool always be as detailed as possible on what you want: list go
 for web searches use `googlesearch` tool (which uses Gemini with Google Search grounding).
 
 when possible, ask the search to retrieve and include relevant GitHub project URLs in the results.
+
+## model ids
+
+if you need to look up model ids, use `https://models.dev/api.json`.
+
+to list OpenAI models sorted by latest release first:
+
+```bash
+curl -s https://models.dev/api.json | jq '.openai.models | to_entries | map(.value) | sort_by(.release_date) | reverse | map(.id)'
+```
+
+to swap providers, replace `.openai.models` with another provider key like `.anthropic.models` or `.google.models`.
 
 ## docs .md files
 
