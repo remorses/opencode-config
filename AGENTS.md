@@ -76,11 +76,15 @@ ONLY commit when user asks to do so.
 
 before committing, always check what files were changed and review the git diff. Only commit your changes. NEVER assume there are no other changes—other agents may have made changes you don't know of. If there are unrelated changes, use `critique hunks list` to list hunks and stage only the relevant ones with `critique hunks add id1 id2`. See `critique --help` for more info.
 
+If staging hunks is too difficult NEVER use git stash to remove other changes. just commit the whole file instead and keep things simple. it doesn't matter if some other changes end up in the commit.
+
 if user says "commit all" then also commit other changes, grouping them accordingly and using detailed commit messages.
 
 never amend commits or rewrite git history
 
 always write very detailed commit messages. Feel free to include diagrams, markdown, tables, lists, quotes, etc.
+
+always append the current opencode session id at the end of every commit message. format it as a final line like `Session: ses_xxx`.
 
 NEVER use `chore: commit remaining workspace updates`. read the diff and analyze it to commit with descriptive message. splitting in many commits to split changes by goal.
 
@@ -171,7 +175,7 @@ the `--` separator explicitly marks where paths begin, preventing git from confu
 
 ## github
 
-before creating any gh pr or issue output the title and body in chat and ask for confirmation first
+before creating any gh pr or issue, ask for confirmation only when the target github repository owner is not remorses. if the repo owner is remorses, do not ask for confirmation first
 
 when searching for working examples of a code pattern, always use `gh search code` and `gh search repos` first before guessing. search for the concrete api names, method names, and small string snippets from the pattern you want.
 
