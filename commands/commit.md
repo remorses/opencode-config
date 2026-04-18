@@ -24,5 +24,6 @@ example principles to choose commit splits:
 - are these files part of the same feature set? would these change break the codebase if not put together?
 - were these files modified by a different agent? if so we should understand the changes and split in a different commit. understanding the second agent goals
 
-
 if possible split the changes in smaller commits. if a commit diff includes 1000 of lines changes that's definitely too big.
+
+don't ask for confirmation or question.
