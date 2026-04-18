@@ -328,9 +328,11 @@ import fixtureTxt from './fixture.txt'
 
 Use a real `declare module` file so TypeScript understands the import shape. Never paper over missing module types with `@ts-expect-error`.
 
-## Routing: prefer custom_domain
+## Routing: prefer custom_domain when you actually need routing
 
-Always use `custom_domain` instead of `routes` for binding a domain to a worker. Custom domains work without needing a proxied A/AAAA DNS record first — Cloudflare creates it automatically.
+Do **not** add `routes` / `custom_domain` entries just because a project uses Spiceflow, Vite, or `@cloudflare/vite-plugin`. Spiceflow does not need wrangler routing rules to run, build, or deploy, and Vite does not need them either.
+
+Only add `routes` when you are intentionally binding a real hostname to the worker. If you do need that, prefer `custom_domain` instead of path-based `routes`. Custom domains work without needing a proxied A/AAAA DNS record first — Cloudflare creates it automatically.
 
 ```jsonc
 {
@@ -348,6 +350,8 @@ Always use `custom_domain` instead of `routes` for binding a domain to a worker.
 ```
 
 Use `routes` (non-custom_domain) only when you need path-based routing (`example.com/api/*`) on a domain that already has another worker or Pages project on the root.
+
+If you are using the default `*.workers.dev` hostname, or you have not decided on a custom domain yet, leave `routes` out entirely.
 
 ## Environments: preview and production
 
@@ -379,6 +383,7 @@ Only `vars` values need to differ between environments. Everything else (binding
   "secrets": {
     "required": ["API_KEY", "AUTH_SECRET"]
   },
+  // Optional: only add this when you want a custom hostname.
   "routes": [
     { "pattern": "app.example.com", "custom_domain": true }
   ],
@@ -400,6 +405,7 @@ Only `vars` values need to differ between environments. Everything else (binding
       "secrets": {
         "required": ["API_KEY", "AUTH_SECRET"]
       },
+      // Optional: only add this when you want a custom hostname.
       "routes": [
         { "pattern": "app.preview.example.com", "custom_domain": true, "zone_name": "example.com" }
       ]
