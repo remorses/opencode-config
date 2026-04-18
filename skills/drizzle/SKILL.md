@@ -6,7 +6,7 @@ description: >
   filters, schema design (ULIDs, cascade deletes, indexes, enums over bools),
   Zod schema generation, type inference, transactions, migrations, and
   driver setup for Cloudflare Durable Objects (via sqlite-proxy),
-  libSQL/Turso, and Postgres via Hyperdrive.
+  libSQL/Turso, Postgres via Hyperdrive, and Cloudflare D1.
   ALWAYS load this skill when a repo uses drizzle-orm.
 ---
 
@@ -83,10 +83,23 @@ export const db = drizzle({
 })
 ```
 
-For environments where the connection depends on runtime bindings (Cloudflare Hyperdrive, DO):
+For environments where the connection depends on runtime bindings (Cloudflare D1, Hyperdrive, DO):
 
 ```ts
-// db/src/index.ts
+// Cloudflare D1 — simplest option, just pass the binding
+import { drizzle } from 'drizzle-orm/d1'
+import { env } from 'cloudflare:workers'
+import * as schema from './schema.ts'
+
+export { schema }
+
+export function getDb() {
+  return drizzle(env.DB, { schema, relations: schema.relations })
+}
+```
+
+```ts
+// Cloudflare Hyperdrive (Postgres)
 import { drizzle } from 'drizzle-orm/node-postgres'
 import pg from 'pg'
 import * as schema from './schema.ts'
@@ -777,7 +790,113 @@ In the db package's `package.json`:
 
 ## Driver setup
 
-Docs: Durable Objects https://orm.drizzle.team/docs/connect-cloudflare-do | Turso https://orm.drizzle.team/docs/connect-turso | D1 https://orm.drizzle.team/docs/connect-cloudflare-d1 | All drivers https://orm.drizzle.team/docs/connect-overview
+Docs: D1 https://orm.drizzle.team/docs/connect-cloudflare-d1 | Durable Objects https://orm.drizzle.team/docs/connect-cloudflare-do | Turso https://orm.drizzle.team/docs/connect-turso | All drivers https://orm.drizzle.team/docs/connect-overview
+
+### Cloudflare D1 (recommended for Cloudflare SQLite)
+
+D1 is Cloudflare's managed SQLite database. It's the simplest option for Cloudflare Workers — no Durable Objects, no proxy layers, just pass the D1 binding directly to drizzle.
+
+**Prefer D1 over Durable Objects** for new projects unless you specifically need DO features (like single-point-of-serialization, WebSocket hibernation, or PITR). D1 is simpler to set up, has native `db.batch()` support, and uses `wrangler d1 migrations apply` for schema management.
+
+**Driver setup:**
+
+```ts
+// src/db.ts
+import { env } from 'cloudflare:workers'
+import { drizzle } from 'drizzle-orm/d1'
+import * as schema from './schema.ts'
+
+export function getDb() {
+  return drizzle(env.DB, { schema, relations: schema.relations })
+}
+```
+
+That's it — `drizzle(env.DB)` with schema and relations. No stub, no RPC, no proxy.
+
+**drizzle.config.ts:**
+
+```ts
+import { defineConfig } from 'drizzle-kit'
+
+export default defineConfig({
+  out: './drizzle',
+  schema: './src/schema.ts',
+  dialect: 'sqlite',
+  // No `driver` field for D1 — just dialect: 'sqlite'
+})
+```
+
+**wrangler.jsonc:**
+
+```jsonc
+{
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "my-app-db",
+      "database_id": "<id-from-wrangler-d1-create>",
+      "migrations_dir": "./drizzle"
+    }
+  ]
+}
+```
+
+**Creating D1 databases:**
+
+```bash
+wrangler d1 create my-app-db
+wrangler d1 create my-app-preview-db
+```
+
+**D1 migrations with wrangler:**
+
+Drizzle-kit generates migration files in subfolder format (`timestamp_name/migration.sql`), but wrangler D1 expects flat SQL files in `migrations_dir`. After generating, copy the SQL to a flat file:
+
+```bash
+# Generate migration from schema changes
+pnpm drizzle-kit generate --name=initial
+
+# drizzle-kit outputs: drizzle/20260417161933_initial/migration.sql
+# wrangler needs: drizzle/0001_initial.sql
+cp drizzle/20260417161933_initial/migration.sql drizzle/0001_initial.sql
+
+# Apply to remote D1 database
+wrangler d1 migrations apply DB --remote
+
+# Apply to preview environment
+wrangler d1 migrations apply DB --remote --env preview
+
+# Apply locally for dev
+wrangler d1 migrations apply DB --local
+```
+
+**Batch support** — D1 natively supports `db.batch()`. No extra setup needed:
+
+```ts
+const db = getDb()
+const [users, posts] = await db.batch([
+  db.query.users.findMany(),
+  db.query.posts.findMany({ where: { status: 'published' } }),
+])
+```
+
+**Migrating from Durable Objects to D1:**
+
+If you're switching an existing worker from DO to D1:
+1. Create D1 databases with `wrangler d1 create`
+2. Replace `drizzle-orm/sqlite-proxy` with `drizzle-orm/d1` in your `db.ts`
+3. Replace `durable_objects` bindings with `d1_databases` in `wrangler.jsonc`
+4. Add `deleted_classes` migration tag to remove old DO classes:
+   ```jsonc
+   "migrations": [
+     { "tag": "v1", "new_sqlite_classes": ["OldStore"] },
+     { "tag": "v2", "deleted_classes": ["OldStore"] }
+   ]
+   ```
+5. Delete the DO class file, remove its export from `app.tsx`
+6. Remove `driver: 'durable-sqlite'` from drizzle.config.ts
+7. Remove `rules` for `.sql` text imports (no longer needed)
+8. Regenerate types with `wrangler types`
 
 ### Cloudflare Durable Objects (SQLite via sqlite-proxy)
 
@@ -1176,6 +1295,11 @@ When writing migrations manually for Durable Objects, remember to also update `m
 # Apply to database (Postgres, libSQL)
 doppler run -- pnpm drizzle-kit migrate
 
+# Apply to Cloudflare D1 (use wrangler, not drizzle-kit)
+wrangler d1 migrations apply DB --remote              # production
+wrangler d1 migrations apply DB --remote --env preview # preview
+wrangler d1 migrations apply DB --local                # local dev
+
 # Dev only — push schema directly, no migration files
 doppler run -- pnpm drizzle-kit push
 ```
@@ -1234,7 +1358,7 @@ Durable Objects with SQLite can be used as a full database, accessible from outs
 **How it works:**
 - Inside the DO: `createLibsqlHandler(durableObjectExecutor(ctx.storage))` bridges the Hrana v2 protocol to `ctx.storage.sql`, exposed as an RPC method (`hranaHandler`)
 - In the worker: `createLibsqlProxy()` sits in front, parses the `namespace:secret` auth token from incoming requests, resolves the right DO stub via `getStub`, and forwards the Hrana request to it
-- **Requires a dedicated domain/subdomain** (e.g. `libsql.example.com`) — the worker routes requests hitting that hostname to the proxy, keeping normal app traffic separate. Add it as a `custom_domain` route in `wrangler.json`
+- **Usually wants a dedicated domain/subdomain** (e.g. `libsql.example.com`) so external tools have a stable hostname and the proxy stays separate from normal app traffic. But this is for the proxy endpoint itself — do **not** add wrangler `routes` / `custom_domain` rules just because the project uses Spiceflow or Vite. Add a `custom_domain` route only if you actually want that hostname.
 
 **Connecting from external tools:**
 
