@@ -304,7 +304,7 @@ if user asks you to create .md files with findings always put them in a docs fol
 
 ## background processes
 
-for running dev servers and other long-running commands, use tmux background sessions with names
+for running dev servers and other long-running commands, use tuistory background sessions with names. prefer `tuistory launch`, `tuistory read`, and `tuistory wait` over shell sleeps because they react to real process output.
 
 ## compounding engineering
 
