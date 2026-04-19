@@ -22,6 +22,10 @@ permission:
   codesearch: "allow"
   external_directory:
     "/tmp/*": "allow"
+    "~/.opensrc/*": "allow"
+    "~/.opensrc": "allow"
+    "~/.cache/*": "allow"
+    "~/.cache": "allow"
     "/tmp": "allow"
     "*": "ask"
 ---
