@@ -84,7 +84,7 @@ never amend commits or rewrite git history
 
 always write very detailed commit messages. Feel free to include diagrams, markdown, tables, lists, quotes, etc.
 
-always append the current opencode session id at the end of every commit message. format it as a final line like `Session: ses_xxx`.
+always append the current opencode session id at the end of every commit message. format it as a final line like `Session: ses_xxx`. later you can use kimaki cli to read session as markdown from past commits to understand why they were made.
 
 NEVER use `chore: commit remaining workspace updates`. read the diff and analyze it to commit with descriptive message. splitting in many commits to split changes by goal.
 
@@ -343,6 +343,8 @@ you should write failing tests first, make sure they fail, then write the code o
 if you have difficulties making some tests pass in some edge cases do not apply workarounds in the tests, instead aks help to the user or oracle agent if present. for example if we are developing a NAPI module and tests do not pass in linux you should not change the tests to make them pass in linux or skip them.
 
 leave them failing instead and report to the user the issues faced as a last resort
+
+if user starts a session asking you to run existing tests and they fail try looking at recent commits to find possible regression reasons
 
 # opensrc
 
