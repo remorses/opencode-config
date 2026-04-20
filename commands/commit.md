@@ -26,4 +26,4 @@ example principles to choose commit splits:
 
 if possible split the changes in smaller commits. if a commit diff includes 1000 of lines changes that's definitely too big.
 
-don't ask for confirmation or question.
+NEVER ask for confirmation before committing. The user invoking this command IS the confirmation. Just do the commits directly without asking "should I proceed?" or showing a plan and waiting. Execute immediately.
