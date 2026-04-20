@@ -461,3 +461,15 @@ const findUser = (id: string) => store.getState().users.get(id);
 Load the `zustand-centralized-state` skill for the full pattern.
 
 **React:** Avoid `useEffect`. Put code inside event handlers instead if possible .
+
+## writing READMEs and docs
+
+markdown files must follow progressive disclosure: the top of the document must be easy to follow and contain gist, essence of the document. the section that follows should cover basic concepts, as the document progresses the section theme becomes more complex and advanced.
+
+for example if you are writing a README for a new Express like React framework you would put the tagline at the top, in a few words it should explain what the framework is and the value proposition. then a code snippet example that shows the overall gist of the framework. then a list of features. then a section for each feature, starting from the core and basic ones to then go to the most advanced. agent only rules should be put at the bottom.
+
+each paragraph should ideally have a code snippet example or diagram. it's much easier for the user to understand by example than to read intricate prose. use tables to display comparisons or tabular data.
+
+If you need to embed rules for agents or complex topics you can use details html block to toggle them so the user does not need to see walls of text or non important content while skimming the document.
+
+use bold to mark important key words in each paragraph to make it easy for the user to skim the content.
