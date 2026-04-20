@@ -76,7 +76,7 @@ Always use `wrangler.jsonc` (not `wrangler.toml`). Newer features are exclusive 
 
 ### compatibility_date: ALWAYS use today's date
 
-**MUST:** Always set `compatibility_date` to today's date (or the most recent date possible) when creating a new worker or updating an existing one. Old dates disable newer runtime features like `WeakRef`, `FinalizationRegistry`, and other JS globals — causing cryptic "X is not defined" errors at runtime. There is no benefit to using an old date unless you are pinning behavior for a production worker you cannot test.
+**MUST:** Always set `compatibility_date` to today's date minus 30 days (we can't use today's date directly because the wrangler version used should also released after that day or it will show an error) when creating a new worker or updating an existing one. Old dates disable newer runtime features like `WeakRef`, `FinalizationRegistry`, and other JS globals — causing cryptic "X is not defined" errors at runtime. There is no benefit to using an old date unless you are pinning behavior for a production worker you cannot test.
 
 ```jsonc
 {
