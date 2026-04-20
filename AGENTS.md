@@ -466,7 +466,7 @@ Load the `zustand-centralized-state` skill for the full pattern.
 
 markdown files must follow progressive disclosure: the top of the document must be easy to follow and contain gist, essence of the document. the section that follows should cover basic concepts, as the document progresses the section theme becomes more complex and advanced.
 
-for example if you are writing a README for a new Express like React framework you would put the tagline at the top, in a few words it should explain what the framework is and the value proposition. then a code snippet example that shows the overall gist of the framework. then a list of features. then a section for each feature, starting from the core and basic ones to then go to the most advanced. agent only rules should be put at the bottom.
+for example if you are writing a README for a new Express like React framework you would put the tagline at the top, in a few words it should explain what the framework is and the value proposition. then a code snippet example that shows the overall gist of the framework. then a list of features. then a section for each feature, starting from the core and basic ones to then go to the most advanced. agent only rules should be put at the bottom (exception is how to install skills, that is an user facing section, close to the top).
 
 each paragraph should ideally have a code snippet example or diagram. it's much easier for the user to understand by example than to read intricate prose. use tables to display comparisons or tabular data.
 
