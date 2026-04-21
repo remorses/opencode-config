@@ -26,6 +26,8 @@ if you need to create scripts always prefer typescript over bash or js. never cr
 
 prefer always writing scripts in Node.js and run them with tsx or bun. If you ever need to run them with python for some reason use uv and uvx
 
+scripts should always progressively log to let user know what is happening and current state in case of crash in the middle of the script. for example for a script that updates rows in the database and does so with multiple update statements run one by one you should log each update so that we know the script is currently running and doing something.
+
 ## planning
 
 when the user asks you to plan, they want you to read all relevant files and create a concrete plan with steps: sections where you describe what files you would update and what tests you would add to validate the new changes.
