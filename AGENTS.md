@@ -252,6 +252,8 @@ NEVER use we or our in messages. Write as if you were me, making the body person
 
 always omit chores or internal things from github release. end users are going to read these so we should omit internal not user facing changes and instead be very detailed on user facing APIs changes and features. adding code snippets and nice code formatting.
 
+NEVER pass `--prerelease` to `gh release create`, even for prerelease npm versions (like `1.0.0-rsc.2`). prerelease releases are hidden from the default GitHub releases view and users can't find them. always use `--latest` instead.
+
 ## updating PRs and issues
 
 always update existing PRs, issues, or comments instead of recreating them. use `gh pr edit` or `gh issue edit` to update title/body.
