@@ -582,9 +582,8 @@ Type-safe client usage from other parts of the app. The spiceflow client is a pr
 
 ```ts
 // website/src/lib/billing-client.ts
-import { createSpiceflowClient } from 'spiceflow/client'
+import { createSpiceflowFetch } from 'spiceflow/client'
 import * as errore from 'errore'
-import type { RouteType } from 'website/src/lib/spiceflow-plugins.server'
 import type { PriceLookupKey } from 'website/src/lib/stripe'
 
 export class BillingClientError extends errore.createTaggedError({
@@ -592,18 +591,19 @@ export class BillingClientError extends errore.createTaggedError({
   message: 'Billing API call failed: $operation',
 }) {}
 
-export const apiClient = createSpiceflowClient<RouteType>(env.PUBLIC_URL!)
+// Type safety comes from SpiceflowRegister — add
+// `declare module 'spiceflow/react' { interface SpiceflowRegister { app: typeof spiceflowApp } }`
+// in the server entry file (website/src/lib/spiceflow-plugins.server.tsx)
+const safeFetch = createSpiceflowFetch(env.PUBLIC_URL!)
 
 export async function startCheckout(lookupKey: PriceLookupKey) {
-  // The proxy maps the route path to dot access — the /billing/checkout
-  // route mounted under /api/plugins becomes apiClient.api.plugins.billing.checkout.
-  const { data, error } = await apiClient.api.plugins.billing.checkout.post({
-    lookupKey,
-    returnPath: '/billing/done',
+  const result = await safeFetch('/api/plugins/billing/checkout', {
+    method: 'POST',
+    body: { lookupKey, returnPath: '/billing/done' },
   })
-  if (error) return new BillingClientError({ operation: 'checkout', cause: error })
+  if (result instanceof Error) return new BillingClientError({ operation: 'checkout', cause: result })
 
-  window.location.href = data.url
+  window.location.href = result.url
   return null
 }
 ```
@@ -621,8 +621,8 @@ if (result instanceof Error) {
 Notes:
 
 - The `z.enum(priceLookupKeys)` on the `/checkout` route gives **autocomplete on every call site** and fails compilation if you typo a plan name. TypeScript infers the body shape from the route definition.
-- **Wrap `error` in a tagged domain error**, don't return it as-is. The SDK error is a plain object — wrapping in `BillingClientError` gives you `_tag`, typed properties, and a `cause` chain for debugging.
-- **Check `error` with a truthy check**, not `instanceof Error`. The spiceflow client returns plain `{ data: T | null, error: SomeErrorShape | null }` — similar to Supabase.
+- **Wrap the error in a tagged domain error**, don't return it as-is. Wrapping in `BillingClientError` gives you `_tag`, typed properties, and a `cause` chain for debugging.
+- **Check with `instanceof Error`** — `createSpiceflowFetch` returns `Error | Data` directly following the errore convention. No `{ data, error }` destructuring. On error, the returned `SpiceflowFetchError` has `status`, `value` (parsed error body), and `response` (raw `Response`) properties.
 
 ## Webhook handler
 
