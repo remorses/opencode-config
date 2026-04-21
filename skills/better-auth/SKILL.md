@@ -216,11 +216,10 @@ Now **every page, layout, and client component** can access the session type-saf
 'use client'
 
 import { useLoaderData } from 'spiceflow/react'
-import type { App } from '../main'
 
 export function UserMenu() {
-  // Type-safe: session field is inferred from the /* loader return type
-  const { session } = useLoaderData<App>('/*')
+  // Type-safe when SpiceflowRegister is declared in the app entry file
+  const { session } = useLoaderData('/*')
 
   if (!session) return <a href="/login">Sign in</a>
 
@@ -303,7 +302,9 @@ export const app = new Spiceflow()
     return state.session.user
   })
 
-export type App = typeof app
+declare module 'spiceflow/react' {
+  interface SpiceflowRegister { app: typeof app }
+}
 ```
 
 ## Client setup
@@ -437,9 +438,9 @@ When calling authenticated Spiceflow API routes from the client, use `createSpic
 
 ```ts
 import { createSpiceflowFetch } from 'spiceflow/client'
-import type { App } from './main'
 
-const safeFetch = createSpiceflowFetch<App>(new URL('/', process.env.NEXT_PUBLIC_URL!).href)
+// Type safety comes from SpiceflowRegister declared in the app entry file
+const safeFetch = createSpiceflowFetch(new URL('/', process.env.NEXT_PUBLIC_URL!).href)
 
 const me = await safeFetch('/api/me', {
   fetch: { credentials: 'include' },
@@ -697,10 +698,9 @@ Any client component can read the session via `useLoaderData` without props — 
 ```tsx
 'use client'
 import { useLoaderData } from 'spiceflow/react'
-import type { App } from '../main'
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { session } = useLoaderData<App>('/*')
+  const { session } = useLoaderData('/*')
 
   if (!session) return <a href="/login">Please sign in</a>
   return <>{children}</>

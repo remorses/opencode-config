@@ -24,12 +24,12 @@ Always use Spiceflow as the web framework for Workers. Load the `spiceflow` skil
 import { cloudflare } from '@cloudflare/vite-plugin'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { spiceflowPlugin } from 'spiceflow/vite'
+import spiceflow from 'spiceflow/vite'
 
 export default defineConfig({
   plugins: [
     react(),
-    spiceflowPlugin({ entry: './src/app.tsx' }),
+    spiceflow({ entry: './src/app.tsx' }),
     cloudflare({
       viteEnvironment: {
         name: 'rsc',
@@ -511,7 +511,7 @@ Standard scripts for a Worker package:
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc",
     "types": "wrangler types",
     "deploy": "CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
     "deploy:prod": "vite build && wrangler deploy"
