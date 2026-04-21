@@ -1138,15 +1138,21 @@ export default defineConfig({
 
 Docs: Transactions https://orm.drizzle.team/docs/transactions | Batch https://orm.drizzle.team/docs/batch-api
 
-### Always use `db.batch()`, avoid `db.transaction()`
+### Prefer no transaction at all
 
-**Never use `db.transaction()`.** It holds an open database transaction across multiple round-trips — one per statement. This causes serious problems in production:
+**Transactions are the first thing that breaks under load.** They hold locks, hog connections, and cause contention. Before reaching for any transaction or batch, ask yourself: do I actually need atomicity here? Most writes are idempotent or can be retried independently. If a partial failure is acceptable (e.g. an export that can be re-run), just use plain sequential or parallel queries with no transaction wrapper.
+
+Only use `db.batch()` when you genuinely need atomicity (all-or-nothing). Never use `db.transaction()` (interactive transactions) at all.
+
+### If you need atomicity, use `db.batch()`, NEVER `db.transaction()`
+
+**Never use `db.transaction()`.** It holds an open database transaction across multiple round-trips, one per statement. This causes serious problems in production:
 - Transactions last too long (each statement waits for a network round-trip before the next one starts)
 - They hog database connections and locks, starving other requests
 - They fail frequently even at low RPS because of lock contention and timeouts
 - On serverless/edge (Cloudflare Workers, Vercel), cold starts make it even worse
 
-**Use `db.batch()` instead.** It sends all statements in a single HTTP request. The database wraps them in an implicit transaction (BEGIN → statements → COMMIT). If any statement fails, the whole batch rolls back. Same atomicity guarantees, zero round-trip overhead.
+**Use `db.batch()` instead** when atomicity is required. It sends all statements in a single HTTP request. The database wraps them in an implicit transaction (BEGIN → statements → COMMIT). If any statement fails, the whole batch rolls back. Same atomicity guarantees, zero round-trip overhead.
 
 ```ts
 const [newUsers, updatedPosts, allComments] = await db.batch([
@@ -1156,7 +1162,13 @@ const [newUsers, updatedPosts, allComments] = await db.batch([
 ])
 ```
 
-Statements execute **in order** inside one transaction, so statement 2 sees data that statement 1 inserted. The only limitation is you can't use the **return value** of statement 1 to build statement 2 in your TS code (all queries are defined upfront as an array). If you truly need to chain return values, do two separate batch calls — still better than holding a transaction open.
+Statements execute **in order** inside one transaction, so statement 2 sees data that statement 1 inserted. The only limitation is you can't use the **return value** of statement 1 to build statement 2 in your TS code (all queries are defined upfront as an array). If you truly need to chain return values, do two separate batch calls, still better than holding a transaction open.
+
+### Never pass unbounded arrays to `db.batch()`
+
+**Always cap the size of arrays passed to `db.batch()`.** An unbounded array (e.g. all rows from user input or a full table scan) inside a single batch creates a massive transaction that locks the database for the entire duration. Large projects with thousands of rows will hit timeouts and starve other requests.
+
+If you have a dynamic array of unknown size, split it into fixed-size chunks and batch each chunk separately. Or better yet, if atomicity is not needed, just use plain inserts without batching at all.
 
 ### Batch patterns
 
@@ -1239,6 +1251,46 @@ if (queries.length > 0) {
 ```
 
 This is a known drizzle limitation (drizzle-team/drizzle-orm#1292). The cast is safe because we guard with a length check at runtime.
+
+## Foreign key ordering in parallel writes
+
+**Always read the schema before writing insert/update code.** Trace the foreign key dependency chain and make sure parent rows exist before inserting child rows. This applies to `Promise.all`, `db.batch()`, and any concurrent write pattern.
+
+When running multiple inserts in parallel (e.g. `Promise.all` or `db.batch()`), child tables that reference parent tables via foreign keys **must wait** for the parent inserts to complete first. Running them all in a single parallel step causes intermittent FK constraint violations in production.
+
+### How to think about it
+
+1. Read the schema and draw the FK dependency chain
+2. Group tables into layers: tables with no FK dependencies go in layer 1, tables that reference layer 1 go in layer 2, etc.
+3. Execute each layer sequentially; within a layer, inserts can run in parallel
+
+### Example: wrong vs right
+
+Given these tables where `Breakpoint` → `Component` and `Instance` → `Component` + `WebPage`:
+
+```ts
+// BAD: all inserts in one Promise.all — Breakpoint may insert before Component exists
+await Promise.all([
+  db.insert(component).values(components),
+  db.insert(webPage).values(pages),
+  db.insert(breakpoint).values(breakpoints),    // FK → component
+  db.insert(instance).values(instances),         // FK → component + webPage
+])
+
+// GOOD: parent tables first (layer 1), then dependent tables (layer 2)
+await Promise.all([
+  db.insert(component).values(components),       // layer 1
+  db.insert(webPage).values(pages),              // layer 1
+])
+await Promise.all([
+  db.insert(breakpoint).values(breakpoints),     // layer 2: FK → component
+  db.insert(instance).values(instances),         // layer 2: FK → component + webPage
+])
+```
+
+With `db.batch()` this is handled automatically because statements execute in order inside one transaction. But with `Promise.all` or any other concurrent pattern, you must manually respect the dependency chain.
+
+This also applies to **deletes in reverse order**: delete children first, then parents. Otherwise you get FK violations on the delete side too (unless `onDelete: Cascade` handles it).
 
 ## Migrations & SQL export
 
