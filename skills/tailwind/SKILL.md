@@ -220,3 +220,74 @@ when creating or editing inline SVGs, always use `currentColor` for `fill` and `
 then style with Tailwind's text color utilities: `text-foreground`, `text-muted-foreground`, `text-primary`, etc.
 
 **data-URI SVGs cannot use `currentColor`**: SVG used as a CSS `background-image` data URI (`url("data:image/svg+xml,...")`) is NOT part of the document tree, so `currentColor` resolves to black regardless of the parent's color. always use inline `<svg>` elements (not background-image) for icons that need to adapt to light/dark mode.
+
+## prefer `cn()` for className composition
+
+always use the `cn()` helper (clsx + tailwind-merge) for composing class names. never use template literals or string concatenation to build className strings. `cn()` handles falsy values, deduplicates conflicting tailwind classes, and reads much cleaner.
+
+for conditional classes, pass boolean expressions with `&&` inside `cn()`:
+
+```tsx
+// BAD — template literal, no tailwind-merge, hard to scan
+<div className={`px-4 py-2 ${isActive ? "bg-primary text-primary-foreground" : "bg-muted"} ${isDisabled ? "opacity-50" : ""}`}>
+
+// BAD — ternary soup
+<div className={isActive ? "px-4 py-2 bg-primary text-primary-foreground" : "px-4 py-2 bg-muted"}>
+
+// GOOD — cn() with && for conditional classes
+<div className={cn(
+  "px-4 py-2",
+  isActive && "bg-primary text-primary-foreground",
+  !isActive && "bg-muted",
+  isDisabled && "opacity-50",
+)}>
+```
+
+when a component accepts a `className` prop, always merge it last so the caller can override defaults:
+
+```tsx
+function Card({ className, ...props }: React.ComponentProps<"div">) {
+  return <div className={cn("rounded-lg border bg-card p-4", className)} {...props} />;
+}
+```
+
+if existing code uses template literals for conditional classes, refactor it to `cn()` when you touch that code.
+
+## React component reuse (shadcn convention)
+
+never duplicate complex styling across multiple files. instead, create reusable components in `components/ui/` following the shadcn convention, and import them everywhere. this applies to all styled primitives: buttons, inputs, selects, badges, dialogs, tables, empty states, etc.
+
+**common examples that must always be components:**
+
+- `Button` — never write raw `<button className="bg-primary text-primary-foreground ...">`. use the `Button` component with `variant` and `size` props.
+- `Input` / `Textarea` — never write raw `<input className="rounded-md border border-input ...">`. use the `Input` component.
+- `NativeSelect` — never write raw `<select className="flex h-9 w-full rounded-md border ...">`. use the `NativeSelect` component for native selects or the `Select` component for custom dropdowns.
+- `EmptyState` — the "centered icon + heading + description + action" pattern should be a single component, not copy-pasted markup.
+
+**when you see small differences between usages, add support via props** (variant, size, loading, etc.) on the centralized component rather than duplicating the entire component with tweaks.
+
+```tsx
+// BAD — hardcoded select with hand-rolled styles
+<select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 ...">
+  <option value="">All environments</option>
+</select>
+
+// GOOD — reusable component
+<NativeSelect>
+  <option value="">All environments</option>
+</NativeSelect>
+```
+
+**module export rule: only export components from component files.** never mix component exports with non-component exports (style strings, constants, utility functions) in the same file. this breaks React Fast Refresh / HMR because the bundler can't determine whether to do a full reload or a hot update when non-component exports change. if you need shared styles, encode them as CSS classes (in globals.css or a utility CSS file) and reference them via className in the component. if you need shared constants, put them in a separate non-component module (e.g. `lib/constants.ts`).
+
+```tsx
+// BAD — mixing components and non-component exports breaks HMR
+export const hiddenValueStyle = { WebkitTextSecurity: "disc" };
+export function SecretsTable() { ... }
+
+// GOOD — style is a CSS class, component file only exports components
+// globals.css: .text-security-disc { -webkit-text-security: disc; }
+export function SecretsTable() { ... }
+```
+
+**when to create a new ui component:** if you find the same visual pattern (same markup structure + same tailwind classes) in 2+ places, extract it. one-off patterns can stay inline. the `components/ui/` folder is for generic, reusable primitives. domain-specific components live in `components/` without the `ui/` prefix.
