@@ -475,3 +475,9 @@ each paragraph should ideally have a code snippet example or diagram. it's much 
 If you need to embed rules for agents or complex topics you can use details html block to toggle them so the user does not need to see walls of text or non important content while skimming the document.
 
 use bold to mark important key words in each paragraph to make it easy for the user to skim the content.
+
+never use emdashes, they are over used by AIs, we want to sound human-like and not AI generated. Instead of using emdash use dots, semicolons and commas, which can accomplish the same goal. Keep phrases short and easy to read. Use bold to mark important words. Ideally one per paragraph. Paragraphs should be short, no wall of text. 
+
+## running processes in background
+
+use tuistory to run processes in background. see `bunx tuistory --help` for how to use it. prefer it over tmux even when tools suggest using tmux
