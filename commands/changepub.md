@@ -234,6 +234,8 @@ git push origin HEAD --tags
 
 **Never create draft releases** — always publish releases immediately so users see them.
 
+**NEVER pass `--prerelease` to `gh release create`**, even for prerelease npm versions (like `1.0.0-rsc.2`). Prerelease releases are hidden from the main GitHub page of the repo and users can't find them. Always use `--latest` instead.
+
 **Do NOT use `--notes-file CHANGELOG.md`** — that dumps the entire changelog into the release body.
 
 ### Merging unpublished versions into release notes
