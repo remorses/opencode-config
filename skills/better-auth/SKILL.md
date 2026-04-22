@@ -785,6 +785,31 @@ This causes `state_mismatch` errors on OAuth callbacks because BetterAuth stores
 
 **`headers` parameter** — always pass the original `request.headers` when the API call needs request context (cookies, user agent, IP). Without it, BetterAuth can't read existing cookies or set new ones with the correct domain.
 
+## SQLite/D1 date binding issue
+
+BetterAuth passes `Date` objects for timestamp columns (`createdAt`, `updatedAt`, `expiresAt`). This crashes on Cloudflare D1 because D1's `.bind()` only accepts `string | number | null | ArrayBuffer`.
+
+**Do not use `new Proxy` to wrap D1.** Instead, use a drizzle `customType` called `epochMs` for all timestamp columns. It stores epoch milliseconds as integers (same SQL type, no migration needed) but converts `Date → date.getTime()` in drizzle's `toDriver` hook before values reach D1. See the `drizzle` skill's "Timestamps" section for the full implementation.
+
+```ts
+// Use epochMs instead of integer({ mode: 'number' }) for timestamps
+const user = sqliteTable('user', {
+  createdAt: epochMs('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: epochMs('updated_at').notNull().$defaultFn(() => Date.now()),
+})
+
+// Then pass env.DB directly to drizzle, no wrapper needed
+export function getDb() {
+  return drizzle(env.DB, { schema, relations: schema.relations })
+}
+```
+
+**Why not `supportsDates: false`?** When this flag is set, BetterAuth converts `Date → toISOString()` (a string). If your columns are `integer` (storing epoch ms), this stores ISO strings in integer columns, corrupting data and breaking sorting/comparisons.
+
+**Why not `integer({ mode: 'timestamp_ms' })`?** This changes the TypeScript type from `number` to `Date`, requiring changes across the entire codebase. API JSON responses would serialize as ISO strings instead of epoch numbers, breaking CLI clients.
+
+This issue is tracked in https://github.com/better-auth/better-auth/issues/8882 (PR #8913 adds `supportsDates: false` for SQLite but converts to ISO strings, not epoch numbers, so it doesn't help for integer timestamp schemas).
+
 ## Cloudflare Workers
 
 better-auth uses AsyncLocalStorage. Enable it in `wrangler.jsonc`:
