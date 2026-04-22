@@ -671,8 +671,40 @@ Exception: truly unstructured/opaque data (raw API responses for debugging) can 
 
 ### Timestamps
 
-SQLite: `integer('created_at', { mode: 'number' })` storing `Date.now()` (epoch ms).
 Postgres: `pgCore.timestamp('created_at').defaultNow().notNull()`.
+
+SQLite with D1: use a `customType` called `epochMs` instead of `integer({ mode: 'number' })`. This is required because BetterAuth passes `Date` objects as bind parameters, but D1 only accepts `string | number | null | ArrayBuffer`. The `epochMs` type converts `Date → date.getTime()` via drizzle's `toDriver` hook while keeping the TypeScript type as `number`.
+
+```ts
+import * as sqliteCore from 'drizzle-orm/sqlite-core'
+
+// Integer column that stores epoch milliseconds as a plain number.
+// Unlike integer({ mode: 'number' }), this accepts Date objects in toDriver
+// so BetterAuth's internal Date params don't crash D1's .bind().
+export const epochMs = sqliteCore.customType<{ data: number; driverParam: number }>({
+  dataType() { return 'integer' },
+  toDriver(value: unknown): number {
+    if (value instanceof Date) return value.getTime()
+    return value as number
+  },
+  fromDriver(value: unknown): number { return value as number },
+})
+
+// Usage:
+const user = sqliteCore.sqliteTable('user', {
+  id: sqliteCore.text('id').primaryKey(),
+  createdAt: epochMs('created_at').notNull().$defaultFn(() => Date.now()),
+  updatedAt: epochMs('updated_at').notNull().$defaultFn(() => Date.now()),
+})
+```
+
+Why not `integer({ mode: 'timestamp_ms' })`? That changes the TypeScript type from `number` to `Date`, breaking all code that does arithmetic on timestamps, and JSON serialization changes from epoch numbers to ISO strings (breaking CLI/API clients).
+
+Why not the `supportsDates: false` adapter flag? BetterAuth converts `Date → toISOString()` (a string), which would store text in integer columns, corrupting data.
+
+The `epochMs` approach generates the same `integer` SQL type, so no migration is needed when switching from `integer({ mode: 'number' })`.
+
+SQLite without D1 (e.g. better-sqlite3, libsql): plain `integer({ mode: 'number' })` works if BetterAuth is not in the picture. Use `epochMs` whenever BetterAuth + SQLite are combined.
 
 ### Column naming
 
@@ -850,16 +882,24 @@ wrangler d1 create my-app-preview-db
 
 **D1 migrations with wrangler:**
 
-Drizzle-kit generates migration files in subfolder format (`timestamp_name/migration.sql`), but wrangler D1 expects flat SQL files in `migrations_dir`. After generating, copy the SQL to a flat file:
+Drizzle-kit generates migrations as subdirectories (`<timestamp>_<name>/migration.sql`), but **wrangler D1 only recognizes flat `.sql` files** in `migrations_dir`. It does not search subdirectories. This is a known incompatibility (drizzle-team/drizzle-orm#5266, cloudflare/workers-sdk#13257). Migrations stuck in subdirectories are silently ignored by wrangler and never applied.
+
+**Best practice: automate flattening with a post-generate script.** Add a TypeScript script that scans the migrations directory after `drizzle-kit generate`, finds subdirectories with no flat counterpart, and copies them out with sequential numbering (`0001_`, `0002_`, ...). Chain it in your generate script so it runs automatically:
+
+```json
+{
+  "scripts": {
+    "generate": "drizzle-kit generate && tsx scripts/flatten-migrations.ts ./drizzle",
+    "flatten": "tsx scripts/flatten-migrations.ts ./drizzle"
+  }
+}
+```
+
+Copy the flatten script from `scripts/flatten-migrations.ts` bundled with this skill into your project's scripts directory. It scans for subdirectories containing `migration.sql`, skips any that already have a flat counterpart (matched by content), and copies new ones as `NNNN_<slug>.sql` with sequential numbering. Subdirectories are kept intact for drizzle-kit's snapshot tracking.
+
+**Applying migrations:**
 
 ```bash
-# Generate migration from schema changes
-pnpm drizzle-kit generate --name=initial
-
-# drizzle-kit outputs: drizzle/20260417161933_initial/migration.sql
-# wrangler needs: drizzle/0001_initial.sql
-cp drizzle/20260417161933_initial/migration.sql drizzle/0001_initial.sql
-
 # Apply to remote D1 database
 wrangler d1 migrations apply DB --remote
 
@@ -869,6 +909,8 @@ wrangler d1 migrations apply DB --remote --env preview
 # Apply locally for dev
 wrangler d1 migrations apply DB --local
 ```
+
+Always migrate **before** deploying the new worker code that depends on the schema change.
 
 **Batch support** — D1 natively supports `db.batch()`. No extra setup needed:
 
