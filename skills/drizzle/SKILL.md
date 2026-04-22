@@ -912,6 +912,31 @@ wrangler d1 migrations apply DB --local
 
 Always migrate **before** deploying the new worker code that depends on the schema change.
 
+**Running scripts against D1 outside Workers (seeds, backfills, one-off queries):**
+
+Use the `d1-http` driver to talk to remote D1 databases from any Node.js/Bun script. No Worker, no wrangler config needed. Each query is an HTTP round-trip to Cloudflare's API, so it's slower than in-worker queries but works anywhere.
+
+```ts
+import { drizzle } from 'drizzle-orm/d1-http'
+import * as schema from './schema.ts'
+
+const db = drizzle({
+  accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
+  databaseId: process.env.CLOUDFLARE_DATABASE_ID!,
+  token: process.env.CLOUDFLARE_D1_TOKEN!,
+  schema,
+  relations: schema.relations,
+})
+
+// Full drizzle ORM, same API as inside the worker
+const users = await db.query.users.findMany()
+await db.insert(schema.users).values({ name: 'Seed User', email: 'seed@example.com' })
+```
+
+The `token` is a Cloudflare API token with **D1:Edit** permission, created at https://dash.cloudflare.com/profile/api-tokens. The `databaseId` is the UUID from `wrangler d1 list` or your `wrangler.jsonc`.
+
+For local scripts against local D1, use `wrangler d1 execute DB --local --command "..."` or connect directly to the SQLite file at `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite` via `better-sqlite3`.
+
 **Batch support** — D1 natively supports `db.batch()`. No extra setup needed:
 
 ```ts
