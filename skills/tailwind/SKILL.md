@@ -257,6 +257,10 @@ if existing code uses template literals for conditional classes, refactor it to 
 
 never duplicate complex styling across multiple files. instead, create reusable components in `components/ui/` following the shadcn convention, and import them everywhere. this applies to all styled primitives: buttons, inputs, selects, badges, dialogs, tables, empty states, etc.
 
+Prefer baseui based components instead of radix-ui if available. 
+
+To find available shadcn components fetch https://ui.shadcn.com/llms.txt
+
 **common examples that must always be components:**
 
 - `Button` — never write raw `<button className="bg-primary text-primary-foreground ...">`. use the `Button` component with `variant` and `size` props.
