@@ -98,6 +98,122 @@ export function getDb() {
 }
 ```
 
+### Cloudflare D1 with the same `import { db } from 'db'` in Workers and Node
+
+When a project uses **D1 inside Workers** and also needs **Node.js/Bun scripts** for seeds, backfills, or admin queries, keep **one schema file** and publish **two runtime entrypoints** with the **same exports**. Do **not** put `if (process.env...)` branches in one file. Use `package.json` export conditions instead.
+
+**Important:** in Drizzle beta, `driver: 'd1-http'` exists in **drizzle-kit config**, but there is **no public runtime import** `drizzle-orm/d1-http`. The Drizzle repo itself handles `d1-http` in `drizzle-kit/src/cli/connections.ts` by importing `drizzle-orm/sqlite-proxy` and calling the Cloudflare D1 HTTP API with `fetch()`. So the runtime pattern for Node.js/Bun scripts should be `drizzle-orm/sqlite-proxy`, not `drizzle-orm/d1-http`.
+
+**Rule:** Wrangler/Workers should resolve a `workerd` entry that uses `drizzle-orm/d1`. Local scripts should resolve the default entry that uses `drizzle-orm/sqlite-proxy` over the Cloudflare D1 HTTP API.
+
+```ts
+// db/src/schema.ts
+import * as sqliteCore from 'drizzle-orm/sqlite-core'
+
+export const users = sqliteCore.sqliteTable('users', {
+  id: sqliteCore.text('id').primaryKey().notNull(),
+  email: sqliteCore.text('email').notNull(),
+})
+
+export const relations = {}
+```
+
+```ts
+// db/src/workerd.ts
+import { env } from 'cloudflare:workers'
+import { drizzle } from 'drizzle-orm/d1'
+import * as schema from './schema.ts'
+
+export { schema }
+
+export const db = drizzle(env.DB, {
+  schema,
+  relations: schema.relations,
+})
+```
+
+```ts
+// db/src/node.ts
+import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import * as schema from './schema.ts'
+
+export { schema }
+
+async function remoteCallback(
+  sql: string,
+  params: any[],
+  method: 'run' | 'all' | 'values' | 'get',
+) {
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID!}/d1/database/${process.env.CLOUDFLARE_DATABASE_ID!}/${method === 'values' ? 'raw' : 'query'}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.CLOUDFLARE_D1_TOKEN!}`,
+      },
+      body: JSON.stringify({ sql, params }),
+    },
+  )
+
+  const data = await response.json() as {
+    success: boolean
+    errors?: { code: number; message: string }[]
+    result: Array<{ results: any[] | { rows: any[] } }>
+  }
+
+  if (!data.success) {
+    throw new Error(data.errors?.map((error) => `${error.code}: ${error.message}`).join('\n') ?? 'Unknown D1 error')
+  }
+
+  const result = data.result[0]?.results
+  const rows = Array.isArray(result) ? result : (result?.rows ?? [])
+
+  // sqlite-proxy expects a falsy rows value for `get` no-row results.
+  // Returning [] is truthy and can produce `{ id: undefined }` in findFirst.
+  // https://github.com/drizzle-team/drizzle-orm/issues/5461
+  return { rows: method === 'get' && rows.length === 0 ? undefined : rows }
+}
+
+export const db = drizzle(remoteCallback, { schema, relations: schema.relations })
+```
+
+```json
+{
+  "name": "db",
+  "type": "module",
+  "exports": {
+    ".": {
+      "workerd": "./src/workerd.ts",
+      "default": "./src/node.ts"
+    },
+    "./schema": "./src/schema.ts"
+  }
+}
+```
+
+Now every consumer uses the **same import path**:
+
+```ts
+import { db, schema } from 'db'
+```
+
+- In **Cloudflare Workers**, Wrangler resolves the `workerd` export
+- In **Node.js/Bun scripts**, the normal/default export resolves
+- `schema.ts` stays shared and isomorphic. Only the client wiring changes
+
+If editor/type resolution in the Worker package picks the default entry instead of the `workerd` one, add this to the Worker package `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "customConditions": ["workerd"]
+  }
+}
+```
+
+This pattern is the simplest way to keep **one Drizzle schema**, **one import path**, and still run **scripts outside Cloudflare**.
+
 ```ts
 // Cloudflare Hyperdrive (Postgres)
 import { drizzle } from 'drizzle-orm/node-postgres'
@@ -220,6 +336,8 @@ Docs: https://orm.drizzle.team/docs/rqb-v2 | Filters: https://orm.drizzle.team/d
 
 **Reads: always use `db.query`** — the relational query API with **object-style `where`**. Never use `db.select().from()` for reads.
 
+**Latency rule:** prefer `db.query` because it emits **exactly one SQL statement**, even when using `with` and relation filters. This is especially important on high-latency databases like D1 and serverless Postgres, where extra round-trips dominate response time. If you can express the read with relations, `db.query` is usually the best choice.
+
 ```ts
 // Simple equality — just pass the value
 const user = await db.query.accounts.findFirst({
@@ -271,6 +389,7 @@ const usersWithPosts = await db.query.users.findMany({
 - Use **object-style `where`** — no operator imports needed. Pass values directly for equality, use `{ gt: }`, `{ like: }`, `{ in: }` etc. for operators
 - Use `AND`, `OR`, `NOT` for logical combinations
 - Use `with` to include relations (like Prisma's `include`)
+- `db.query` with `with` still runs as **one SQL query**, not N queries. Prefer it for latency-sensitive reads.
 - Use `orderBy` as object: `{ createdAt: 'desc' }`
 - Use `findFirst` (adds `LIMIT 1`) or `findMany`
 - **NEVER use `orm.inArray()`, `orm.eq()`, or other operator functions inside `db.query` `where`** — the query API only accepts object-style filters. `orm.inArray(schema.users.id, ids)` will fail with a type error. Instead, use `{ id: { in: ids } }` or loop with `findFirst` per ID.
@@ -914,19 +1033,56 @@ Always migrate **before** deploying the new worker code that depends on the sche
 
 **Running scripts against D1 outside Workers (seeds, backfills, one-off queries):**
 
-Use the `d1-http` driver to talk to remote D1 databases from any Node.js/Bun script. No Worker, no wrangler config needed. Each query is an HTTP round-trip to Cloudflare's API, so it's slower than in-worker queries but works anywhere.
+Use `drizzle-orm/sqlite-proxy` to talk to remote D1 databases from any Node.js/Bun script. No Worker runtime required. Each query is an HTTP round-trip to Cloudflare's API, so it's slower than in-worker queries but works anywhere.
+
+Do **not** write `import { drizzle } from 'drizzle-orm/d1-http'` in runtime code. In Drizzle beta, that path is **not** a public `drizzle-orm` export. `d1-http` is a **drizzle-kit driver name**, not a runtime import path. The Drizzle repo currently wires it up in `drizzle-kit/src/cli/connections.ts` via `drizzle-orm/sqlite-proxy` plus `fetch()`.
+
+**Required environment variables:**
+
+- `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID
+- `CLOUDFLARE_DATABASE_ID` — the D1 database UUID
+- `CLOUDFLARE_D1_TOKEN` — Cloudflare API token with at least `Account - D1 - Edit`
+
+If the tool also needs to discover account metadata, add `Account - Account Settings - Read` to the token too.
 
 ```ts
-import { drizzle } from 'drizzle-orm/d1-http'
+import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import * as schema from './schema.ts'
 
-const db = drizzle({
-  accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
-  databaseId: process.env.CLOUDFLARE_DATABASE_ID!,
-  token: process.env.CLOUDFLARE_D1_TOKEN!,
-  schema,
-  relations: schema.relations,
-})
+const db = drizzle(
+  async (sql, params, method) => {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID!}/d1/database/${process.env.CLOUDFLARE_DATABASE_ID!}/${method === 'values' ? 'raw' : 'query'}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.CLOUDFLARE_D1_TOKEN!}`,
+        },
+        body: JSON.stringify({ sql, params }),
+      },
+    )
+
+    const data = await response.json() as {
+      success: boolean
+      errors?: { code: number; message: string }[]
+      result: Array<{ results: any[] | { rows: any[] } }>
+    }
+
+    if (!data.success) {
+      throw new Error(data.errors?.map((error) => `${error.code}: ${error.message}`).join('\n') ?? 'Unknown D1 error')
+    }
+
+    const result = data.result[0]?.results
+    const rows = Array.isArray(result) ? result : (result?.rows ?? [])
+
+    // sqlite-proxy expects a falsy rows value for `get` no-row results.
+    // Returning [] is truthy and can produce `{ id: undefined }` in findFirst.
+    // https://github.com/drizzle-team/drizzle-orm/issues/5461
+    return { rows: method === 'get' && rows.length === 0 ? undefined : rows }
+  },
+  { schema, relations: schema.relations },
+)
 
 // Full drizzle ORM, same API as inside the worker
 const users = await db.query.users.findMany()
@@ -934,6 +1090,31 @@ await db.insert(schema.users).values({ name: 'Seed User', email: 'seed@example.c
 ```
 
 The `token` is a Cloudflare API token with **D1:Edit** permission, created at https://dash.cloudflare.com/profile/api-tokens. The `databaseId` is the UUID from `wrangler d1 list` or your `wrangler.jsonc`.
+
+```bash
+# plain shell env injection
+CLOUDFLARE_ACCOUNT_ID=... \
+CLOUDFLARE_DATABASE_ID=... \
+CLOUDFLARE_D1_TOKEN=... \
+pnpm tsx scripts/backfill-users.ts
+```
+
+```ts
+// scripts/backfill-users.ts
+import { db, schema } from 'db'
+
+const existingUsers = await db.query.users.findMany()
+console.log('users', existingUsers.length)
+
+await db.insert(schema.users).values({
+  id: crypto.randomUUID(),
+  email: 'seed@example.com',
+})
+```
+
+This is why the conditional-exports pattern above matters. The script imports the **same `db` symbol** as Worker code, but Node resolves `drizzle-orm/sqlite-proxy` while Wrangler resolves `drizzle-orm/d1`.
+
+The same env vars also work well for `drizzle-kit studio`, `drizzle-kit pull`, or any other local admin script that talks to the remote D1 database.
 
 For local scripts against local D1, use `wrangler d1 execute DB --local --command "..."` or connect directly to the SQLite file at `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite` via `better-sqlite3`.
 
