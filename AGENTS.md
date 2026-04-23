@@ -54,7 +54,9 @@ GIT_EDITOR=true git cherry-pick --continue
 GIT_EDITOR=true git revert --continue
 ```
 
-for commits, always use `git commit -m "message"` or a heredoc, never bare `git commit`.
+for commits, always use `git commit -m 'message'` or a heredoc, never bare `git commit`.
+
+NEVER use double quotes in `git commit -m` strings. backticks inside double quotes trigger shell command substitution and can silently mangle the commit message. if you need inline code in the commit body, use single quotes for one-line messages or a heredoc for multiline messages.
 
 if a previous interactive git command was aborted and git mentions a stale lock, first make sure no git/editor process is still running, then retry the non-interactive command. only remove a stale `.git/.../index.lock` after confirming no git process is active.
 
@@ -395,7 +397,7 @@ sometimes other agents added unrelated changes in git diffs
 when committing you should first see the git diff, then if the files only have your changes commit those files only with
 
 ```bash
-git commit path/to/file1 path/to/file2 -m "commit message"
+git commit path/to/file1 path/to/file2 -m 'commit message'
 ```
 
 If instead other changes exist in those same files, you can use the critique hunks command to stage only some portions and leave unrelated changes unstaged and uncommitted
