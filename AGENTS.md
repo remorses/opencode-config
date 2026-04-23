@@ -28,6 +28,31 @@ prefer always writing scripts in Node.js and run them with tsx or bun. If you ev
 
 scripts should always progressively log to let user know what is happening and current state in case of crash in the middle of the script. for example for a script that updates rows in the database and does so with multiple update statements run one by one you should log each update so that we know the script is currently running and doing something.
 
+## multiline strings
+
+always use `string-dedent` for multiline strings so they stay nicely formatted and readable, especially for markdown, prompts, SQL, HTML, and long error messages.
+
+when using `string-dedent`, always make the first and last line empty. otherwise `string-dedent` can throw.
+
+when you need a fenced code block with a language like `js`, `ts`, or `tsx`, assign the dedented string to a variable like `JS`, `TS`, or `TSX` so editors can infer syntax highlighting more reliably.
+
+```ts
+import dedent from 'string-dedent'
+
+const message = dedent`
+  ## Summary
+
+  - first item
+  - second item
+`
+
+const TSX = dedent`
+  export function Button() {
+    return <button>Hello</button>
+  }
+`
+```
+
 ## planning
 
 when the user asks you to plan, they want you to read all relevant files and create a concrete plan with steps: sections where you describe what files you would update and what tests you would add to validate the new changes.
@@ -483,6 +508,21 @@ If you need to embed rules for agents or complex topics you can use details html
 use bold to mark important key words in each paragraph to make it easy for the user to skim the content.
 
 never use emdashes, they are over used by AIs, we want to sound human-like and not AI generated. Instead of using emdash use dots, semicolons and commas, which can accomplish the same goal. Keep phrases short and easy to read. Use bold to mark important words. Ideally one per paragraph. Paragraphs should be short, no wall of text. 
+
+## validating URLs in markdown
+
+every time you add a URL to a markdown file (README, docs, SKILL.md, AGENTS.md, etc.), immediately validate it with curl. check that the status is 200 and the response body is not empty or an error page.
+
+```bash
+# validate a URL after adding it
+curl -sI "https://example.com/path" | head -1
+# expected: HTTP/2 200
+
+# also check content is valid (not a 404 page served with 200)
+curl -s "https://example.com/path" | head -5
+```
+
+if the URL returns a non-200 status or the content looks wrong (error page, redirect to login, etc.), fix it before committing.
 
 you can add callouts in README files using github syntax:
 
