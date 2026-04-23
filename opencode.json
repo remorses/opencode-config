@@ -150,7 +150,18 @@
   "formatter": false,
 
   "permission": {
-    "edit": "allow",
+    "edit": {
+      "*": "allow",
+      "/Users/morse/Documents/GitHub/kimakivoice/cli/skills/*": "deny"
+    },
+    "write": {
+      "*": "allow",
+      "/Users/morse/Documents/GitHub/kimakivoice/cli/skills/*": "deny"
+    },
+    "apply_patch": {
+      "*": "allow",
+      "/Users/morse/Documents/GitHub/kimakivoice/cli/skills/*": "deny"
+    },
     "bash": "allow",
     "external_directory": {
       "*": "ask",
