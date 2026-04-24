@@ -9,3 +9,5 @@ tmp
 # gitchamber - source code for packages
 node_modules/.gitchamber/
 opensrc
+
+.opencode-prompts
