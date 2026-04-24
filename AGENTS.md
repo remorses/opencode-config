@@ -503,6 +503,14 @@ for example if you are writing a README for a new Express like React framework y
 
 each paragraph should ideally have a code snippet example or diagram. it's much easier for the user to understand by example than to read intricate prose. use tables to display comparisons or tabular data.
 
+### diagrams in markdown
+
+make heavy use of ASCII diagrams inside code blocks to explain architecture, flows, and relationships. diagrams should try to cover the full width of the page, which is about **95 characters**. don't cram everything into narrow 50-char diagrams.
+
+prefer a **varied, organic layout**. not every label needs to be inside a box. mix plain text labels, boxes for major components, and directional arrows (►, ◄, ▼, ▲) for connections. avoid perfectly symmetric grid layouts; asymmetric fanouts and side annotations look more natural and are easier to read.
+
+all connections between nodes must use directional arrows. never use plain lines (───) without an arrowhead. always verify alignment by counting characters precisely: every box border (┌┐└┘) must match the width of its content lines (│...│). use the diagram-fixer agent after creating diagrams.
+
 If you need to embed rules for agents or complex topics you can use details html block to toggle them so the user does not need to see walls of text or non important content while skimming the document.
 
 use bold to mark important key words in each paragraph to make it easy for the user to skim the content.
