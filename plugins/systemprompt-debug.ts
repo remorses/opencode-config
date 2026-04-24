@@ -27,7 +27,7 @@ const systemPromptDriftPlugin: Plugin = async ({ client, directory }) => {
       }
 
       const filePath = path.join(dataDir, `${sessionId}.md`);
-      await fs.writeFile(filePath, output.system, "utf-8");
+      await fs.writeFile(filePath, input.model.id + '\n\n' + output.system, "utf-8");
     },
   };
 };
