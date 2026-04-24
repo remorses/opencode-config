@@ -37,12 +37,20 @@ With drizzle-orm v0 (stable):
 pnpm add better-auth @better-auth/drizzle-adapter
 ```
 
-With drizzle-orm v1 (beta) — requires the PR #6913 build:
+With drizzle-orm v1 (beta) — requires the PR #6913 build and the `/relations-v2` subpath:
 
 ```bash
 pnpm add better-auth @better-auth/drizzle-adapter@"https://pkg.pr.new/better-auth/better-auth/@better-auth/drizzle-adapter@6913"
 pnpm add drizzle-orm@beta
 ```
+
+**Important:** With drizzle-orm v1, you must import from the `/relations-v2` subpath:
+
+```ts
+import { drizzleAdapter } from '@better-auth/drizzle-adapter/relations-v2'
+```
+
+The default export (`@better-auth/drizzle-adapter`) only works with drizzle-orm v0.
 
 ## Server config
 
@@ -85,14 +93,14 @@ export const auth = betterAuth({
 
 ```ts
 import { betterAuth } from 'better-auth'
-import { drizzleAdapter } from '@better-auth/drizzle-adapter'
+import { drizzleAdapter } from '@better-auth/drizzle-adapter' // or '/relations-v2' for drizzle-orm v1
 import { db } from 'db'
 import * as schema from 'db/schema'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'sqlite',
-    schema,
+    schema, // not needed with /relations-v2 if schema is passed to drizzle()
   }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
@@ -746,19 +754,24 @@ This is a pre-release build from https://github.com/better-auth/better-auth/pull
 
 Once the PR is merged, switch back to `pnpm add @better-auth/drizzle-adapter@latest`.
 
-Usage is the same as the stable adapter:
+Usage requires the `/relations-v2` subpath import. The default export does not work with drizzle-orm v1:
 
 ```ts
+// GOOD — drizzle-orm v1
+import { drizzleAdapter } from '@better-auth/drizzle-adapter/relations-v2'
+
+// BAD — only works with drizzle-orm v0
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg', // or 'sqlite'
-    schema, // pass your drizzle schema
   }),
   // ...
 })
 ```
+
+
 
 ## Server-side API calls and cookies
 
