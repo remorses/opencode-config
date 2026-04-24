@@ -102,9 +102,33 @@ export const auth = betterAuth({
 
 ### Environment variables
 
+`BETTER_AUTH_URL` is **always a secret**, never a plain env var or hardcoded value. It differs per environment: dev uses `http://localhost:3000`, preview uses the preview deploy URL, production uses the real domain. Treat it the same as `BETTER_AUTH_SECRET`.
+
+For Cloudflare Workers, put both in `secrets.required` in `wrangler.jsonc`:
+
+```jsonc
+{
+  "secrets": {
+    "required": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET"
+    ]
+  }
+}
+```
+
+For Doppler/Sigillo, set per-environment values:
+
+| Variable | development | preview | production |
+|---|---|---|---|
+| `BETTER_AUTH_URL` | `http://localhost:3000` | `https://preview.example.com` | `https://example.com` |
+| `BETTER_AUTH_SECRET` | (random 32+ chars) | (random 32+ chars) | (random 32+ chars) |
+
 ```env
 BETTER_AUTH_SECRET=  # min 32 chars, generate with: openssl rand -base64 32
-BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_URL=     # MUST be set per env — never hardcode
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 ```
