@@ -13,6 +13,18 @@ use tailwind v4. this new tailwind version does not use tailwind.config.js. inst
 read https://tailwindcss.com/docs/upgrade-guide to understand the updates landed in tailwind v4 if you do not have tailwind v4 in your training context. ignore the parts that talk about running the upgrade cli. this project already uses tailwind v4 so no need to upgrade anything.
 
 
+## design
+
+prefer a minimalistic, Vercel-like design
+
+focus on good spacing, sizes, gaps and consistency. focus on good typography.
+
+do not use Card as a way to group elements. it looks cheap and it's overly used. do not use shadows unless asked to.
+
+instead prefer minimal layouts with good positioning of the elements. few choices but very carefully made to look good.
+
+if there are already components for what you need inside components/ui folder use them. do not re declare components again.
+
 ## dark mode with @variant dark
 
 always prefer `@variant dark { ... }` over hardcoded `.dark` selectors for dark mode overrides. this is strategy-agnostic: it compiles to whatever selector is configured in `@custom-variant dark` (e.g. `.dark` class, `prefers-color-scheme`, `data-theme`, or a combination). changing the strategy only requires updating one line. never write `.dark { }` or `.dark .selector` in Tailwind-processed CSS files — use `@variant dark` instead.
