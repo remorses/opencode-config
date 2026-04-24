@@ -505,7 +505,7 @@ each paragraph should ideally have a code snippet example or diagram. it's much 
 
 ### diagrams in markdown
 
-make heavy use of ASCII diagrams inside code blocks to explain architecture, flows, and relationships. diagrams should try to cover the full width of the page, which is about **100 characters**. don't cram everything into narrow 50-char diagrams.
+make heavy use of ASCII diagrams inside code blocks to explain architecture, flows, and relationships. diagrams should try to cover the full width of the page, which is about **100 characters**. don't cram everything into narrow 50-char diagrams. never go over 100 characters per line.
 
 prefer a **varied, organic layout**. not every label needs to be inside a box. mix plain text labels, boxes for major components, and directional arrows (►, ◄, ▼, ▲) for connections. avoid perfectly symmetric grid layouts; asymmetric fanouts and side annotations look more natural and are easier to read.
 
