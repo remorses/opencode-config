@@ -503,6 +503,10 @@ for example if you are writing a README for a new Express like React framework y
 
 each paragraph should ideally have a code snippet example or diagram. it's much easier for the user to understand by example than to read intricate prose. use tables to display comparisons or tabular data.
 
+use bold to mark important key words in each paragraph to make it easy for the user to skim the content.
+
+never use emdashes, they are over used by AIs, we want to sound human-like and not AI generated. Instead of using emdash use dots, semicolons and commas, which can accomplish the same goal. Keep phrases short and easy to read. Use bold to mark important words. Ideally one per paragraph. Paragraphs should be short, no wall of text. 
+
 ### diagrams in markdown
 
 make heavy use of ASCII diagrams inside code blocks to explain architecture, flows, and relationships. diagrams should try to cover the full width of the page, which is about **100 characters**. don't cram everything into narrow 50-char diagrams. never go over 100 characters per line.
@@ -513,9 +517,6 @@ all connections between nodes must use directional arrows. never use plain lines
 
 If you need to embed rules for agents or complex topics you can use details html block to toggle them so the user does not need to see walls of text or non important content while skimming the document.
 
-use bold to mark important key words in each paragraph to make it easy for the user to skim the content.
-
-never use emdashes, they are over used by AIs, we want to sound human-like and not AI generated. Instead of using emdash use dots, semicolons and commas, which can accomplish the same goal. Keep phrases short and easy to read. Use bold to mark important words. Ideally one per paragraph. Paragraphs should be short, no wall of text. 
 
 ## validating URLs in markdown
 
