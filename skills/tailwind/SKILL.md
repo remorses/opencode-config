@@ -3,7 +3,7 @@ name: tailwind
 description: >
   Tailwind CSS v4 conventions, dark mode with @variant dark, and CSS-based
   configuration (no tailwind.config.js). ALWAYS load this skill before editing
-  any Tailwind styles, markup, or CSS custom properties in a Tailwind project.
+  any Tailwind styles, markup, or CSS in a Tailwind project.
 ---
 
 # tailwind v4
