@@ -259,18 +259,25 @@ wrangler d1 migrations apply DB --local
 
 > **Always deploy preview first, then production.** D1 migrations can fail (bad SQL, constraint violations on existing data) and there is no automatic rollback. Running against preview first catches these failures safely. If preview migration fails, **stop** and do not continue to production.
 
-Bake migrations into deploy scripts:
+Bake migrations into deploy scripts. The remote migration scripts print a unix timestamp before running so you can restore via D1 time travel if something goes wrong:
 
 ```json
 {
   "scripts": {
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:prod": "wrangler d1 migrations apply DB --remote",
-    "db:migrate:preview": "wrangler d1 migrations apply DB --remote --env preview",
+    "db:migrate:prod": "echo \"D1 pre-migration timestamp: $(date +%s)\" && wrangler d1 migrations apply DB --remote",
+    "db:migrate:preview": "echo \"D1 pre-migration timestamp: $(date +%s)\" && wrangler d1 migrations apply DB --remote --env preview",
     "deploy": "pnpm db:migrate:preview && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
     "deploy:prod": "pnpm db:migrate:prod && vite build && wrangler deploy"
   }
 }
+```
+
+If a migration corrupts data, use the printed timestamp to restore via D1 time travel:
+
+```bash
+wrangler d1 time-travel restore DB --timestamp=<unix_timestamp>
+wrangler d1 time-travel restore DB --timestamp=<unix_timestamp> --env preview
 ```
 
 ### Running scripts against D1 outside Workers
