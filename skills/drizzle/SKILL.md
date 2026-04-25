@@ -335,6 +335,18 @@ const [updated] = await db.update(schema.accounts)
   .returning()
 ```
 
+**IMPORTANT: Never include primary keys in UPDATE SET clauses on SQLite/D1.** When SQLite sees `UPDATE user SET id = ?, name = ? WHERE id = ?`, it checks all foreign key constraints referencing that `id`, even if the value isn't changing. If the user has 1000 sessions, that's 1000+ extra row reads billed by D1. Always use explicit field lists in `.set({})` and never pass the full object. This applies to any ORM layer on SQLite, not just Drizzle.
+
+```ts
+// BAD — passes id in SET, triggers FK constraint checks on every referencing row
+await db.update(schema.users).set(userParam).where(orm.eq(schema.users.id, userParam.id))
+
+// GOOD — explicit fields, no id in SET
+await db.update(schema.users)
+  .set({ name: userParam.name, updatedAt: Date.now() })
+  .where(orm.eq(schema.users.id, userParam.id))
+```
+
 ### Delete
 
 ```ts
