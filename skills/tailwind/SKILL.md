@@ -309,3 +309,16 @@ export function SecretsTable() { ... }
 ```
 
 **when to create a new ui component:** if you find the same visual pattern (same markup structure + same tailwind classes) in 2+ places, extract it. one-off patterns can stay inline. the `components/ui/` folder is for generic, reusable primitives. domain-specific components live in `components/` without the `ui/` prefix.
+
+
+## scrollbars
+
+always set all scrollbars styles to transparent and thin.
+
+```css
+:root {
+  scrollbar-width: thin;
+  scrollbar-color: gray transparent;
+  scrollbar-gutter: stable;
+}
+```
