@@ -420,6 +420,23 @@ The `@cloudflare/vite-plugin` resolves and flattens your `wrangler.jsonc` at **b
 
 `wrangler deploy` deploys **one environment at a time**. It does **not** deploy every configured `env.*` block. With no `--env` flag, Wrangler deploys the top-level/default config (usually production). Use `wrangler deploy --env preview` or another explicit env name when targeting a non-production environment.
 
+> **IMPORTANT: Cloudflare D1 does NOT auto-apply migrations on deploy.** If you deploy new worker code that references columns or tables from a pending migration, the worker will crash with "no such table" or "no such column" errors. Always run D1 migrations before deploying. Bake them into the deploy scripts so they can't be skipped.
+
+> **Always deploy preview first, then production.** D1 migrations can fail (bad SQL, constraint violations on existing data) and there is no automatic rollback. Running against preview first catches these failures safely. If the preview migration or deploy fails, **stop**. Do not continue to production.
+
+For projects using D1, bake migrations into the deploy chain:
+
+```json
+{
+  "scripts": {
+    "deploy": "pnpm db:migrate:preview && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "pnpm db:migrate:prod && vite build && wrangler deploy"
+  }
+}
+```
+
+For projects without D1 (no migrations needed):
+
 ```json
 {
   "scripts": {
@@ -429,10 +446,22 @@ The `@cloudflare/vite-plugin` resolves and flattens your `wrangler.jsonc` at **b
 }
 ```
 
-- `pnpm deploy` → builds for preview env, deploys to **preview** (safe default)
-- `pnpm deploy:prod` → builds for production, deploys to **production**
+- `pnpm deploy` → migrates + builds for preview env, deploys to **preview** (safe default)
+- `pnpm deploy:prod` → migrates + builds for production, deploys to **production**
 
 **Preview is the default deploy target.** This prevents accidental production deploys. Production deploys should be deliberate.
+
+Deployment sequence for D1 projects:
+
+```bash
+# 1. Deploy preview (migration + build + deploy)
+pnpm deploy
+
+# 2. Verify preview works (load the page, hit health endpoint, check logs)
+
+# 3. Deploy production
+pnpm deploy:prod
+```
 
 ### Secrets per environment
 
@@ -504,7 +533,25 @@ The `rules` entry is required for drizzle DO migrations — imports `.sql` files
 
 ## package.json scripts
 
-Standard scripts for a Worker package:
+Standard scripts for a Worker package (with D1):
+
+```json
+{
+  "scripts": {
+    "dev": "pnpm db:migrate:local && vite dev",
+    "build": "vite build",
+    "typecheck": "tsc",
+    "types": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:prod": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:preview": "wrangler d1 migrations apply DB --remote --env preview",
+    "deploy": "pnpm db:migrate:preview && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "pnpm db:migrate:prod && vite build && wrangler deploy"
+  }
+}
+```
+
+Standard scripts for a Worker package (without D1):
 
 ```json
 {

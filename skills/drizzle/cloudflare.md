@@ -255,7 +255,23 @@ wrangler d1 migrations apply DB --remote --env preview
 wrangler d1 migrations apply DB --local
 ```
 
-Always migrate **before** deploying the new worker code that depends on the schema change.
+> **IMPORTANT: Cloudflare D1 does NOT auto-apply migrations on deploy.** Always run migrations before deploying. Bake them into deploy scripts so they can't be skipped. If you deploy new worker code that references columns or tables from a pending migration, the worker will crash with "no such table" or "no such column" errors.
+
+> **Always deploy preview first, then production.** D1 migrations can fail (bad SQL, constraint violations on existing data) and there is no automatic rollback. Running against preview first catches these failures safely. If preview migration fails, **stop** and do not continue to production.
+
+Bake migrations into deploy scripts:
+
+```json
+{
+  "scripts": {
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:prod": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:preview": "wrangler d1 migrations apply DB --remote --env preview",
+    "deploy": "pnpm db:migrate:preview && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "pnpm db:migrate:prod && vite build && wrangler deploy"
+  }
+}
+```
 
 ### Running scripts against D1 outside Workers
 
