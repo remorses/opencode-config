@@ -424,7 +424,7 @@ The `@cloudflare/vite-plugin` resolves and flattens your `wrangler.jsonc` at **b
 
 > **Always deploy preview first, then production.** D1 migrations can fail (bad SQL, constraint violations on existing data) and there is no automatic rollback. Running against preview first catches these failures safely. If the preview migration or deploy fails, **stop**. Do not continue to production.
 
-For projects using D1, bake migrations into the deploy chain:
+For projects using D1, bake migrations into the deploy chain. The remote migration scripts print a unix timestamp before running so you can restore via D1 time travel if something goes wrong:
 
 ```json
 {
@@ -433,6 +433,13 @@ For projects using D1, bake migrations into the deploy chain:
     "deploy:prod": "pnpm db:migrate:prod && vite build && wrangler deploy"
   }
 }
+```
+
+If a migration corrupts data, use the printed timestamp to restore:
+
+```bash
+wrangler d1 time-travel restore DB --timestamp=<unix_timestamp>
+wrangler d1 time-travel restore DB --timestamp=<unix_timestamp> --env preview
 ```
 
 For projects without D1 (no migrations needed):
@@ -543,8 +550,8 @@ Standard scripts for a Worker package (with D1):
     "typecheck": "tsc",
     "types": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:prod": "wrangler d1 migrations apply DB --remote",
-    "db:migrate:preview": "wrangler d1 migrations apply DB --remote --env preview",
+    "db:migrate:prod": "echo \"D1 pre-migration timestamp: $(date +%s)\" && wrangler d1 migrations apply DB --remote",
+    "db:migrate:preview": "echo \"D1 pre-migration timestamp: $(date +%s)\" && wrangler d1 migrations apply DB --remote --env preview",
     "deploy": "pnpm db:migrate:preview && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
     "deploy:prod": "pnpm db:migrate:prod && vite build && wrangler deploy"
   }
