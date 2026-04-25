@@ -1,3 +1,4 @@
+// Source: https://github.com/remorses/sigillo/blob/main/app/src/lib/memoize.ts
 // Memoize async functions via Cloudflare Cache API (caches.default).
 // Cache keys include the deployment id so stale entries are never served across deploys.
 // Requires a custom domain; does NOT work on *.workers.dev.
