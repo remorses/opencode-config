@@ -538,6 +538,61 @@ See the `drizzle` skill for full schema and migration conventions. Key wrangler 
 
 The `rules` entry is required for drizzle DO migrations — imports `.sql` files as text.
 
+## Memoizing slow operations with the Cache API
+
+Workers run globally on 300+ datacenters, but your database (D1, Postgres, etc.) lives in one region. Cross-region reads can be 50-200ms. Use the Cache API (`caches.default`) to memoize slow lookups at the edge so repeated reads from the same datacenter are ~1-5ms.
+
+Each datacenter has its own independent cache. No cross-datacenter replication. First request to a datacenter is always a miss, subsequent requests are fast. This is ideal for data that changes rarely (auth checks, config, org membership, environment lookups).
+
+The `memoize()` utility wraps any async function. Args are superjson-serialized and SHA-256 hashed into cache keys. Supports stale-while-revalidate: within the SWR window, stale values return immediately while a background refresh runs via `waitUntil()`. Cache keys include the spiceflow deployment id so stale entries from old builds are never served.
+
+**Requires a custom domain.** Does NOT work on `*.workers.dev`.
+
+**Full implementation:** copy `./worker-memoize.ts` (bundled with this skill) into your project as `lib/memoize.ts`. Dependencies: `superjson`, `cloudflare:workers`, `spiceflow`.
+
+**Usage example — memoize auth and config lookups:**
+
+```ts
+import { memoize } from './lib/memoize.ts'
+
+// Defaults: 5 min fresh TTL, 10 min stale-while-revalidate
+
+// Org membership check — called on every request, changes rarely
+const lookupOrgMember = memoize({
+  namespace: 'org-member',
+  fn: async (userId: string, orgId: string) => {
+    const db = getDb()
+    const member = await db.query.orgMember.findFirst({ where: { userId, orgId } })
+    if (!member) return null // null = not cached
+    return { role: member.role }
+  },
+})
+
+// Project ownership — never changes
+const getOrgIdForProject = memoize({
+  namespace: 'project-org',
+  fn: async (projectId: string) => {
+    const db = getDb()
+    const row = await db.query.project.findFirst({
+      where: { id: projectId },
+      columns: { orgId: true },
+    })
+    return row?.orgId ?? null // null = not cached
+  },
+})
+```
+
+**null, undefined, and Error results are never cached.** This prevents caching "not found" or "unauthorized" responses that would lock users out until the TTL expires. Memoized functions that indicate absence or failure MUST return null/undefined or throw. If a background SWR refresh returns null/Error, the stale cache entry is evicted so the next request hits the database.
+
+**What to memoize vs skip:**
+
+| Memoize | Skip |
+|---|---|
+| Auth/membership checks | Session validation (BetterAuth has its own cookieCache) |
+| Org/project ownership lookups | Secrets (change frequently, stale = security risk) |
+| OAuth client id by hostname | Encryption keys (CPU, not I/O) |
+| Environment resolution (id/slug) | Write operations |
+
 ## package.json scripts
 
 Standard scripts for a Worker package (with D1):
