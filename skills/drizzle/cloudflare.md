@@ -594,3 +594,28 @@ async restore(timestamp: number) {
 ```
 
 PITR restores the entire SQLite database, both SQL tables and KV data. It is not available in local development.
+
+## Memoizing drizzle queries at the edge
+
+Workers run globally on 300+ datacenters, but D1 lives in one region. Cross-region reads can be 50-200ms. Use the `memoize()` utility bundled with this skill (`./worker-memoize.ts`) to cache drizzle query results at the edge via the Cloudflare Cache API. Reads from cache are ~1-5ms.
+
+Copy `./worker-memoize.ts` into your project as `lib/memoize.ts`. Dependencies: `superjson`, `cloudflare:workers`, `spiceflow`.
+
+```ts
+import { memoize } from './lib/memoize.ts'
+
+// Defaults: 5 min fresh, 10 min stale-while-revalidate
+const getOrgIdForProject = memoize({
+  namespace: 'project-org',
+  fn: async (projectId: string) => {
+    const db = getDb()
+    const row = await db.query.project.findFirst({
+      where: { id: projectId },
+      columns: { orgId: true },
+    })
+    return row?.orgId ?? null // null/undefined = not cached
+  },
+})
+```
+
+**null, undefined, and Error results are never cached.** Functions must return null/undefined or throw for "not found" / auth failure cases so those results don't get cached and lock users out. See the `cloudflare-workers` skill for the full memoize documentation and what to memoize vs skip.
