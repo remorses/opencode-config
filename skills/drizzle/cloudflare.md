@@ -513,6 +513,12 @@ export default defineConfig({
 })
 ```
 
+## SQLite enums are safe to extend
+
+In SQLite, `text('status', { enum: ['a', 'b', 'c'] })` does **not** generate a `CHECK` constraint. The enum is purely a TypeScript type hint. Adding a new value to the array produces no migration at all, or at most a no-op snapshot update. No table recreate, no data copy.
+
+This means enums are safe and cheap to evolve over time on D1 and SQLite. Prefer them over plain `text().$type<...>()` because the enum values are discoverable in the schema definition and Drizzle uses them for type inference and Zod generation.
+
 ## Cloudflare-specific migrations notes
 
 ### Apply migrations to D1
