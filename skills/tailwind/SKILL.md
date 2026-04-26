@@ -51,7 +51,25 @@ always prefer `@variant dark { ... }` over hardcoded `.dark` selectors for dark 
 
 ## styling preferences
 
-always prefer using tailwind for styling. prefer flex and gap for layout. use built-in tailwind colors like gray, red, green, blue, etc. avoid margins — use flexbox gaps, grid gaps, or spacing wrapper divs instead.
+always prefer using tailwind for styling. use built-in tailwind colors like gray, red, green, blue, etc.
+
+**spacing: always prefer `gap` over margin/padding.** use flexbox/grid `gap` classes for spacing between sibling elements. never use `margin-top`, `margin-bottom`, `space-y-*`, or padding to create space between items in a list or stack. gap is simpler (no first/last-child overrides), composes better, and avoids margin collapse bugs. use `py-*`/`px-*` only for internal padding within a single element (e.g. inside a card), not for spacing between siblings.
+
+```html
+<!-- BAD — margin between items -->
+<div class="flex flex-col">
+  <div class="mb-4">Item 1</div>
+  <div class="mb-4">Item 2</div>
+  <div>Item 3</div>
+</div>
+
+<!-- GOOD — gap between items -->
+<div class="flex flex-col gap-4">
+  <div>Item 1</div>
+  <div>Item 2</div>
+  <div>Item 3</div>
+</div>
+```
 
 ## CSS custom properties — never duplicate values
 
