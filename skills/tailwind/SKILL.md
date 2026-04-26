@@ -251,6 +251,38 @@ then style with Tailwind's text color utilities: `text-foreground`, `text-muted-
 
 **data-URI SVGs cannot use `currentColor`**: SVG used as a CSS `background-image` data URI (`url("data:image/svg+xml,...")`) is NOT part of the document tree, so `currentColor` resolves to black regardless of the parent's color. always use inline `<svg>` elements (not background-image) for icons that need to adapt to light/dark mode.
 
+## dark mode detection in React — hydration-safe with `useSyncExternalStore`
+
+when a client component needs to know if dark mode is active (e.g. to pass a theme to a third-party library like mermaid, or to swap an image src), never use `useState` + `useEffect` + `MutationObserver`. that pattern causes hydration mismatches because `useState(() => document.documentElement.classList.contains('dark'))` evaluates during SSR where `document` doesn't exist.
+
+use `useSyncExternalStore` with **module-level stable callbacks** instead:
+
+```tsx
+import { useSyncExternalStore } from 'react'
+
+// Module-level — stable references, never re-allocated
+function getIsDark(): boolean {
+  return document.documentElement.classList.contains('dark')
+}
+const getServerIsDark = () => false
+
+function subscribeTheme(cb: () => void) {
+  const observer = new MutationObserver(cb)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  return () => observer.disconnect()
+}
+
+// Inside any component
+const isDark = useSyncExternalStore(subscribeTheme, getIsDark, getServerIsDark)
+```
+
+server always returns `false` (light). React handles the mismatch gracefully during hydration. the MutationObserver fires `cb` on `<html>` class changes, triggering a synchronous re-render.
+
+**rules:**
+- all three callbacks must be **stable references** (module-level or `useCallback`). inline arrows cause React to re-subscribe every render.
+- never read `document` inside the server snapshot. return a safe default.
+- this pattern works for any external state tied to the DOM (scroll position, media queries, `<html>` attributes, etc.).
+
 ## prefer `cn()` for className composition
 
 always use the `cn()` helper (clsx + tailwind-merge) for composing class names. never use template literals or string concatenation to build className strings. `cn()` handles falsy values, deduplicates conflicting tailwind classes, and reads much cleaner.
