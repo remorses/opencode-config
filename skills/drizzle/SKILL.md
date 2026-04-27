@@ -813,7 +813,9 @@ Docs: Transactions https://orm.drizzle.team/docs/transactions | Batch https://or
 
 ### Prefer no transaction at all
 
-**Transactions are the first thing that breaks under load.** They hold locks, hog connections, and cause contention. Before reaching for any transaction or batch, ask yourself: do I actually need atomicity here? Most writes are idempotent or can be retried independently. If a partial failure is acceptable (e.g. an export that can be re-run), just use plain sequential or parallel queries with no transaction wrapper.
+**Transactions are the first thing that breaks under load.** They hold locks, hog connections, and cause contention. Before reaching for any transaction or batch, ask yourself: do I actually need atomicity here? Most writes are idempotent or can be retried independently. If a partial failure is acceptable (e.g. an export that can be re-run), use plain sequential queries with no transaction wrapper.
+
+For SQLite drivers that support batching (D1, libSQL/Turso, Durable Object SQLite), prefer `db.batch()` over `Promise.all()` when running multiple independent database statements at the same time. `Promise.all()` sends separate database requests and adds extra round trips; `db.batch()` sends the statements together and executes them in order. Use `Promise.all()` for non-database async work like encryption, HTTP calls, file reads, or CPU prep before building the SQL statements.
 
 Only use `db.batch()` when you genuinely need atomicity (all-or-nothing). Never use `db.transaction()` (interactive transactions) at all.
 
@@ -825,7 +827,7 @@ Only use `db.batch()` when you genuinely need atomicity (all-or-nothing). Never 
 - They fail frequently even at low RPS because of lock contention and timeouts
 - On serverless/edge (Cloudflare Workers, Vercel), cold starts make it even worse
 
-**Use `db.batch()` instead** when atomicity is required. It sends all statements in a single HTTP request. The database wraps them in an implicit transaction (BEGIN → statements → COMMIT). If any statement fails, the whole batch rolls back. Same atomicity guarantees, zero round-trip overhead.
+**Use `db.batch()` instead** when atomicity is required, or when you would otherwise run multiple SQLite statements in `Promise.all()`. It sends all statements in a single request. The database wraps them in an implicit transaction (BEGIN → statements → COMMIT). If any statement fails, the whole batch rolls back. Same atomicity guarantees, zero round-trip overhead.
 
 ```ts
 const [newUsers, updatedPosts, allComments] = await db.batch([
@@ -890,7 +892,7 @@ await db.batch(
 )
 ```
 
-**Multiple reads in parallel:**
+**Multiple SQLite reads:**
 
 ```ts
 const results = await db.batch(
@@ -925,17 +927,17 @@ if (queries.length > 0) {
 
 This is a known drizzle limitation (drizzle-team/drizzle-orm#1292). The cast is safe because we guard with a length check at runtime.
 
-## Foreign key ordering in parallel writes
+## Foreign key ordering in grouped writes
 
-**Always read the schema before writing insert/update code.** Trace the foreign key dependency chain and make sure parent rows exist before inserting child rows. This applies to `Promise.all`, `db.batch()`, and any concurrent write pattern.
+**Always read the schema before writing insert/update code.** Trace the foreign key dependency chain and make sure parent rows exist before inserting child rows. This applies to `Promise.all`, `db.batch()`, and any grouped write pattern.
 
-When running multiple inserts in parallel (e.g. `Promise.all` or `db.batch()`), child tables that reference parent tables via foreign keys **must wait** for the parent inserts to complete first. Running them all in a single parallel step causes intermittent FK constraint violations in production.
+When running multiple inserts in parallel with `Promise.all`, child tables that reference parent tables via foreign keys **must wait** for the parent inserts to complete first. Running them all in a single parallel step causes intermittent FK constraint violations in production. Prefer `db.batch()` for SQLite so the statements are sent together and execute in order.
 
 ### How to think about it
 
 1. Read the schema and draw the FK dependency chain
 2. Group tables into layers: tables with no FK dependencies go in layer 1, tables that reference layer 1 go in layer 2, etc.
-3. Execute each layer sequentially; within a layer, inserts can run in parallel
+3. Execute each layer sequentially. For SQLite, use one `db.batch()` per layer instead of `Promise.all()` when possible
 
 ### Example: wrong vs right
 
