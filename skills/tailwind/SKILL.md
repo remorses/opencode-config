@@ -361,6 +361,61 @@ export function SecretsTable() { ... }
 **when to create a new ui component:** if you find the same visual pattern (same markup structure + same tailwind classes) in 2+ places, extract it. one-off patterns can stay inline. the `components/ui/` folder is for generic, reusable primitives. domain-specific components live in `components/` without the `ui/` prefix.
 
 
+## scroll fade edges with CSS `mask-image`
+
+use `mask-image` with a `linear-gradient` to fade content at scroll edges. the gradient goes from `transparent` (hidden) to `black` (fully visible). the mask's alpha channel controls opacity, so content smoothly disappears instead of being hard-clipped.
+
+```css
+/* fade both top and bottom edges */
+.scroll-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 48px,
+    black calc(100% - 48px),
+    transparent
+  );
+}
+```
+
+the `48px` controls how wide the fade zone is. adjust to taste. for horizontal scroll, change `to bottom` to `to right`.
+
+### non-linear fade curve
+
+`linear-gradient` only supports linear interpolation, but you can control the perceived curve with the **midpoint hint** (the percentage between two color stops):
+
+```css
+/* ease-out: fast start, slow finish */
+mask-image: linear-gradient(to bottom, transparent, black 20%);
+
+/* ease-in: slow start, fast finish */
+mask-image: linear-gradient(to bottom, transparent, black 80%);
+```
+
+the midpoint hint shifts where the 50% opacity point lands. lower values make the fade happen earlier (ease-out feel), higher values delay it (ease-in feel). for more control, add manual stops to approximate any curve:
+
+```css
+mask-image: linear-gradient(
+  to bottom,
+  transparent 0%,
+  rgba(0,0,0,0.05) 20%,
+  rgba(0,0,0,0.2) 40%,
+  rgba(0,0,0,0.5) 60%,
+  rgba(0,0,0,0.8) 80%,
+  black 100%
+);
+```
+
+### dynamic scroll fade React component
+
+see [scroll-fade.tsx](scroll-fade.tsx) for a ready-to-copy `ScrollFade` component and `useScrollFade` hook. uses `useSyncExternalStore` with stable callbacks; only shows fade when there's content to scroll to in that direction. `ResizeObserver` handles dynamic content changes (lazy load, accordions) without needing a scroll event.
+
+```tsx
+<ScrollFade className="h-64">              {/* both edges */}
+<ScrollFade className="h-64" top={false}>   {/* bottom only */}
+<ScrollFade className="h-64" bottom={false}> {/* top only */}
+```
+
 ## scrollbars
 
 always set all scrollbars styles to transparent and thin.

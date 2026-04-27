@@ -29,6 +29,24 @@ pnpm install drizzle-kit@beta --save-dev
 
 **Docs reference:** https://orm.drizzle.team/llms.txt — full docs index for LLMs. Fetch this when you need to look up something not covered here.
 
+## CRITICAL: Duplicate drizzle-orm in pnpm monorepos
+
+In pnpm monorepos, `drizzle-orm` can get installed as two separate copies when different packages in the workspace resolve it with different peer dependency sets (e.g. one with `@cloudflare/workers-types`, one without). TypeScript sees them as incompatible types because drizzle-orm uses private class fields internally.
+
+**Symptoms:** `Types have separate declarations of a private property 'cachedTables'`, `db.query.tableName is possibly undefined`, `orm.eq()` not assignable to parameter, where clauses rejected with type errors. These errors appear on `db.insert()`, `db.update()`, `db.delete()`, `db.query`, and `orm.eq/and/or` calls when the schema is imported from a different workspace package than the one calling drizzle.
+
+**Diagnosis:** search for duplicates in the lockfile:
+
+```bash
+grep " drizzle-orm@" pnpm-lock.yaml
+```
+
+If you see multiple entries with different peer dep suffixes in parentheses, you have duplicates.
+
+**Fix:** run `pnpm dedupe drizzle-orm` from the workspace root. This collapses the duplicate entries into one. If that doesn't work, load the `pnpm` skill for the full deduplication workflow.
+
+Never work around this with type casts (`as any`, `as unknown as T`, `!`). The casts hide the real problem and break silently when drizzle internals change.
+
 ## Project structure
 
 In projects with multiple packages (monorepos), put all database code in a dedicated `db` package at the workspace root. Read the `npm-package` skill for how to set up the package with proper `package.json`, `tsconfig.json`, exports, and build.
