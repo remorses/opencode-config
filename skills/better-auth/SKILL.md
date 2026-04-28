@@ -5,7 +5,8 @@ description: >
   Covers server config with Drizzle adapter (Postgres and SQLite), Spiceflow middleware
   for forwarding auth requests, client setup, session middleware, social and email/password
   auth, server-side session checks, and React client hooks (useSession, signIn, signOut,
-  signUp). ALWAYS load this skill when a project uses better-auth.
+  signUp). Also covers device authorization (CLI device flow), bearer token auth,
+  and server actions with auth. ALWAYS load this skill when a project uses better-auth.
 ---
 
 # better-auth
@@ -165,18 +166,27 @@ import { auth } from './lib/auth'
 
 export const app = new Spiceflow()
   .use(async ({ request }, next) => {
-    const url = new URL(request.url)
-    if (url.pathname.startsWith('/api/auth')) {
+    if (request.parsedUrl.pathname.startsWith('/api/auth')) {
       const response = await auth.handler(request)
-      // if better-auth doesn't handle this path, fall through to app routes
-      if (response.status === 404) {
-        return next()
-      }
-      return response
+      // Return auth responses (200, 401, 403, etc.) directly.
+      // Only fall through on 404 (no matching auth endpoint).
+      if (response.ok || response.status !== 404) return response
     }
     return next()
   })
   // ... rest of your routes
+```
+
+Use `res.ok || res.status !== 404` instead of just `res.status === 404` so auth error responses (401, 403, 400) are returned directly instead of falling through to your app routes:
+
+```ts
+.use(async ({ request }, next) => {
+  if (request.parsedUrl.pathname.startsWith('/api/auth')) {
+    const response = await auth.handler(request)
+    if (response.ok || response.status !== 404) return response
+  }
+  return next()
+})
 ```
 
 This handles ALL better-auth endpoints (sign-in, sign-up, OAuth callback, session, etc.). The middleware short-circuits for auth paths and returns the auth response directly. Non-auth paths and unmatched auth paths fall through to `next()`.
@@ -195,11 +205,9 @@ type AuthSession = typeof auth.$Infer.Session | null
 export const app = new Spiceflow()
   // 1. Auth middleware — forward /api/auth/* to better-auth
   .use(async ({ request }, next) => {
-    const url = new URL(request.url)
-    if (url.pathname.startsWith('/api/auth')) {
+    if (request.parsedUrl.pathname.startsWith('/api/auth')) {
       const response = await auth.handler(request)
-      if (response.status === 404) return next()
-      return response
+      if (response.ok || response.status !== 404) return response
     }
     return next()
   })
@@ -289,6 +297,25 @@ For API routes (not pages), use `state.session` directly since loaders only run 
 })
 ```
 
+### Server actions with auth
+
+Spiceflow server actions (`'use server'` functions) run in a different request context than the page render. You cannot access the page's `request` or `state` directly. Use `getActionRequest()` from spiceflow to get the action's request, then call `requireSession()` on it:
+
+```tsx
+import { getActionRequest, parseFormData } from 'spiceflow'
+
+async function deletePost(formData: FormData) {
+  'use server'
+  const request = getActionRequest()
+  const session = await requireSession(request) // throws 401 if not signed in
+  const { postId } = parseFormData(z.object({ postId: z.string() }), formData)
+  await db.delete(posts).where(eq(posts.id, postId))
+  throw redirect('/posts')
+}
+```
+
+Always call `requireSession(getActionRequest())` at the top of every server action that mutates data. The action request carries the user's cookies/auth headers, so `getSession` works the same as in route handlers.
+
 ### Full Spiceflow app example
 
 ```ts
@@ -301,11 +328,9 @@ type AuthSession = typeof auth.$Infer.Session | null
 export const app = new Spiceflow()
   // Auth middleware
   .use(async ({ request }, next) => {
-    const url = new URL(request.url)
-    if (url.pathname.startsWith('/api/auth')) {
+    if (request.parsedUrl.pathname.startsWith('/api/auth')) {
       const response = await auth.handler(request)
-      if (response.status === 404) return next()
-      return response
+      if (response.ok || response.status !== 404) return response
     }
     return next()
   })
@@ -557,6 +582,199 @@ export const authClient = createAuthClient({
 ```
 
 After adding plugins, re-run `pnpm dlx auth@latest generate` to generate updated schema, then run drizzle migrations.
+
+### Device authorization (CLI device flow)
+
+Use the `deviceAuthorization` plugin when your app has a CLI companion that needs to authenticate via a browser. The CLI displays a user code, opens a browser to your verification page, and polls until the user approves.
+
+**Server:**
+
+```ts
+import { betterAuth } from 'better-auth'
+import { deviceAuthorization, bearer } from 'better-auth/plugins'
+
+export const auth = betterAuth({
+  // ...
+  plugins: [
+    deviceAuthorization({ verificationUri: '/device' }),
+    bearer(), // needed so the CLI can use the session token as a Bearer header
+  ],
+})
+```
+
+**Schema:** The plugin requires a `device_code` table. Generate it with `pnpm dlx auth@latest generate`. The table stores device codes, user codes, expiry, and approval status.
+
+```ts
+export const deviceCode = sqliteTable('device_code', {
+  id: text('id').primaryKey().notNull().$defaultFn(() => ulid()),
+  deviceCode: text('device_code').notNull().unique(),
+  userCode: text('user_code').notNull().unique(),
+  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+  expiresAt: epochMs('expires_at').notNull(),
+  status: text('status', {
+    enum: ['pending', 'approved', 'denied', 'expired'],
+  }).notNull().default('pending'),
+  lastPolledAt: epochMs('last_polled_at'),
+  pollingInterval: integer('polling_interval', { mode: 'number' }),
+  clientId: text('client_id'),
+  scope: text('scope'),
+})
+```
+
+**Verification page (Spiceflow):**
+
+The device flow verification page must:
+1. Check the user code is valid via `auth.api.deviceVerify()`
+2. Require the user to be signed in (redirect to login if not)
+3. Provide approve/deny actions via server actions
+
+```tsx
+import { getActionRequest, json, parseFormData, Spiceflow, redirect } from 'spiceflow'
+import { router } from 'spiceflow/react'
+import { z } from 'zod'
+
+const devicePageQuerySchema = z.object({
+  user_code: z.string().optional(),
+  status: z.enum(['approved', 'denied']).optional(),
+})
+
+const deviceUserCodeSchema = z.object({ userCode: z.string().min(1) })
+
+export const app = new Spiceflow()
+  // ... auth middleware ...
+  .page({
+    path: '/device',
+    query: devicePageQuerySchema,
+    handler: async ({ request, query }) => {
+      const userCode = query.user_code ?? ''
+      const status = query.status
+
+      if (!userCode) {
+        return <div>Open this page from the CLI login flow.</div>
+      }
+
+      // 1. Validate the device code
+      const auth = getAuth()
+      const device = await auth.api.deviceVerify({
+        query: { user_code: userCode },
+      }).catch(() => null)
+
+      if (!device) {
+        return <div>Invalid or expired device code.</div>
+      }
+
+      // 2. Require sign-in
+      const session = await getSession(request)
+      if (!session) {
+        throw redirect(router.href('/login', {
+          callbackURL: `${request.parsedUrl.pathname}${request.parsedUrl.search}`,
+        }))
+      }
+
+      // 3. Server actions for approve/deny
+      async function approveDevice(formData: FormData) {
+        'use server'
+        const actionRequest = getActionRequest()
+        await requireSession(actionRequest)
+        const { userCode: code } = parseFormData(deviceUserCodeSchema, formData)
+        const actionAuth = getAuth()
+        await actionAuth.api.deviceApprove({
+          body: { userCode: code },
+          headers: actionRequest.headers,
+        })
+        throw redirect(router.href('/device', {
+          user_code: code,
+          status: 'approved',
+        }))
+      }
+
+      async function denyDevice(formData: FormData) {
+        'use server'
+        const actionRequest = getActionRequest()
+        await requireSession(actionRequest)
+        const { userCode: code } = parseFormData(deviceUserCodeSchema, formData)
+        const actionAuth = getAuth()
+        await actionAuth.api.deviceDeny({
+          body: { userCode: code },
+          headers: actionRequest.headers,
+        })
+        throw redirect(router.href('/device', {
+          user_code: code,
+          status: 'denied',
+        }))
+      }
+
+      if (status === 'approved') {
+        return <div>CLI approved. You can close this page.</div>
+      }
+      if (status === 'denied') {
+        return <div>CLI denied. You can close this page.</div>
+      }
+
+      return (
+        <div>
+          <p>A CLI is requesting access. Code: {userCode}</p>
+          <form action={approveDevice}>
+            <input type="hidden" name="userCode" value={userCode} />
+            <button type="submit">Approve</button>
+          </form>
+          <form action={denyDevice}>
+            <input type="hidden" name="userCode" value={userCode} />
+            <button type="submit">Deny</button>
+          </form>
+        </div>
+      )
+    },
+  })
+```
+
+**CLI side** (polling loop):
+
+```ts
+import { createAuthClient } from 'better-auth/client'
+
+const client = createAuthClient({ baseURL: 'https://myapp.com' })
+
+// 1. Request a device code
+const { data } = await client.deviceAuthorization.request()
+console.log(`Open: ${data.verificationUri}?user_code=${data.userCode}`)
+console.log(`Code: ${data.userCode}`)
+
+// 2. Open the browser for the user
+open(data.verificationUriComplete)
+
+// 3. Poll until approved
+const result = await client.deviceAuthorization.verifyDevice({
+  deviceCode: data.deviceCode,
+})
+// result contains the session token
+```
+
+### Bearer token auth
+
+The `bearer` plugin lets clients authenticate with `Authorization: Bearer <session-token>` instead of cookies. Essential for CLI tools, API clients, and mobile apps.
+
+**Server:**
+
+```ts
+import { betterAuth } from 'better-auth'
+import { bearer } from 'better-auth/plugins'
+
+export const auth = betterAuth({
+  // ...
+  plugins: [bearer()],
+})
+```
+
+No client plugin needed. The CLI or API client just sends the session token as a Bearer header:
+
+```ts
+const response = await fetch('https://myapp.com/api/me', {
+  headers: { Authorization: `Bearer ${sessionToken}` },
+})
+```
+
+`auth.api.getSession({ headers })` automatically checks both cookies and the Authorization header when the bearer plugin is enabled. No code changes needed in your session resolution logic.
 
 ### Other plugins
 
