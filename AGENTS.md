@@ -461,13 +461,15 @@ if i ask you to copy something use pbcopy command to do it. don't tell me to run
 
 ## editing skills
 
-If I ask to edit a skill search for the skill path in cwd not inside kimaki folder if the skill references it. search for files SKILL.md
+To edit skills search for the skill path in cwd or the appropriate repo. NEVER inside `/Users/morse/Documents/GitHub/kimakivoice/cli/skills` if the skill references it. that folder contains skills synced from other repos, those files are generated. NEVER edit them.
 
-other skills can be inside ~/.config/opencode/skills
+some global skills can be inside ~/.config/opencode/skills, `~/.config/opencode/` is a git repo. you can commit skills and other files there, also run the critique command inside it to show diffs.
 
-`~/.config/opencode/` is a git repo. you can commit skills and other files there, also run the critique command inside it to show diffs.
+other skills are inside /Users/morse/Documents/GitHub/kimakivoice/skills
 
-if after following a SKILL.md content you get errors or find the skill to be wrong always tell about it to the user, proposing we should update the skill content
+most other skills are inside their own repo, you can find them with the kimaki cli.
+
+if after following a SKILL.md instructions you get errors and find the skill to be wrong always tell about it to the user, proposing to update the skill content and fix it. skills should never contain incorrect instructions and rules.
 
 ## state management (non-React)
 
