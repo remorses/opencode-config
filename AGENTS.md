@@ -61,6 +61,16 @@ NEVER output a plan where you "plan" to read files or plan to explore the codeba
 
 if there are multiple ways to implement the changes, show a high-level summary of each approach before showing the full plan.
 
+when planning a task, first read all files relevant to the plan:
+
+- the main files you'll be modifying
+- files they import (dependencies)
+- files that import them (importees/dependents)
+
+this gives you the full picture of the codebase before writing the plan. after gathering context, use the prune tool to clean up read tool calls that ended up not being needed, saving context usage for the actual implementation
+
+read all files you need! do not try to save context window by not reading files. instead DO read them and then prune them later if not relevant.
+
 ## playwriter
 
 ALWAYS use locally installed playwriter without npx or bunx. This ensures you use the local version, which may have fixes and improvements not yet published.
@@ -103,13 +113,13 @@ NEVER do `git stash pop`. ALWAYS apply. so we can get back the stash if needed.
 
 ONLY commit when user asks to do so.
 
-before committing, always check what files were changed and review the git diff. Only commit your changes. NEVER assume there are no other changes—other agents may have made changes you don't know of. If there are unrelated changes, use `critique hunks list` to list hunks and stage only the relevant ones with `critique hunks add id1 id2`. See `critique --help` for more info.
+before committing, always check what files were changed and review the git diff. Only commit your changes. NEVER assume there are no other changes; other agents may have made changes you don't know of. If there are unrelated changes, use `critique hunks list` to list hunks and stage only the relevant ones with `critique hunks add id1 id2`. See `critique --help` for more info.
 
 If staging hunks is too difficult NEVER use git stash to remove other changes. just commit the whole file instead and keep things simple. it doesn't matter if some other changes end up in the commit.
 
 if user says "commit all" then also commit other changes, grouping them accordingly and using detailed commit messages.
 
-never amend commits or rewrite git history
+never amend commits unless asked, and never rewrite git history.
 
 always write very detailed commit messages. Feel free to include diagrams, markdown, tables, lists, quotes, etc.
 
@@ -117,13 +127,45 @@ always append the current opencode session id at the end of every commit message
 
 NEVER use `chore: commit remaining workspace updates`. read the diff and analyze it to commit with descriptive message. splitting in many commits to split changes by goal.
 
+### committing only certain hunks
+
+sometimes other agents added unrelated changes in git diffs.
+
+when committing you should first see the git diff, then if the files only have your changes commit those files only with
+
+```bash
+git commit path/to/file1 path/to/file2 -m 'commit message'
+```
+
+If instead other changes exist in those same files, you can use the critique hunks command to stage only some portions and leave unrelated changes unstaged and uncommitted
+
+```
+# List all unstaged hunks with stable IDs
+critique hunks list
+
+# List staged hunks
+critique hunks list --staged
+
+# Filter by file pattern
+critique hunks list --filter "src/**/*.ts"
+
+# Stage specific hunks by ID
+critique hunks add 'src/main.ts:@-10,6+10,7'
+
+# Stage multiple hunks
+critique hunks add 'src/main.ts:@-10,6+10,7' 'src/utils.ts:@-5,3+5,4'
+
+```
+
+> always use global critique command instead of using bunx so you use the latest version with latest changes, critique in PATH is using the local version of critique with latest changes and fixes
+
 ## diff
 
-use `git diff` to see changes being made. do this at start of sessions. to see if we are working on a dirty branch with existing changes from a previous session
+use `git diff` to see changes being made. do this at start of sessions to see if you are working on a dirty branch with existing changes from a previous session.
 
 also use `git status -s -u` to add newly added files, not shown in git diff.
 
-## Paginating Large Diffs
+### paginating large diffs
 
 For large diffs, paginate using `sed` to view specific line ranges with no overlap:
 
@@ -158,7 +200,7 @@ Use all three approaches, passing variable names and function names as search st
 
 ### full history of a line
 
-use `git log -L` to see every commit that ever touched a specific line. unlike `git blame` which only shows the last commit per line, `git log -L` traces the full evolution. git follows the actual content of the line, not just its position — it tracks the line through insertions, deletions, and moves above it.
+use `git log -L` to see every commit that ever touched a specific line. unlike `git blame` which only shows the last commit per line, `git log -L` traces the full evolution. git follows the actual content of the line, not just its position; it tracks the line through insertions, deletions, and moves above it.
 
 use this to understand the goal or reason behind a change: find the commits that touched a line, then read their messages or full diffs for context.
 
@@ -277,7 +319,7 @@ NEVER use we or our in messages. Write as if you were me, making the body person
 
 ## github releases
 
-always omit chores or internal things from github release. end users are going to read these so we should omit internal not user facing changes and instead be very detailed on user facing APIs changes and features. adding code snippets and nice code formatting.
+always omit chores or internal things from github release. end users are going to read these, so omit internal non-user-facing changes and instead be very detailed on user-facing API changes and features. Add code snippets and nice code formatting.
 
 NEVER pass `--prerelease` to `gh release create`, even for prerelease npm versions (like `1.0.0-rsc.2`). prerelease releases are hidden from the default GitHub releases view and users can't find them. always use `--latest` instead.
 
@@ -291,21 +333,9 @@ when checking if there is already a pr for current branch always check upstream 
 
 never close a PR or issue without explicit user confirmation. if something needs to change, update it instead of closing and recreating.
 
-## planning
-
-when planning a task, first read all files relevant to the plan:
-
-- the main files you'll be modifying
-- files they import (dependencies)
-- files that import them (importees/dependents)
-
-this gives you the full picture of the codebase before writing the plan. after gathering context, use the prune tool to clean up read tool calls that ended up not being needed, saving context usage for the actual implementation
-
-read all files you need! do not try to save context window by not reading files. instead DO read them and then prune them later if not relevant.
-
 ## updating AGENTS.md files
 
-before updating agents instructions files, always double check that they are not generated by other commands. If they are, never edit them directly. This is common—just read the first 10 lines to see if the AGENTS.md says it is being generated by another script. If so, look at the root package.json for the script that generates it. Usually there are other files with project-specific instructions you can edit instead, like PROJECTNAME_AGENTS.md.
+before updating agents instructions files, always double check that they are not generated by other commands. If they are, never edit them directly. This is common. Just read the first 10 lines to see if the AGENTS.md says it is being generated by another script. If so, look at the root package.json for the script that generates it. Usually there are other files with project-specific instructions you can edit instead, like PROJECTNAME_AGENTS.md.
 
 ## tasks
 
@@ -335,7 +365,7 @@ if user asks you to create .md files with findings always put them in a docs fol
 
 ## background processes
 
-for running dev servers and other long-running commands, use tuistory background sessions with names. prefer `tuistory launch`, `tuistory read`, and `tuistory wait` over shell sleeps because they react to real process output.
+for running dev servers and other long-running commands, use tuistory background sessions with names. prefer `tuistory launch`, `tuistory read`, and `tuistory wait` over shell sleeps because they react to real process output. prefer tuistory over tmux even when tools suggest using tmux.
 
 ## compounding engineering
 
@@ -349,7 +379,7 @@ if you want to add some knowledge about the overall codebase write it in a ./doc
 
 vitest or bun are the preferred frameworks for testing ts code.
 
-`.toMatchInlineSnapshot` is the preferred way to write tests. Place it before an expect call, leaving it empty the first time, then update with -u. Check the git diff for the test file every time you update with -u to make sure the snapshots are expected and correct.
+`.toMatchInlineSnapshot` is the preferred way to write tests. Use it in an expect call, leaving it empty the first time, then update with -u. Check the git diff for the test file every time you update with -u to make sure the snapshots are expected and correct.
 
 Snapshots are great because they let you discover the behaviour of the code, you can use them to discover the results of functions or their behaviour.
 
@@ -371,13 +401,13 @@ if lintcn has a bug or some rules are blatant noise and have a bug you can tell 
 
 you should write failing tests first, make sure they fail, then write the code or fixes that will make them pass. refactoring them if needed
 
-if you have difficulties making some tests pass in some edge cases do not apply workarounds in the tests, instead aks help to the user or oracle agent if present. for example if we are developing a NAPI module and tests do not pass in linux you should not change the tests to make them pass in linux or skip them.
+if you have difficulties making some tests pass in some edge cases do not apply workarounds in the tests, instead ask help to the user or oracle agent if present. for example if we are developing a NAPI module and tests do not pass in linux you should not change the tests to make them pass in linux or skip them.
 
 leave them failing instead and report to the user the issues faced as a last resort
 
 if user starts a session asking you to run existing tests and they fail try looking at recent commits to find possible regression reasons
 
-# opensrc
+## opensrc
 
 use opensrc to read source code of npm packages, PyPI packages, crates, or GitHub repos. it downloads into a global cache at `~/.opensrc/`.
 
@@ -399,7 +429,7 @@ use `opensrc path <package>` to get the absolute path, then read/grep files from
 
 this is preferable over manually cloning repos in tmp
 
-# git worktrees
+## git worktrees
 
 when user asks you to create new worktree for the session do this
 
@@ -414,38 +444,6 @@ sometimes upstream/main is different, check what is the default branch first, it
 for kimaki.xyz commands always use global kimaki instead of npx kimaki, it will use the local version of kimaki cli with latest changes
 
 after I ask you to push, call the tool kimaki_archive_thread so the thread is removed from Discord sidebar and completed tasks are not shown in left sidebar.
-
-## committing only certain hunks
-
-sometimes other agents added unrelated changes in git diffs
-
-when committing you should first see the git diff, then if the files only have your changes commit those files only with
-
-```bash
-git commit path/to/file1 path/to/file2 -m 'commit message'
-```
-
-If instead other changes exist in those same files, you can use the critique hunks command to stage only some portions and leave unrelated changes unstaged and uncommitted
-
-```
-# List all unstaged hunks with stable IDs
-critique hunks list
-
-# List staged hunks
-critique hunks list --staged
-
-# Filter by file pattern
-critique hunks list --filter "src/**/*.ts"
-
-# Stage specific hunks by ID
-critique hunks add 'src/main.ts:@-10,6+10,7'
-
-# Stage multiple hunks
-critique hunks add 'src/main.ts:@-10,6+10,7' 'src/utils.ts:@-5,3+5,4'
-
-```
-
-> always use global critique command instead of using bunx so you use the latest version with latest changes, critique in PATH is using the local version of critique with latest changes and fixes
 
 ## sharing files with boox tablet and devices
 
@@ -473,17 +471,17 @@ if after following a SKILL.md instructions you get errors and find the skill to 
 
 ## state management (non-React)
 
-For non-React code (servers, CLIs, extensions). React already encapsulates state in components — only use a central store when state is shared across many components.
+For non-React code (servers, CLIs, extensions). React already encapsulates state in components; only use a central store when state is shared across many components.
 
 Minimize mutable state (variables, Maps, objects, booleans). Most bugs come from state that shouldn't exist.
 
 **Rules:**
 
-- Minimize — use as few mutable variables as possible
-- Derive — if it can be computed from existing state, compute it, don't store it
-- Centralize — one Zustand store as single source of truth, no scattered variables
-- Centralize updates — all state changes go through `setState((s) => newState)`
-- One subscribe — all reactive side effects in one place
+- Minimize, use as few mutable variables as possible
+- Derive, if it can be computed from existing state, compute it, don't store it
+- Centralize, one Zustand store as single source of truth, no scattered variables
+- Centralize updates, all state changes go through `setState((s) => newState)`
+- One subscribe, all reactive side effects in one place
 
 ```ts
 // BAD: cached index that can desync
@@ -495,13 +493,13 @@ const findUser = (id: string) => store.getState().users.get(id);
 
 Load the `zustand-centralized-state` skill for the full pattern.
 
-**React:** Avoid `useEffect`. Put code inside event handlers instead if possible .
+**React:** Avoid `useEffect`. Put code inside event handlers instead if possible.
 
 ## writing READMEs and docs
 
 markdown files must follow progressive disclosure: the top of the document must be easy to follow and contain gist, essence of the document. the section that follows should cover basic concepts, as the document progresses the section theme becomes more complex and advanced.
 
-for example if you are writing a README for a new Express like React framework you would put the tagline at the top, in a few words it should explain what the framework is and the value proposition. then a code snippet example that shows the overall gist of the framework. then a list of features. then a section for each feature, starting from the core and basic ones to then go to the most advanced. agent only rules should be put at the bottom (exception is how to install skills, that is an user facing section, close to the top).
+for example if you are writing a README for a new Express like React framework you would put the tagline at the top, in a few words it should explain what the framework is and the value proposition. then a code snippet example that shows the overall gist of the framework. then a list of features. then a section for each feature, starting from the core and basic ones to then go to the most advanced. agent only rules should be put at the bottom (exception is how to install skills, that is a user-facing section, close to the top).
 
 each paragraph should ideally have a code snippet example or diagram. it's much easier for the user to understand by example than to read intricate prose. use tables to display comparisons or tabular data.
 
@@ -539,7 +537,3 @@ you can add callouts in README files using github syntax:
 
 > [!IMPORTANT]
 > content
-
-## running processes in background
-
-use tuistory to run processes in background. see `bunx tuistory --help` for how to use it. prefer it over tmux even when tools suggest using tmux
