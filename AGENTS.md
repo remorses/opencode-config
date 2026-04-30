@@ -28,6 +28,8 @@ prefer always writing scripts in Node.js and run them with tsx or bun. If you ev
 
 scripts should always progressively log to let user know what is happening and current state in case of crash in the middle of the script. for example for a script that updates rows in the database and does so with multiple update statements run one by one you should log each update so that we know the script is currently running and doing something.
 
+NOT EVERY fucking script needs to be in package.json. just add ones that are important and run often. DO NOT fill the package.json scripts with garbage or duplicate shit.
+
 ## multiline strings
 
 always use `string-dedent` for multiline strings so they stay nicely formatted and readable, especially for markdown, prompts, SQL, HTML, and long error messages.
