@@ -160,6 +160,134 @@ after this, classes like `bg-primary`, `text-muted-foreground`, `border-border`,
 
 define the actual values in `:root` for light mode and inside `.dark` or `@variant dark` or `@media (prefers-color-scheme: dark)` for dark mode — whichever strategy the project uses. check the existing globals.css to see which strategy is in place before adding new tokens.
 
+## shadcn/ui project setup
+
+when setting up shadcn/ui in a new project, install these dependencies:
+
+```bash
+bunx --bun shadcn@latest add init
+# or manually:
+pnpm add shadcn class-variance-authority clsx tailwind-merge lucide-react tw-animate-css @base-ui/react
+```
+
+### `components.json` with package name aliases (not `@`)
+
+**never use `@/` tsconfig path aliases** for shadcn. instead, use the **package name** from `package.json` as the import prefix. for example, if your package is named `my-app`, imports look like `my-app/src/components/ui/button`. this works natively in Node.js, bundlers, and TypeScript without extra bundler config. it also works correctly in monorepos where `@` is ambiguous across packages.
+
+example `components.json`:
+
+```json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "css": "src/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "my-app/src/components",
+    "utils": "my-app/src/lib/utils",
+    "ui": "my-app/src/components/ui",
+    "lib": "my-app/src/lib",
+    "hooks": "my-app/src/hooks"
+  }
+}
+```
+
+replace `my-app` with the actual `name` field from your `package.json`. leave `tailwind.config` empty (or omit it) for Tailwind v4. set `rsc: true` if using React Server Components (e.g. with spiceflow).
+
+### package.json exports for the package-name pattern
+
+add a `./src/*` export so Node.js and bundlers can resolve `my-app/src/...` imports:
+
+```json
+{
+  "name": "my-app",
+  "exports": {
+    "./package.json": "./package.json",
+    "./src/*": "./src/*"
+  }
+}
+```
+
+### tsconfig.json paths for TypeScript resolution
+
+TypeScript's module resolution (especially `nodenext` or `bundler`) expects file extensions when resolving through `package.json` exports, which conflicts with how shadcn generates extensionless imports like `my-app/src/lib/utils`. adding a `paths` entry silences these resolution errors by bypassing the exports map and resolving directly to the source files:
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "my-app/src/*": ["./src/*"]
+    }
+  }
+}
+```
+
+without this, TypeScript will complain that it cannot resolve `my-app/src/lib/utils` because the exports map expects `my-app/src/lib/utils.ts` (with extension). the `paths` mapping lets extensionless imports work during development while the `package.json` exports handle runtime resolution in bundlers.
+
+### globals.css setup
+
+the full CSS file should import tailwindcss, the animation library, and define the `@custom-variant dark` directive plus `@theme inline` bridge:
+
+```css
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  /* ... all color tokens (see @theme inline section above) ... */
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  /* ... all light mode token values ... */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  /* ... all dark mode token values ... */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+```
+
+### cn() helper
+
+create `src/lib/utils.ts`:
+
+```ts
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+```
+
+### adding components
+
+run `bunx --bun shadcn@latest add button` (or any component name) from the project root. the CLI reads `components.json` and places files in the correct directories with the correct import paths. components use `@base-ui/react` primitives by default when available.
+
 ## derive colors with opacity, not new hardcoded values
 
 add as few hardcoded colors as possible. derive variations from existing tokens using opacity. this is simpler and auto-adapts in dark mode when the base token changes.
