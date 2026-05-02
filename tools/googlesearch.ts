@@ -97,7 +97,7 @@ const googlesearch = tool({
 - Finding GitHub repos, npm packages, or official docs
 
 **When NOT to use (prefer alternatives):**
-- For library internals: use lib-investigator agent or download source to \`node_modules/.gitchamber\`
+- For library internals: use lib-investigator agent or fetch source with \`opensrc path <pkg>\`
 - For API signatures: read local .d.ts files first
 - For code patterns: use codesearch tool and gh search cli
 
