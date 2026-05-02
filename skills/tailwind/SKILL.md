@@ -361,6 +361,10 @@ but only do this when the value actually appears in **multiple places**. a varia
 
 never introduce prefixed variable namespaces like `--app-*`, `--hc-*`, `--fd-*`, `--editorial-*`. keep everything in the flat shadcn naming style. if a new variable is needed, pick a descriptive name that could plausibly be a shadcn extension (e.g. `--text-tertiary`, `--border-subtle`, `--divider`).
 
+## SVG icons — extract into separate components
+
+never inline SVG icons inside a larger component. extract each icon into its own small component that accepts `className` and spreads `...props`. SVG paths are visual noise that buries the actual layout. prefer `lucide-react` when the icon exists there.
+
 ## SVGs — always use `currentColor`
 
 when creating or editing inline SVGs, always use `currentColor` for `fill` and `stroke` instead of hardcoded colors. this way the icon inherits the parent's CSS `color` property and automatically adapts to dark mode, hover states, and any text color utility.
