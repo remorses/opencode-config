@@ -264,6 +264,7 @@ const usersWithPosts = await db.query.users.findMany({
 **Key rules:**
 
 - Use **object-style `where`** — no operator imports needed. Pass values directly for equality, use `{ gt: }`, `{ like: }`, `{ in: }` etc. for operators
+- Always **inline `where` objects** directly in `db.query.*` calls. Do not extract them into reusable constants. Inline objects give better property autocomplete and clearer TypeScript errors at the call site.
 - Use `AND`, `OR`, `NOT` for logical combinations
 - Use `with` to include relations (like Prisma's `include`)
 - `db.query` with `with` still runs as **one SQL query**, not N queries. Prefer it for latency-sensitive reads.
