@@ -2,7 +2,9 @@
   "$schema": "https://opencode.ai/config.json",
   "lsp": false,
 
-
+  "compaction": {
+    "prune": true
+  },
 
   // "mode": {
   //   "build": {
@@ -125,7 +127,7 @@
     "/Users/morse/Documents/GitHub/kimakivoice/cli/src/anthropic-auth-plugin.ts",
     "/Users/morse/.config/opencode/plugins/systemprompt-debug.ts"
     // "kitty-graphics-agent",
-     // "opencode-cursor-oauth"
+    // "opencode-cursor-oauth"
     // "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
     // "@tarquinen/opencode-dcp", SHIT. breaks claude rules of thinking
     // "/Users/morse/kimaki/codex-multi-auth/index.ts", SHIT. breaks everything. codex 5.3 does not work.probably uses the API for some reason! spent a lot of money on API for no reason
@@ -185,12 +187,9 @@
     "disable_paste_summary": true
   },
   "agent": {
-
-
     // "plan": {
     //   "mode": "primary",
     //   "prompt": "{file:./prompts/PLAN.md}",
-
     //   "permission": {
     //     "edit": "deny",
     //     "bash": "allow"
