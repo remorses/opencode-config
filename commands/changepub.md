@@ -325,7 +325,7 @@ Changelog item entry here. with examples
 For packages that contain these `.md` files we should
 
 - read the .md files inside `.changeset` if any (also check in parent folders if this is a workspace. sometimes `.changeset` is at the repo root)
-- update the CHANGELOG.md for the packages, adding each one of these .md entries content as a list item for the new version
+- update the CHANGELOG.md for the packages, adding each one of these .md entries content as a list item for the new version. Keep all content, if there are code snippets or examples, add them too, indented into the list item
 - if any entry adds a **new feature or capability**, use a **minor** bump
 - use **patch** only when all entries are fixes or non-feature improvements
 - then delete these .md files

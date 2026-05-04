@@ -46,18 +46,51 @@ template now includes a federation example.
 3. **Don't edit CHANGELOG.md.** New changes must be added as changesets instead
 4. **Never run the changeset CLI.** Always write the `.md` file manually.
 5. **Present tense.** Write "add support for X", "fix bug with Y", not "added" or "fixed".
-6. **Single concise paragraph.** Not bullet points or lists. Include code snippets if they help explain the change.
-7. **One changeset per logical change.** If a PR has two unrelated changes, create two changeset files.
+6. **One changeset per logical change.** If a PR has two unrelated changes, create two changeset files.
 
 ## What goes in the description
 
-Focus on what the user sees, not internal refactoring details. Good changeset descriptions:
+Changeset descriptions become the public changelog. Write them as **rich content** aimed at end users. These are not commit messages; they should be detailed and helpful.
 
-- Explain the user-facing behavior change
-- Include a short code snippet if the API surface changed
-- Mention the fix if it resolves a specific bug
+Include any combination of:
 
-Bad changeset descriptions: "update internals", "refactor code", "misc improvements".
+- **Code examples** showing new APIs or changed behavior
+- **Migration steps** if the user needs to update their code
+- **Diagrams** (ASCII) explaining architecture or data flow changes
+- **Before/after comparisons** showing old vs new usage
+- **Links** to relevant docs or issues
+
+Focus on what the user sees, not internal refactoring. Explain why the change matters and how to use it.
+
+**Good example:**
+
+```md
+---
+'spiceflow': minor
+---
+
+Add `parseFormData()` utility for type-safe form handling with Standard Schema validation.
+
+\`\`\`ts
+import { parseFormData } from 'spiceflow'
+import { z } from 'zod'
+
+const schema = z.object({
+  name: z.string(),
+  age: z.coerce.number(),
+})
+
+app.post('/users', async (ctx) => {
+  const data = await parseFormData(ctx.request, schema)
+  // data is fully typed: { name: string, age: number }
+})
+\`\`\`
+
+Handles string-to-number and string-to-boolean coercion automatically.
+Array fields use `getAll()` under the hood.
+```
+
+**Bad examples:** "update internals", "refactor code", "misc improvements", or any single vague sentence without context.
 
 ## Pre-release mode
 
