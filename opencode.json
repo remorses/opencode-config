@@ -5,6 +5,9 @@
   "compaction": {
     "prune": true
   },
+  "skills": {
+    "paths": ["/Users/morse/Documents/GitHub/kimakivoice/cli/skills"]
+  },
 
   // "mode": {
   //   "build": {
