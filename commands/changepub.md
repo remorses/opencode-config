@@ -196,10 +196,17 @@ If multiple versions accumulated since last publish, merge them into one changel
 
 ## Step 4: Commit the Release
 
+If any changeset `.md` files reference GitHub issues with `Fixes #123`, `Closes #456`, or similar keywords, include those references in the commit message body. GitHub closes issues automatically when the commit containing these keywords lands on the default branch.
+
 ```bash
 git add .
-git commit -m "release: packagename@x.y.z"
-````
+git commit -m 'release: packagename@x.y.z
+
+Fixes #123
+Closes #456'
+```
+
+Collect all issue references from the changeset files being consumed and append them as separate lines in the commit body. This ensures issues get closed at publish time without needing a separate PR or GitHub Action.
 
 ## Step 5: Publish to npm
 

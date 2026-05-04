@@ -47,6 +47,7 @@ template now includes a federation example.
 4. **Never run the changeset CLI.** Always write the `.md` file manually.
 5. **Present tense.** Write "add support for X", "fix bug with Y", not "added" or "fixed".
 6. **One changeset per logical change.** If a PR has two unrelated changes, create two changeset files.
+7. **Reference fixed issues.** When a change fixes a GitHub issue, include `Fixes #123` (or `Closes #123`) on its own line in the changeset description. At publish time, the `changepub` command collects these references and includes them in the release commit message body. GitHub closes the issues automatically when that commit lands on the default branch. This also creates a clickable link in the CHANGELOG for users to find context.
 
 ## What goes in the description
 
@@ -88,6 +89,21 @@ app.post('/users', async (ctx) => {
 
 Handles string-to-number and string-to-boolean coercion automatically.
 Array fields use `getAll()` under the hood.
+```
+
+**Example with issue reference:**
+
+```md
+---
+'spiceflow': patch
+---
+
+Fix race condition in WebSocket reconnection that caused duplicate event handlers.
+
+The `reconnect()` method now drains pending listeners before re-attaching,
+preventing the exponential handler growth reported in the issue.
+
+Fixes #287
 ```
 
 **Bad examples:** "update internals", "refactor code", "misc improvements", or any single vague sentence without context.
