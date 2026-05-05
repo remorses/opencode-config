@@ -133,6 +133,66 @@ never duplicate a CSS variable value. if `--ring` should match `--primary`, writ
 }
 ```
 
+### canonical source variables
+
+keep a **minimal set of canonical variables** that hold actual color values. every other variable must reference one of these canonicals via `var()`. this means each unique color value exists in exactly one place.
+
+**canonical sources** (get hardcoded hex/oklch values):
+- `--background`, `--foreground` — page surface and text
+- `--card`, `--card-foreground` — elevated surface and its text
+- `--primary`, `--primary-foreground` — brand color and text on it
+- `--secondary`, `--muted`, `--muted-foreground`, `--accent` — neutral surfaces
+- `--destructive`, `--success`, `--warning`, `--info` — semantic status colors
+- `--input`, `--overlay` — form/overlay specifics
+
+**derived variables** (always `var()` references, never hardcoded):
+- `--popover: var(--card)` — popovers are elevated surfaces like cards
+- `--popover-foreground: var(--card-foreground)`
+- `--secondary-foreground: var(--card-foreground)`
+- `--accent-foreground: var(--card-foreground)`
+- `--destructive-foreground: var(--primary-foreground)` — text on status colors is always white
+- `--success-foreground: var(--primary-foreground)`
+- `--warning-foreground: var(--primary-foreground)`
+- `--info-foreground: var(--primary-foreground)`
+- `--border: var(--accent)` — borders use the accent shade
+- `--ring: var(--primary)` — focus ring matches brand
+
+derived variables are defined **once** in `:root`. they don't need to be repeated in `.dark` because they resolve from the canonical's dark override automatically. the dark mode block only overrides the canonical sources that actually change value.
+
+```css
+:root {
+  /* Canonical source variables */
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --primary: #fa7319;
+  --primary-foreground: #ffffff;
+  --accent: #ebebeb;
+
+  /* Derived — always reference a canonical */
+  --popover: var(--card);
+  --popover-foreground: var(--card-foreground);
+  --secondary-foreground: var(--card-foreground);
+  --accent-foreground: var(--card-foreground);
+  --destructive-foreground: var(--primary-foreground);
+  --border: var(--accent);
+  --ring: var(--primary);
+}
+
+.dark {
+  /* Only canonical sources that change */
+  --background: #171717;
+  --foreground: #ffffff;
+  --card: #1c1c1c;
+  --card-foreground: #f7f7f7;
+  --accent: #333333;
+  /* derived vars auto-resolve — no repetition needed */
+}
+```
+
+when adding a new color token, first check if its value matches an existing canonical. if it does, reference that canonical instead of writing the same hex value again.
+
 ## shadcn color token convention
 
 use the shadcn/ui CSS custom property convention for design tokens. this makes it trivial to copy-paste shadcn components into the repo without remapping colors. each semantic token is a plain CSS variable in `:root` (light) with a dark override, then bridged to Tailwind via `@theme inline`.
