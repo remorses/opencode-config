@@ -8,7 +8,7 @@ permission:
   plan_enter: allow
   task:
     "*": allow
-    oracle: deny
+    # oracle: deny
     image-understanding: deny
 ---
 

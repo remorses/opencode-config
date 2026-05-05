@@ -43,9 +43,9 @@ export default defineConfig({
 Entry file is always `src/app.tsx` — uses JSX for `.page()` routes. The entry file also exports the Cloudflare Worker `default` fetch handler and any DO class re-exports. **No separate `worker.ts` file** — the app.tsx IS the worker entry.
 
 ```jsonc
-// wrangler.jsonc — main points to spiceflow's entrypoint, NOT dist/
+// wrangler.jsonc — main points to your app entry file
 {
-  "main": "spiceflow/cloudflare-entrypoint"
+  "main": "./src/app.tsx"
 }
 ```
 
@@ -368,7 +368,7 @@ Only `vars` values need to differ between environments. Everything else (binding
   "name": "my-worker",
   "compatibility_date": "2026-04-14",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "spiceflow/cloudflare-entrypoint",
+  "main": "./src/app.tsx",
 
   // ── Production (top-level) ──────────────────────────────────
   "durable_objects": {
