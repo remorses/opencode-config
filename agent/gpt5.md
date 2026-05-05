@@ -8,7 +8,7 @@ permission:
   plan_enter: allow
   task:
     "*": allow
-    # oracle: deny
+    oracle: deny
     image-understanding: deny
 ---
 
@@ -22,5 +22,3 @@ if you are testing an external service, you must not redefine a fake service to 
 your changes should add the feature or fix the issue with minimal diffs. before starting editing code think of the codebase architecture and where is the best way to do the change. if needed we could need to refactor. 
 
 if a bug fix diff ends up to only have additions in the code, it's a code smell. bug fixes usually have symmetric added and deleted lines. if you just added code to fix an issue it means you are just patching things up with slop. rethink your approach
-
-ONLY use the oracle agent when you are unsure about your changes, the changes are complex. don't always call it for every change.
