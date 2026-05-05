@@ -1153,3 +1153,24 @@ drizzleAdapter(db, {
   usePlural: true,
 })
 ```
+
+## Testing with vitest
+
+Test better-auth apps by calling `app.handle()` directly with vitest. No browser, no build, sub-second feedback. This tests the real business logic: user creation, session validation, protected pages, server actions with auth, resource CRUD with ownership checks.
+
+Much faster than browser e2e tests and covers the important things: auth flows, authorization guards, data isolation between users, redirect behavior after mutations.
+
+**Setup:** set `AUTH_DB=:memory:` in vitest env so tests run against an in-memory SQLite database. Add a setup file that applies drizzle migrations before tests start. Enable the `bearer()` plugin so tests can authenticate with `Authorization: Bearer <token>` headers.
+
+**Pattern:** create real users via `auth.api.signUpEmail`, get bearer tokens, pass them to `createSpiceflowFetch(app, { headers })`. Call server actions with `runAction` + authed request. Assert on page renders, loader data, and redirect responses.
+
+Full working example: https://github.com/remorses/spiceflow/tree/main/example-better-auth
+
+The test file covers:
+- Public routes rendering without auth
+- Protected routes with real user sessions (signup in `beforeAll`, set `.headers`)
+- Unauthenticated access returning errors or redirects
+- Multiple users with separate fetch clients verifying data isolation
+- Server actions reading auth headers via `runAction` + custom request
+- Full workflow: create user → create org → validate redirect → dashboard renders empty → create project → dashboard shows it → delete → empty again
+- Cross-user access denial (user B cannot see user A's org)
