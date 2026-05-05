@@ -204,6 +204,52 @@ after this, classes like `bg-primary`, `text-muted-foreground`, `border-border`,
 
 define the actual values in `:root` for light mode and inside `.dark` or `@variant dark` or `@media (prefers-color-scheme: dark)` for dark mode — whichever strategy the project uses. check the existing globals.css to see which strategy is in place before adding new tokens.
 
+## shadcn CLI
+
+always use `bunx shadcn@latest` for all shadcn commands. useful commands:
+
+```bash
+# add components
+bunx shadcn@latest add button card dialog
+
+# search registries for components
+bunx shadcn@latest search @shadcn -q "sidebar"
+
+# get component docs and example URLs
+bunx shadcn@latest docs button dialog select
+
+# preview changes before adding/updating
+bunx shadcn@latest add button --dry-run
+bunx shadcn@latest add button --diff button.tsx
+
+# project info (framework, aliases, tailwind version, installed components)
+bunx shadcn@latest info --json
+
+# apply a preset theme
+bunx shadcn@latest apply a2r6bw
+```
+
+**always run `bunx shadcn@latest docs <component>` and fetch the URLs before using a component.** this ensures correct API usage rather than guessing from memory.
+
+**component selection guide:**
+
+| Need | Use |
+|------|-----|
+| Button/action | `Button` with variant |
+| Form inputs | `Input`, `Select`, `Combobox`, `Switch`, `Checkbox`, `RadioGroup`, `Textarea`, `Slider` |
+| Toggle 2-5 options | `ToggleGroup` + `ToggleGroupItem` |
+| Data display | `Table`, `Card`, `Badge`, `Avatar` |
+| Navigation | `Sidebar`, `NavigationMenu`, `Breadcrumb`, `Tabs`, `Pagination` |
+| Overlays | `Dialog` (modal), `Sheet` (side panel), `Drawer` (bottom), `AlertDialog` (confirm) |
+| Feedback | `sonner` (toast), `Alert`, `Progress`, `Skeleton`, `Spinner` |
+| Command palette | `Command` inside `Dialog` |
+| Layout | `Separator`, `Resizable`, `ScrollArea`, `Accordion`, `Collapsible` |
+| Empty states | `Empty` |
+| Menus | `DropdownMenu`, `ContextMenu`, `Menubar` |
+| Tooltips/info | `Tooltip`, `HoverCard`, `Popover` |
+
+to find all available shadcn components and their docs, fetch https://ui.shadcn.com/llms.txt
+
 ## shadcn/ui project setup
 
 when setting up shadcn/ui in a new project, install these dependencies:
