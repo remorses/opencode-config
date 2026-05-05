@@ -65,9 +65,37 @@ always prefer `@variant dark { ... }` over hardcoded `.dark` selectors for dark 
 
 **also critical**: `@variant dark` only works in CSS files processed by Tailwind — the file with `@import "tailwindcss"` and files `@import`ed from it. CSS files imported via JS `import "file.css"` are plain CSS and Tailwind directives are silently ignored. for those files, use `.dark .selector` selectors directly.
 
+## utility shorthands
+
+### `size-*` for equal width and height
+
+use `size-10` instead of `w-10 h-10` when width and height are the same. applies to icons, avatars, skeletons, containers.
+
+```html
+<!-- BAD -->
+<div class="w-10 h-10">...</div>
+<img class="w-8 h-8 rounded-full" />
+
+<!-- GOOD -->
+<div class="size-10">...</div>
+<img class="size-8 rounded-full" />
+```
+
+### `truncate` shorthand
+
+use `truncate` instead of `overflow-hidden text-ellipsis whitespace-nowrap`. single utility does the same thing.
+
+### no manual `z-index` on overlay components
+
+`Dialog`, `Sheet`, `Drawer`, `AlertDialog`, `DropdownMenu`, `Popover`, `Tooltip`, `HoverCard` handle their own stacking context. never add `z-50` or `z-[999]` to these components.
+
 ## styling preferences
 
 always prefer using tailwind for styling. use built-in tailwind colors like gray, red, green, blue, etc.
+
+**`className` for layout, not styling.** when using shadcn components, use `className` only for layout (e.g. `max-w-md`, `mx-auto`, `mt-4`). never override component colors or typography via className. to change appearance, use built-in variants (`variant="outline"`), semantic tokens (`bg-primary`), or CSS variables.
+
+**no manual `dark:` color overrides.** use semantic tokens that handle light/dark via CSS variables. write `bg-background text-foreground` not `bg-white dark:bg-gray-950`. the `dark:` variant is only acceptable for one-off layout tweaks (e.g. `dark:border-opacity-50`), never for colors that should come from the theme.
 
 **spacing: always prefer `gap` over margin/padding.** use flexbox/grid `gap` classes for spacing between sibling elements. never use `margin-top`, `margin-bottom`, `space-y-*`, or padding to create space between items in a list or stack. gap is simpler (no first/last-child overrides), composes better, and avoids margin collapse bugs. use `py-*`/`px-*` only for internal padding within a single element (e.g. inside a card), not for spacing between siblings.
 
@@ -508,6 +536,160 @@ export function SecretsTable() { ... }
 
 **when to create a new ui component:** if you find the same visual pattern (same markup structure + same tailwind classes) in 2+ places, extract it. one-off patterns can stay inline. the `components/ui/` folder is for generic, reusable primitives. domain-specific components live in `components/` without the `ui/` prefix.
 
+## shadcn icons — `data-icon` attribute
+
+in shadcn buttons, use `data-icon="inline-start"` (prefix) or `data-icon="inline-end"` (suffix) on icons. **no sizing classes on icons inside shadcn components** — they handle icon sizing via CSS.
+
+```tsx
+// BAD — manual sizing and margin
+<Button>
+  <SearchIcon className="mr-2 size-4" />
+  Search
+</Button>
+
+// GOOD — data-icon, no sizing
+<Button>
+  <SearchIcon data-icon="inline-start" />
+  Search
+</Button>
+
+<Button>
+  Next
+  <ArrowRightIcon data-icon="inline-end" />
+</Button>
+```
+
+this also applies to `DropdownMenuItem`, `Alert`, `Sidebar*` — icons inside these components need no sizing classes.
+
+## shadcn form composition
+
+### FieldGroup + Field for form layout
+
+always use `FieldGroup` + `Field` for form layout. never use raw `div` with `space-y-*` or `grid gap-*` for form fields.
+
+```tsx
+<FieldGroup>
+  <Field>
+    <FieldLabel htmlFor="email">Email</FieldLabel>
+    <Input id="email" type="email" />
+  </Field>
+  <Field>
+    <FieldLabel htmlFor="password">Password</FieldLabel>
+    <Input id="password" type="password" />
+  </Field>
+</FieldGroup>
+```
+
+use `Field orientation="horizontal"` for settings pages. use `FieldLabel className="sr-only"` for visually hidden labels.
+
+### InputGroup for buttons/icons inside inputs
+
+never use `relative` + `absolute` positioning for buttons inside inputs. use `InputGroup` + `InputGroupAddon`.
+
+```tsx
+// BAD — manual absolute positioning
+<div className="relative">
+  <Input placeholder="Search..." className="pr-10" />
+  <Button className="absolute right-0 top-0" size="icon">
+    <SearchIcon />
+  </Button>
+</div>
+
+// GOOD — InputGroup composition
+<InputGroup>
+  <InputGroupInput placeholder="Search..." />
+  <InputGroupAddon>
+    <Button size="icon">
+      <SearchIcon data-icon="inline-start" />
+    </Button>
+  </InputGroupAddon>
+</InputGroup>
+```
+
+### ToggleGroup for option sets (2-7 choices)
+
+instead of mapping `Button` with manual active state for a small set of options, use `ToggleGroup`.
+
+```tsx
+// BAD — manual active state on buttons
+const [selected, setSelected] = useState("daily")
+<div className="flex gap-2">
+  {["daily", "weekly", "monthly"].map((opt) => (
+    <Button variant={selected === opt ? "default" : "outline"} onClick={() => setSelected(opt)}>
+      {opt}
+    </Button>
+  ))}
+</div>
+
+// GOOD — ToggleGroup
+<ToggleGroup spacing={2}>
+  <ToggleGroupItem value="daily">Daily</ToggleGroupItem>
+  <ToggleGroupItem value="weekly">Weekly</ToggleGroupItem>
+  <ToggleGroupItem value="monthly">Monthly</ToggleGroupItem>
+</ToggleGroup>
+```
+
+### Field validation states
+
+use `data-invalid` on `Field` and `aria-invalid` on the control. for disabled: `data-disabled` on `Field`, `disabled` on the control.
+
+```tsx
+<Field data-invalid>
+  <FieldLabel htmlFor="email">Email</FieldLabel>
+  <Input id="email" aria-invalid />
+  <FieldDescription>Invalid email address.</FieldDescription>
+</Field>
+```
+
+## shadcn component composition rules
+
+### items always inside their Group
+
+never render items directly in a content container. always wrap in the appropriate Group component.
+
+| Item | Must be inside |
+|------|---------------|
+| `SelectItem` | `SelectGroup` |
+| `DropdownMenuItem` | `DropdownMenuGroup` |
+| `CommandItem` | `CommandGroup` |
+| `ContextMenuItem` | `ContextMenuGroup` |
+| `MenubarItem` | `MenubarGroup` |
+
+### Dialog/Sheet/Drawer always need a Title
+
+`DialogTitle`, `SheetTitle`, `DrawerTitle` are required for accessibility. use `className="sr-only"` if the title should be visually hidden.
+
+### Button loading state
+
+`Button` has no `isPending` or `isLoading` prop. compose with `Spinner` + `data-icon` + `disabled`:
+
+```tsx
+<Button disabled>
+  <Spinner data-icon="inline-start" />
+  Saving...
+</Button>
+```
+
+### asChild (radix) vs render (base)
+
+shadcn now supports two primitive libraries: `radix` and `base`. check the `base` field in `components.json`.
+
+- **radix**: use `asChild` to replace the default element
+- **base**: use `render` prop instead
+
+```tsx
+// radix
+<DialogTrigger asChild>
+  <Button>Open</Button>
+</DialogTrigger>
+
+// base
+<DialogTrigger render={<Button />}>Open</DialogTrigger>
+```
+
+### prefer unified `radix-ui` package
+
+when adding Radix primitives, prefer the unified `radix-ui` package over scoped packages like `@radix-ui/react-slot`, `@radix-ui/react-dialog`, etc. newer shadcn components use the single package.
 
 ## scroll fade edges with CSS `mask-image`
 
