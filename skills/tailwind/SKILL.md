@@ -852,6 +852,16 @@ see [scroll-fade.tsx](scroll-fade.tsx) for a ready-to-copy `ScrollFade` componen
 <ScrollFade className="h-64" bottom={false}> {/* top only */}
 ```
 
+## porting AlignUI components to shadcn
+
+AlignUI is a design system with ~90 custom semantic color tokens (`bg-white-0`, `text-strong-950`, `stroke-soft-200`, etc.). these don't match shadcn naming and prevent dropping in shadcn components.
+
+see [porting-alignui-to-shadcn.md](porting-alignui-to-shadcn.md) for the full migration guide. it uses `windlint rename` to mechanically rename all tokens to shadcn equivalents (`bg-background`, `text-foreground`, `border-border`, etc.) and rewrite `globals.css` to the standard shadcn pattern with `@theme inline` bridging.
+
+key mappings: `bg-white-0` → `background`, `text-strong-950` → `foreground`, `text-sub-600` → `muted-foreground`, `stroke-soft-200` → `border`, `primary-base` → `primary`, `error-base` → `destructive`, `static-white` → `primary-foreground`. status variant tokens (`-dark/-light/-lighter`) become opacity modifiers (`/80`, `/20`, `/10`). domain-specific statuses (`away`, `feature`, `verified`, `highlighted`, `stable`) map to raw Tailwind palette colors (`yellow`, `purple`, `sky`, `pink`, `teal`).
+
+after renaming, the project uses 17 semantic color tokens (15 standard shadcn + success, warning, info, overlay) instead of ~90.
+
 ## scrollbars
 
 always set all scrollbars styles to transparent and thin.
