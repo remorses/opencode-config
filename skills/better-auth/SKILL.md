@@ -1166,11 +1166,17 @@ Much faster than browser e2e tests and covers the important things: auth flows, 
 
 Full working example: https://github.com/remorses/spiceflow/tree/main/example-better-auth
 
-The test file covers:
-- Public routes rendering without auth
-- Protected routes with real user sessions (signup in `beforeAll`, set `.headers`)
-- Unauthenticated access returning errors or redirects
-- Multiple users with separate fetch clients verifying data isolation
-- Server actions reading auth headers via `runAction` + custom request
-- Full workflow: create user → create org → validate redirect → dashboard renders empty → create project → dashboard shows it → delete → empty again
-- Cross-user access denial (user B cannot see user A's org)
+**Use cases to test:**
+
+- Public pages render without auth (landing, login, marketing)
+- Protected pages redirect unauthenticated users to login
+- Protected API routes return 401 for unauthenticated requests
+- Authenticated users see their own data (dashboard renders user name/email)
+- Multi-step resource creation: signup → create org → redirect → dashboard → create project → verify render
+- Mutations via server actions with auth (update profile, create/delete resources)
+- Redirect behavior after mutations (action creates resource, redirects to its page)
+- **Security: unauthenticated users cannot access protected resources**
+- **Security: users cannot access resources owned by other users** (user B cannot see user A's org dashboard)
+- **Security: ownership checks on mutations** (user B cannot create/delete projects in user A's org)
+- Multiple users with separate sessions see isolated data
+- Loader data contains correct values for the authenticated user
