@@ -10,8 +10,24 @@ description: >
 
 use tailwind v4. this new tailwind version does not use tailwind.config.js. instead it does all configuration in css files.
 
-read https://tailwindcss.com/docs/upgrade-guide to understand the updates landed in tailwind v4 if you do not have tailwind v4 in your training context. ignore the parts that talk about running the upgrade cli. this project already uses tailwind v4 so no need to upgrade anything.
+read https://tailwindcss.com/docs/upgrade-guide to understand the updates landed in tailwind v4 if you do not have tailwind v4 in your training context. if the project still uses tailwind v3, see [migration-v3-to-v4.md](migration-v3-to-v4.md) for the upgrade steps and auto migration CLI.
 
+
+## Vite projects — use the Tailwind Vite plugin
+
+in Vite projects, always use `@tailwindcss/vite` instead of the PostCSS plugin. it's faster because it hooks directly into Vite's pipeline and skips the PostCSS layer entirely.
+
+```ts
+// vite.config.ts
+import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  plugins: [tailwindcss()],
+})
+```
+
+only fall back to `@tailwindcss/postcss` for non-Vite setups (Next.js, Webpack, etc.).
 
 ## design
 
