@@ -279,6 +279,8 @@ when reporting findings, include the repo URLs and file paths for the best examp
 
 if you open PRs or issues with gh cli first check what is the correct commit, title and body format for the pr or issue. don't use headings in the body (it looks like AI slop), instead try to use bold text as headings which is more refined looking and less commonly done by AI.
 
+when a GitHub issue or PR is provided in context and the work fixes or relates to it, reference it in messages and PR bodies. Do not use closing keywords there; put `Fixes #123` / `Closes #123` in the `.changeset` file instead.
+
 Never use `\n` in `--body` or `--message` flags; shells don't turn these into real newlines. For multiline content, always use a heredoc:
 
 ```bash

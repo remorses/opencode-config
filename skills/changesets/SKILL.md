@@ -19,7 +19,13 @@ Never run the `changeset` CLI command interactively. Never run `npx changeset`, 
 
 After making a noteworthy code change, create a new `.md` file inside `.changeset/` with a short descriptive kebab-case filename (e.g. `fix-boolean-query-coercion.md`). The filename should make the change recognizable in `git status` without opening the file. The file has YAML frontmatter declaring which package(s) changed and the semver bump level, followed by a markdown description.
 
-Before writing the file, check whether the change fixes any GitHub issue in the repository. Use `gh issue list --state all` and targeted searches for the user-facing problem, command name, error text, or feature name. If a matching issue exists, mention it in the changeset description with `Fixes #123` or `Closes #123` on its own line.
+Before writing the file, list the last 20 GitHub issues to see whether the change closes any of them:
+
+```bash
+gh issue list --state all --limit 20
+```
+
+If a matching issue exists, mention it in the changeset description with `Fixes #123` or `Closes #123` on its own line.
 
 ```md
 ---
@@ -50,7 +56,7 @@ template now includes a federation example.
 5. **Present tense.** Write "add support for X", "fix bug with Y", not "added" or "fixed".
 6. **One changeset per logical change.** If a PR has two unrelated changes, create two changeset files.
 7. **Use descriptive filenames.** Prefer `fix-auth-token-refresh.md` over random names like `cool-lions-dance.md`. Keep filenames concise, kebab-case, and focused on the logical change.
-8. **Check GitHub issues before writing.** Search open and closed issues for the bug, command, error text, or feature before deciding there is no issue to reference. Do not rely only on commit messages.
+8. **Check recent GitHub issues before writing.** List the last 20 issues with `gh issue list --state all --limit 20` before deciding there is no issue to reference. Do not rely only on commit messages.
 9. **Reference fixed issues.** When a change fixes a GitHub issue, include `Fixes #123` (or `Closes #123`) on its own line in the changeset description. At publish time, the `changepub` command collects these references and includes them in the release commit message body. GitHub closes the issues automatically when that commit lands on the default branch. This also creates a clickable link in the CHANGELOG for users to find context.
 
 ## What goes in the description
