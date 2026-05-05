@@ -4,7 +4,7 @@ description: >
   Changeset-based versioning workflow. Manually add .changeset/*.md files to
   describe changes instead of editing CHANGELOG.md directly. Changesets are
   consumed at publish time to bump versions and generate changelogs. Use this
-  skill when adding changesets or when a repo has a .changeset/ folder.
+  skill when adding changesets or when a repo has a .changeset/ folder. if a repo has a .changeset folder ALWAYS read this skill and write a changeset .md file when creating a commit for new feature or fix.
 ---
 
 # Changesets
