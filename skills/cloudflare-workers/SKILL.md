@@ -516,6 +516,135 @@ Deploy to preview first, then run tests against it:
 pnpm deploy && pnpm vitest --run test/integration.test.ts
 ```
 
+## Testing with Vitest inside workerd
+
+Tests run **inside the real workerd runtime** via `@cloudflare/vitest-pool-workers`. This means `env`, `waitUntil`, D1, KV, R2, Durable Objects — all Cloudflare APIs work in tests without mocks. Miniflare simulates every binding locally as in-memory state; no real Cloudflare infrastructure is needed.
+
+### vite.config.ts setup
+
+The key pattern: swap between `cloudflareTest()` (tests) and `cloudflare()` (dev/build) based on `process.env.VITEST`. Both can live in the same `vite.config.ts`.
+
+```ts
+// vite.config.ts
+import path from 'node:path'
+import { cloudflare } from '@cloudflare/vite-plugin'
+import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers'
+import spiceflow from 'spiceflow/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig(async () => {
+  // readD1Migrations runs on the Node.js side before workerd starts.
+  // Passes SQL file contents to miniflare as TEST_MIGRATIONS so the
+  // setup file can apply them inside workerd.
+  const migrations = await readD1Migrations(path.join(__dirname, 'migrations')).catch(() => [])
+
+  return {
+    plugins: [
+      process.env.VITEST
+        ? cloudflareTest({
+            wrangler: { configPath: './wrangler.jsonc' },
+            miniflare: {
+              // TEST_MIGRATIONS is a test-only binding — not in wrangler.jsonc
+              bindings: { TEST_MIGRATIONS: migrations },
+            },
+          })
+        : cloudflare({
+            viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
+          }),
+      spiceflow({ entry: './src/main.tsx' }),
+    ],
+    test: {
+      setupFiles: ['./src/apply-migrations.ts'],
+    },
+  }
+})
+```
+
+If you have no D1, omit `readD1Migrations` and the `miniflare.bindings` option entirely.
+
+### Applying D1 migrations before tests
+
+Create a setup file that runs inside workerd before each test file:
+
+```ts
+// src/apply-migrations.ts
+import { applyD1Migrations } from 'cloudflare:test'
+import { env } from 'cloudflare:workers'
+
+// Idempotent — tracks applied migrations, safe to call multiple times.
+await applyD1Migrations(env.DB, env.TEST_MIGRATIONS)
+```
+
+Add `TEST_MIGRATIONS` to your type declarations so `env.TEST_MIGRATIONS` is typed:
+
+```ts
+// src/env.d.ts
+declare namespace Cloudflare {
+  interface Env {
+    TEST_MIGRATIONS: D1Migration[]
+  }
+}
+
+interface D1Migration {
+  name: string
+  queries: string[]
+}
+```
+
+### Storage isolation model
+
+**All storage** (D1, KV, R2, Durable Objects) follows the same isolation model:
+
+- **Per test file** — each file gets a fresh storage snapshot; writes are invisible to other files
+- **Shared within a file** — tests within the same file see each other's writes
+- **Automatic reset** — workerd uses an on-disk SQLite snapshot stack: "pushes" a fresh snapshot at file start, "pops" it at file end, discarding all writes
+
+This means setup files like `apply-migrations.ts` run once per test file, applying migrations to a fresh in-memory DB each time.
+
+**Durable Objects** follow the same per-file isolation. DO instances created in one file don't exist in another. `listDurableObjectIds(namespace)` only returns IDs created within the current file's storage context.
+
+```
+pnpm test
+│
+├─ users.test.ts                   ├─ posts.test.ts
+│   Fresh D1 + fresh DO storage        Fresh D1 + fresh DO storage
+│   ├─ setup: apply migrations          ├─ setup: apply migrations
+│   ├─ test 1 writes D1/DO              ├─ test 1 writes D1/DO
+│   └─ test 2 sees test 1's state       └─ test 2 sees test 1's state
+│   (file ends → all state discarded)  (file ends → all state discarded)
+│
+│   Files run concurrently. Each sees only its own storage.
+```
+
+**If you need per-test isolation within a file:** clean up manually in `beforeEach`/`afterEach` (e.g. `DELETE FROM table` or `env.KV.delete(key)`).
+
+**If you need shared state across files** (e.g. integration tests with accumulated data): run with `--max-workers=1 --no-isolate`.
+
+**WebSockets + Durable Objects** don't work with per-file isolation. Use `--max-workers=1 --no-isolate` as a workaround.
+
+### Key test APIs
+
+**From `cloudflare:workers`:**
+
+| Import | Purpose |
+|---|---|
+| `env` | All bindings from `wrangler.jsonc` — typed via `Cloudflare.Env` |
+| `waitUntil` | Register background promises (same as `ctx.waitUntil`) |
+| `exports` | Access `exports.default.fetch()` to hit the Worker handler directly |
+
+**From `cloudflare:test`:**
+
+| Import | Purpose |
+|---|---|
+| `applyD1Migrations(db, migrations)` | Apply SQL migration files to a D1 binding |
+| `runInDurableObject(stub, callback)` | Run a callback inside a DO instance — inspect state, call methods |
+| `runDurableObjectAlarm(stub)` | Immediately fire a scheduled DO alarm |
+| `listDurableObjectIds(namespace)` | List all DO IDs created in the current file's storage context |
+| `createExecutionContext()` | Create a `ctx` object for passing to raw worker handlers |
+| `waitOnExecutionContext(ctx)` | Wait for all `ctx.waitUntil()` promises to settle |
+
+For the full reference including Queues, Workflows, and Scheduled handlers, see [Cloudflare Workers Vitest test APIs](https://developers.cloudflare.com/workers/testing/vitest-integration/test-apis/).
+
 ## Durable Objects with SQLite
 
 See the `drizzle` skill for full schema and migration conventions. Key wrangler config:
