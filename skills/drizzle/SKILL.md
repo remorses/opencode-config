@@ -502,6 +502,32 @@ type NewAccount = typeof schema.accounts.$inferInsert
 function processAccount(account: typeof schema.accounts.$inferSelect) { ... }
 ```
 
+### Enum union types
+
+For SQLite text enums, define the allowed values in the column config and derive the union type from `$inferSelect` or `$inferInsert`. Do not duplicate a separate TypeScript union next to the schema.
+
+```ts
+export const botTokens = sqliteCore.sqliteTable('bot_tokens', {
+  botMode: sqliteCore
+    .text('bot_mode', { enum: ['self_hosted', 'gateway'] })
+    .notNull()
+    .default('self_hosted'),
+})
+
+export type BotMode = typeof botTokens.$inferSelect.botMode
+// "self_hosted" | "gateway"
+```
+
+Use the same pattern for status and preference columns:
+
+```ts
+export type VerbosityLevel = typeof channelVerbosity.$inferSelect.verbosity
+export type WorktreeStatus = typeof threadWorktrees.$inferSelect.status
+export type ThreadSessionSource = typeof threadSessions.$inferSelect.source
+```
+
+SQLite does not enforce these enum values at runtime. `text({ enum: [...] })` only affects TypeScript insert/select inference. Add a `CHECK` constraint manually only when database-level enforcement is actually needed.
+
 ## Zod schema generation
 
 Docs: https://orm.drizzle.team/docs/zod
