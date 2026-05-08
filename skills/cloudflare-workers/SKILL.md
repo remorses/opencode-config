@@ -673,6 +673,8 @@ For exact per-entity counters (API call tracking, usage-based billing, hard rate
 
 **Full implementation:** copy `./usage-counter-do.ts` (bundled with this skill) into your project. No external dependencies.
 
+Usage is stored as append-only event rows with timestamps, so you can query any time window (current billing month, last 7 days, all time). Totals are derived by summing rows.
+
 ```ts
 import { env } from 'cloudflare:workers'
 import type { UsageCounter } from './usage-counter-do.ts'
@@ -682,12 +684,21 @@ function getUsageStub(projectId: string) {
   return env.USAGE_COUNTER.get(id) as DurableObjectStub<UsageCounter>
 }
 
-const count = await getUsageStub('proj_123').increment('api-calls')
-const counts = await getUsageStub('proj_123').getAllCounts()
-await getUsageStub('proj_123').resetAll()
+// Record usage events
+await getUsageStub('proj_123').record('api-calls')
+await getUsageStub('proj_123').record('tokens', 1500)
+
+// Query totals for a billing window
+const monthStart = new Date('2026-07-01').getTime()
+const apiCalls = await getUsageStub('proj_123').getTotalSince('api-calls', monthStart)
+const breakdown = await getUsageStub('proj_123').getBreakdownSince(monthStart)
+
+// Prune old events to keep storage small
+const threeMonthsAgo = Date.now() - 90 * 24 * 60 * 60 * 1000
+await getUsageStub('proj_123').pruneOlderThan(threeMonthsAgo)
 ```
 
-The DO hibernates after 10s of inactivity, so each increment only costs the few ms of execution time. At $0.15/million requests and negligible duration, this is much cheaper than KV ($5/million writes) and fully atomic unlike KV's eventually-consistent read-modify-write.
+The DO hibernates after 10s of inactivity, so each write only costs the few ms of execution time. At $0.15/million requests and negligible duration, this is much cheaper than KV ($5/million writes) and fully atomic unlike KV's eventually-consistent read-modify-write.
 
 For **approximate** usage tracking (dashboards, analytics), use Analytics Engine instead. It handles sampling and high cardinality but doesn't give exact counts.
 
