@@ -636,6 +636,23 @@ accountId: s.text('account_id')
   .references(() => accounts.id, { onDelete: 'cascade' }),
 ```
 
+### `.references()` vs `defineRelations()` — use both
+
+These are two separate layers that serve different purposes:
+
+| | `.references()` | `defineRelations()` |
+|---|---|---|
+| **What it does** | Generates a `FOREIGN KEY` constraint in the DDL migration SQL | Tells drizzle's query builder how to JOIN tables |
+| **Enforced by** | The database engine | Application code (drizzle) |
+| **Generates DDL** | Yes (`REFERENCES org(id) ON DELETE CASCADE`) | No |
+| **Enables `db.query` `with`** | No | Yes |
+| **Cascade deletes** | Yes, at DB level | No |
+| **Catches orphaned rows** | Yes, rejects invalid inserts | No |
+
+**Always use both.** `.references()` enforces data integrity at the database level; `defineRelations()` enables drizzle's relational query API (`db.query` with `with: { ... }`). Dropping `.references()` means the DB won't reject orphaned foreign keys. Dropping `defineRelations()` means `db.query` won't know how to join.
+
+You *can* have `defineRelations` without `.references()` (some databases like PlanetScale MySQL don't support FK constraints), but for SQLite/D1 and Postgres, always add both.
+
 ### Always define relations — both sides
 
 Even if you only query one direction. This enables `db.query` `with` nesting. Define at the bottom of the same schema file:
