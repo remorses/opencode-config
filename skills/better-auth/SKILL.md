@@ -113,6 +113,8 @@ export const auth = betterAuth({
 
 `BETTER_AUTH_URL` is **always a secret**, never a plain env var or hardcoded value. It differs per environment: dev uses `http://localhost:3000`, preview uses the preview deploy URL, production uses the real domain. Treat it the same as `BETTER_AUTH_SECRET`.
 
+**`BETTER_AUTH_URL` must match the Origin header the browser sends.** BetterAuth validates the `Origin` header on every `/api/auth/*` request against the configured `baseURL`. If they don't match, you get `403 {"message":"Invalid origin","code":"INVALID_ORIGIN"}`. This commonly happens when secrets management tools (Sigillo, Doppler) inject the production URL during local dev. Set it correctly in sigillo or doppler with BETTER_AUTH_URL secret. Or use a wrangler.json vars variable. Also make sure sigillo is configured to the dev env locally, check with `sigillo me`
+
 For Cloudflare Workers, put both in `secrets.required` in `wrangler.jsonc`:
 
 ```jsonc
@@ -596,28 +598,39 @@ import { deviceAuthorization, bearer } from 'better-auth/plugins'
 export const auth = betterAuth({
   // ...
   plugins: [
-    deviceAuthorization({ verificationUri: '/device' }),
+    deviceAuthorization({ verificationUri: '/device', schema: {} }),
     bearer(), // needed so the CLI can use the session token as a Bearer header
   ],
 })
 ```
 
+**IMPORTANT: pass `schema: {}` to `deviceAuthorization()`.** In `better-auth@1.6.9+`, the plugin's Zod options schema has `schema: z.custom(() => true)` which is non-optional. Without passing it, the plugin throws a ZodError at init time: `"expected": "nonoptional", "path": ["schema"]`. The `schema` field is only for user-provided table overrides and the plugin merges it with its built-in schema via `mergeSchema()`. Passing an empty object is safe and satisfies the validator. No `as any` cast needed; the published types accept `{}`.
+
+```
+// Error without schema field:
+// ZodError: [{ "code": "invalid_type", "expected": "nonoptional",
+//   "path": ["schema"], "message": "Invalid input: ..." }]
+//   at deviceAuthorization (better-auth/dist/plugins/device-authorization/index.mjs)
+```
+```
+
 **Schema:** The plugin requires a `device_code` table. Generate it with `pnpm dlx auth@latest generate`. The table stores device codes, user codes, expiry, and approval status.
 
 ```ts
-export const deviceCode = sqliteTable('device_code', {
-  id: text('id').primaryKey().notNull().$defaultFn(() => ulid()),
-  deviceCode: text('device_code').notNull().unique(),
-  userCode: text('user_code').notNull().unique(),
-  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+// import * as s from 'drizzle-orm/sqlite-core'
+export const deviceCode = s.sqliteTable('device_code', {
+  id: s.text('id').primaryKey().notNull().$defaultFn(() => ulid()),
+  deviceCode: s.text('device_code').notNull().unique(),
+  userCode: s.text('user_code').notNull().unique(),
+  userId: s.text('user_id').references(() => user.id, { onDelete: 'cascade' }),
   expiresAt: epochMs('expires_at').notNull(),
-  status: text('status', {
+  status: s.text('status', {
     enum: ['pending', 'approved', 'denied', 'expired'],
   }).notNull().default('pending'),
   lastPolledAt: epochMs('last_polled_at'),
-  pollingInterval: integer('polling_interval', { mode: 'number' }),
-  clientId: text('client_id'),
-  scope: text('scope'),
+  pollingInterval: s.integer('polling_interval', { mode: 'number' }),
+  clientId: s.text('client_id'),
+  scope: s.text('scope'),
 })
 ```
 
@@ -801,12 +814,13 @@ A standalone login page that redirects to the dashboard if already authenticated
 
   .page('/login', async ({ loaderData }) => {
     if (loaderData.session) return redirect('/')
+    const { LoginButton } = await import('./components/login-button')
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <div className="text-center max-w-sm">
           <h1 className="text-2xl font-bold tracking-tight mb-2">My App</h1>
           <p className="text-muted-foreground mb-6">Sign in to continue</p>
-          <LoginButton />
+          <LoginButton callbackURL="/" />
         </div>
       </div>
     )
@@ -820,7 +834,7 @@ A standalone login page that redirects to the dashboard if already authenticated
 import { useState } from 'react'
 import { authClient } from '../lib/auth-client'
 
-export function LoginButton() {
+export function LoginButton({ callbackURL = '/' }: { callbackURL?: string }) {
   const [loading, setLoading] = useState(false)
 
   return (
@@ -829,7 +843,7 @@ export function LoginButton() {
         setLoading(true)
         await authClient.signIn.social({
           provider: 'google',
-          callbackURL: '/',
+          callbackURL,
         })
       }}
       disabled={loading}
@@ -1047,8 +1061,9 @@ BetterAuth passes `Date` objects for timestamp columns (`createdAt`, `updatedAt`
 **Do not use `new Proxy` to wrap D1.** Instead, use a drizzle `customType` called `epochMs` for all timestamp columns. It stores epoch milliseconds as integers (same SQL type, no migration needed) but converts `Date → date.getTime()` in drizzle's `toDriver` hook before values reach D1. See the `drizzle` skill's "Timestamps" section for the full implementation.
 
 ```ts
+// import * as s from 'drizzle-orm/sqlite-core'
 // Use epochMs instead of integer({ mode: 'number' }) for timestamps
-const user = sqliteTable('user', {
+const user = s.sqliteTable('user', {
   createdAt: epochMs('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: epochMs('updated_at').notNull().$defaultFn(() => Date.now()),
 })
@@ -1064,6 +1079,7 @@ export function getDb() {
 **Why not `integer({ mode: 'timestamp_ms' })`?** This changes the TypeScript type from `number` to `Date`, requiring changes across the entire codebase. API JSON responses would serialize as ISO strings instead of epoch numbers, breaking CLI clients.
 
 This issue is tracked in https://github.com/better-auth/better-auth/issues/8882 (PR #8913 adds `supportsDates: false` for SQLite but converts to ISO strings, not epoch numbers, so it doesn't help for integer timestamp schemas).
+
 
 ## Cloudflare Workers
 

@@ -509,11 +509,13 @@ each paragraph should ideally have a code snippet example or diagram. it's much 
 
 use bold to mark important key words in each paragraph to make it easy for the user to skim the content.
 
-never use emdashes, they are over used by AIs, we want to sound human-like and not AI generated. Instead of using emdash use dots, semicolons and commas, which can accomplish the same goal. Keep phrases short and easy to read. Use bold to mark important words. Ideally one per paragraph. Paragraphs should be short, no wall of text. 
+never use emdashes, they are over used by AIs, we want to sound human-like and not AI generated. Instead of using emdash use dots, semicolons and commas, which can accomplish the same goal. Keep phrases short and easy to read. Use bold to mark important words. Ideally one per paragraph. Paragraphs should be short, no wall of text.
+
+**split long sections.** if a `##` section grows beyond ~5 paragraphs or ~3 code blocks, split it into `###` subsections with short headings. readers should never have to scroll through a wall of content under a single heading.
 
 ### diagrams in markdown
 
-make heavy use of ASCII diagrams inside code blocks to explain architecture, flows, and relationships. diagrams should try to cover the full width of the page, which is about **100 characters**. don't cram everything into narrow 50-char diagrams. never go over 100 characters per line.
+make heavy use of ASCII diagrams inside code blocks to explain architecture, flows, and relationships. diagrams should try to cover the full width of the page, which is about **94 characters**. don't cram everything into narrow 50-char diagrams. never go over 94 characters per line.
 
 prefer a **varied, organic layout**. not every label needs to be inside a box. mix plain text labels, boxes for major components, and directional arrows (►, ◄, ▼, ▲) for connections. avoid perfectly symmetric grid layouts; asymmetric fanouts and side annotations look more natural and are easier to read.
 

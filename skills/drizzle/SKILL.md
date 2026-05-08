@@ -113,11 +113,22 @@ Always use namespace imports to avoid polluting local scope with generic names l
 
 ```ts
 import * as orm from 'drizzle-orm'
-import * as sqliteCore from 'drizzle-orm/sqlite-core'
-import * as pgCore from 'drizzle-orm/pg-core'
-
-// use orm.eq, orm.and, sqliteCore.sqliteTable, etc.
+import * as s from 'drizzle-orm/sqlite-core'
+import * as p from 'drizzle-orm/pg-core'
 ```
+
+**Use short single-letter aliases for dialect modules in schema files.** Schema files are dominated by column/table/index definitions; you write `s.text`, `s.integer`, `s.sqliteTable`, `s.index` dozens of times per file. The shorter prefix keeps the schema scannable and lets the actual column definitions stand out instead of the namespace:
+
+```ts
+export const user = s.sqliteTable('user', {
+  id: s.text('id').primaryKey(),
+  name: s.text('name').notNull(),
+  role: s.text('role', { enum: ['admin', 'member'] }).notNull(),
+  createdAt: s.integer('created_at', { mode: 'number' }).notNull(),
+})
+```
+
+Same for Postgres: `p.pgTable`, `p.text`, `p.pgEnum`, `p.index`.
 
 Never destructure — `import { eq, and, text } from 'drizzle-orm'` is banned.
 
@@ -152,26 +163,26 @@ Pass both `schema` and `relations` to `drizzle()`:
 
 ```ts
 // Tables
-const users = sqliteTable('users', {
-  id: text('id').primaryKey().$defaultFn(() => ulid()),
-  name: text('name').notNull(),
+const users = s.sqliteTable('users', {
+  id: s.text('id').primaryKey().$defaultFn(() => ulid()),
+  name: s.text('name').notNull(),
 })
 
-const orgs = sqliteTable('orgs', {
-  id: text('id').primaryKey().$defaultFn(() => ulid()),
-  name: text('name').notNull(),
+const orgs = s.sqliteTable('orgs', {
+  id: s.text('id').primaryKey().$defaultFn(() => ulid()),
+  name: s.text('name').notNull(),
 })
 
 // Junction table — cascade both sides so deleting a user or org cleans up memberships
-const orgUsers = sqliteTable('org_users', {
-  id: text('id').primaryKey().$defaultFn(() => ulid()),
-  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  orgId: text('org_id').notNull().references(() => orgs.id, { onDelete: 'cascade' }),
-  role: text('role', { enum: ['owner', 'admin', 'member'] }).notNull().default('member'),
-  createdAt: integer('created_at', { mode: 'number' }).notNull(),
+const orgUsers = s.sqliteTable('org_users', {
+  id: s.text('id').primaryKey().$defaultFn(() => ulid()),
+  userId: s.text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  orgId: s.text('org_id').notNull().references(() => orgs.id, { onDelete: 'cascade' }),
+  role: s.text('role', { enum: ['owner', 'admin', 'member'] }).notNull().default('member'),
+  createdAt: s.integer('created_at', { mode: 'number' }).notNull(),
 }, (table) => [
-  index('org_users_user_id_idx').on(table.userId),
-  index('org_users_org_id_idx').on(table.orgId),
+  s.index('org_users_user_id_idx').on(table.userId),
+  s.index('org_users_org_id_idx').on(table.orgId),
 ])
 
 // Relations — both sides get many-to-many via through
@@ -507,8 +518,8 @@ function processAccount(account: typeof schema.accounts.$inferSelect) { ... }
 For SQLite text enums, define the allowed values in the column config and derive the union type from `$inferSelect` or `$inferInsert`. Do not duplicate a separate TypeScript union next to the schema.
 
 ```ts
-export const botTokens = sqliteCore.sqliteTable('bot_tokens', {
-  botMode: sqliteCore
+export const botTokens = s.sqliteTable('bot_tokens', {
+  botMode: s
     .text('bot_mode', { enum: ['self_hosted', 'gateway'] })
     .notNull()
     .default('self_hosted'),
@@ -600,8 +611,8 @@ Use ULID for primary keys — sortable, unique, human-readable, no collisions:
 ```ts
 import { ulid } from 'ulid'
 
-const accounts = sqliteTable('accounts', {
-  id: text('id').primaryKey().notNull().$defaultFn(() => ulid()),
+const accounts = s.sqliteTable('accounts', {
+  id: s.text('id').primaryKey().notNull().$defaultFn(() => ulid()),
   // ...
 })
 ```
@@ -609,8 +620,8 @@ const accounts = sqliteTable('accounts', {
 For Postgres:
 
 ```ts
-const accounts = pgTable('accounts', {
-  id: pgCore.text('id').primaryKey().notNull().$defaultFn(() => ulid()),
+const accounts = p.pgTable('accounts', {
+  id: p.text('id').primaryKey().notNull().$defaultFn(() => ulid()),
   // ...
 })
 ```
@@ -620,7 +631,7 @@ const accounts = pgTable('accounts', {
 Always set `onDelete: 'cascade'` on child references so deleting a parent cleans up children:
 
 ```ts
-accountId: text('account_id')
+accountId: s.text('account_id')
   .notNull()
   .references(() => accounts.id, { onDelete: 'cascade' }),
 ```
@@ -649,14 +660,14 @@ export const relations = defineRelations({ accounts, boards }, (r) => ({
 Drizzle does not auto-index foreign keys. Add explicit indexes:
 
 ```ts
-const boards = sqliteTable('boards', {
-  id: text('id').primaryKey().notNull(),
-  accountId: text('account_id')
+const boards = s.sqliteTable('boards', {
+  id: s.text('id').primaryKey().notNull(),
+  accountId: s.text('account_id')
     .notNull()
     .references(() => accounts.id, { onDelete: 'cascade' }),
   // ...
 }, (table) => [
-  index('boards_account_id_idx').on(table.accountId),
+  s.index('boards_account_id_idx').on(table.accountId),
 ])
 ```
 
@@ -666,19 +677,19 @@ Booleans are not extensible. Use enums:
 
 ```ts
 // BAD
-isActive: integer('is_active', { mode: 'boolean' }),
-isArchived: integer('is_archived', { mode: 'boolean' }),
+isActive: s.integer('is_active', { mode: 'boolean' }),
+isArchived: s.integer('is_archived', { mode: 'boolean' }),
 
 // GOOD — one column, extensible, self-documenting
-status: text('status', { enum: ['active', 'archived', 'suspended'] }).notNull().default('active'),
+status: s.text('status', { enum: ['active', 'archived', 'suspended'] }).notNull().default('active'),
 ```
 
 For Postgres use `pgEnum`:
 
 ```ts
-const statusEnum = pgCore.pgEnum('status', ['active', 'archived', 'suspended'])
+const statusEnum = p.pgEnum('status', ['active', 'archived', 'suspended'])
 
-const accounts = pgTable('accounts', {
+const accounts = p.pgTable('accounts', {
   status: statusEnum('status').notNull().default('active'),
 })
 ```
@@ -689,16 +700,16 @@ Never store structured domain data as `JSON.stringify()` in a text column. Creat
 
 ```ts
 // BAD — loses all type safety, can't query/index/constrain
-trackedRepos: text('tracked_repos').notNull().default('[]'),
+trackedRepos: s.text('tracked_repos').notNull().default('[]'),
 // usage: JSON.parse(row.trackedRepos) as string[]  // unsafe cast
 
 // GOOD — proper table with foreign key, indexable, type-safe
-const trackedRepos = sqliteTable('tracked_repos', {
-  id: text('id').primaryKey().$defaultFn(() => ulid()),
-  boardId: text('board_id').notNull().references(() => boards.id, { onDelete: 'cascade' }),
-  repoUrl: text('repo_url').notNull(),
+const trackedRepos = s.sqliteTable('tracked_repos', {
+  id: s.text('id').primaryKey().$defaultFn(() => ulid()),
+  boardId: s.text('board_id').notNull().references(() => boards.id, { onDelete: 'cascade' }),
+  repoUrl: s.text('repo_url').notNull(),
 }, (table) => [
-  index('tracked_repos_board_id_idx').on(table.boardId),
+  s.index('tracked_repos_board_id_idx').on(table.boardId),
 ])
 ```
 
@@ -706,17 +717,17 @@ Exception: truly unstructured/opaque data (raw API responses for debugging) can 
 
 ### Timestamps
 
-Postgres: `pgCore.timestamp('created_at').defaultNow().notNull()`.
+Postgres: `p.timestamp('created_at').defaultNow().notNull()`.
 
 SQLite with D1: use a `customType` called `epochMs` instead of `integer({ mode: 'number' })`. This is required because BetterAuth passes `Date` objects as bind parameters, but D1 only accepts `string | number | null | ArrayBuffer`. The `epochMs` type converts `Date → date.getTime()` via drizzle's `toDriver` hook while keeping the TypeScript type as `number`.
 
 ```ts
-import * as sqliteCore from 'drizzle-orm/sqlite-core'
+import * as s from 'drizzle-orm/sqlite-core'
 
 // Integer column that stores epoch milliseconds as a plain number.
 // Unlike integer({ mode: 'number' }), this accepts Date objects in toDriver
 // so BetterAuth's internal Date params don't crash D1's .bind().
-export const epochMs = sqliteCore.customType<{ data: number; driverParam: number }>({
+export const epochMs = s.customType<{ data: number; driverParam: number }>({
   dataType() { return 'integer' },
   toDriver(value: unknown): number {
     if (value instanceof Date) return value.getTime()
@@ -726,8 +737,8 @@ export const epochMs = sqliteCore.customType<{ data: number; driverParam: number
 })
 
 // Usage:
-const user = sqliteCore.sqliteTable('user', {
-  id: sqliteCore.text('id').primaryKey(),
+const user = s.sqliteTable('user', {
+  id: s.text('id').primaryKey(),
   createdAt: epochMs('created_at').notNull().$defaultFn(() => Date.now()),
   updatedAt: epochMs('updated_at').notNull().$defaultFn(() => Date.now()),
 })
