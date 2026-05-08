@@ -513,6 +513,8 @@ never use emdashes, they are over used by AIs, we want to sound human-like and n
 
 **split long sections.** if a `##` section grows beyond ~5 paragraphs or ~3 code blocks, split it into `###` subsections with short headings. readers should never have to scroll through a wall of content under a single heading.
 
+**only show good examples.** never use BAD/GOOD comparisons in docs and skills. just show the correct pattern directly. this keeps documents concise and avoids doubling the length of every code block. the reader only needs to know what to do, not what to avoid.
+
 ### diagrams in markdown
 
 make heavy use of ASCII diagrams inside code blocks to explain architecture, flows, and relationships. diagrams should try to cover the full width of the page, which is about **94 characters**. don't cram everything into narrow 50-char diagrams. never go over 94 characters per line.

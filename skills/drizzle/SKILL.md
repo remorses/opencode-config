@@ -611,8 +611,8 @@ Use ULID for primary keys — sortable, unique, human-readable, no collisions:
 ```ts
 import { ulid } from 'ulid'
 
-const accounts = s.sqliteTable('accounts', {
-  id: s.text('id').primaryKey().notNull().$defaultFn(() => ulid()),
+const projects = s.sqliteTable('projects', {
+  projectId: s.text('project_id').primaryKey().notNull().$defaultFn(() => ulid()),
   // ...
 })
 ```
@@ -620,10 +620,49 @@ const accounts = s.sqliteTable('accounts', {
 For Postgres:
 
 ```ts
-const accounts = p.pgTable('accounts', {
-  id: p.text('id').primaryKey().notNull().$defaultFn(() => ulid()),
+const projects = p.pgTable('projects', {
+  projectId: p.text('project_id').primaryKey().notNull().$defaultFn(() => ulid()),
   // ...
 })
+```
+
+### Table-specific ID columns
+
+**Always name primary key columns after the table**, not just `id`. For example, the `projects` table uses `projectId`, the `accounts` table uses `accountId`, the `environments` table uses `environmentId`.
+
+This makes joins, filters, and relations self-documenting. When you see `projectId` in a child table, you immediately know which table it references. The FK column name matches the referenced PK column name, so you never have to mentally map between different names.
+
+```ts
+const projects = s.sqliteTable('projects', {
+  projectId: s.text('project_id').primaryKey().$defaultFn(() => ulid()),
+  name: s.text('name').notNull(),
+})
+
+const environments = s.sqliteTable('environments', {
+  environmentId: s.text('environment_id').primaryKey().$defaultFn(() => ulid()),
+  projectId: s.text('project_id').notNull().references(() => projects.projectId, { onDelete: 'cascade' }),
+})
+
+// filters use the same name as the referenced PK, shorthand works naturally
+await db.query.environments.findMany({ where: { projectId } })
+
+// relations use the same name on both sides
+export const relations = defineRelations({ projects, environments }, (r) => ({
+  projects: {
+    environments: r.many.environments(),
+  },
+  environments: {
+    project: r.one.projects({
+      from: r.environments.projectId,
+      to: r.projects.projectId,
+    }),
+  },
+}))
+
+// writes are also consistent
+await db.update(schema.projects)
+  .set({ name: 'New Name' })
+  .where(orm.eq(schema.projects.projectId, projectId))
 ```
 
 ### Foreign keys with cascade delete
@@ -633,7 +672,7 @@ Always set `onDelete: 'cascade'` on child references so deleting a parent cleans
 ```ts
 accountId: s.text('account_id')
   .notNull()
-  .references(() => accounts.id, { onDelete: 'cascade' }),
+  .references(() => accounts.accountId, { onDelete: 'cascade' }),
 ```
 
 ### `.references()` vs `defineRelations()` — use both
@@ -666,7 +705,7 @@ export const relations = defineRelations({ accounts, boards }, (r) => ({
   boards: {
     account: r.one.accounts({
       from: r.boards.accountId,
-      to: r.accounts.id,
+      to: r.accounts.accountId,
     }),
   },
 }))
@@ -678,10 +717,10 @@ Drizzle does not auto-index foreign keys. Add explicit indexes:
 
 ```ts
 const boards = s.sqliteTable('boards', {
-  id: s.text('id').primaryKey().notNull(),
+  boardId: s.text('board_id').primaryKey().notNull().$defaultFn(() => ulid()),
   accountId: s.text('account_id')
     .notNull()
-    .references(() => accounts.id, { onDelete: 'cascade' }),
+    .references(() => accounts.accountId, { onDelete: 'cascade' }),
   // ...
 }, (table) => [
   s.index('boards_account_id_idx').on(table.accountId),
