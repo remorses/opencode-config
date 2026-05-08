@@ -667,6 +667,30 @@ See the `drizzle` skill for full schema and migration conventions. Key wrangler 
 
 The `rules` entry is required for drizzle DO migrations — imports `.sql` files as text.
 
+### Usage counter pattern (exact billing / rate limiting)
+
+For exact per-entity counters (API call tracking, usage-based billing, hard rate limits), use a Durable Object with SQLite storage. Each entity (project, user, org) gets its own DO instance via `idFromName()`, so counters are isolated and increments are atomic SQL statements with no read-modify-write races.
+
+**Full implementation:** copy `./usage-counter-do.ts` (bundled with this skill) into your project. No external dependencies.
+
+```ts
+import { env } from 'cloudflare:workers'
+import type { UsageCounter } from './usage-counter-do.ts'
+
+function getUsageStub(projectId: string) {
+  const id = env.USAGE_COUNTER.idFromName(projectId)
+  return env.USAGE_COUNTER.get(id) as DurableObjectStub<UsageCounter>
+}
+
+const count = await getUsageStub('proj_123').increment('api-calls')
+const counts = await getUsageStub('proj_123').getAllCounts()
+await getUsageStub('proj_123').resetAll()
+```
+
+The DO hibernates after 10s of inactivity, so each increment only costs the few ms of execution time. At $0.15/million requests and negligible duration, this is much cheaper than KV ($5/million writes) and fully atomic unlike KV's eventually-consistent read-modify-write.
+
+For **approximate** usage tracking (dashboards, analytics), use Analytics Engine instead. It handles sampling and high cardinality but doesn't give exact counts.
+
 ## Memoizing slow operations with the Cache API
 
 Workers run globally on 300+ datacenters, but your database (D1, Postgres, etc.) lives in one region. Cross-region reads can be 50-200ms. Use the Cache API (`caches.default`) to memoize slow lookups at the edge so repeated reads from the same datacenter are ~1-5ms.
