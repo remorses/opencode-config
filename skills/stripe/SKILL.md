@@ -1,32 +1,51 @@
 ---
 name: stripe
 description: >
-  Stripe billing patterns used in unframer-private. Covers creating products
-  and prices via the Stripe CLI with stable lookup keys, multi-currency USD+EUR
-  pricing, monthly/yearly subscriptions, type-safe Checkout and Billing Portal
-  integration in spiceflow routes, webhook handling, and the rules for
+  Stripe billing patterns for spiceflow + Drizzle apps. Covers creating
+  products and prices via the Stripe CLI with stable lookup keys, multi-currency
+  USD+EUR pricing, monthly/yearly subscriptions, type-safe Checkout and Billing
+  Portal integration in spiceflow routes, webhook handling, and the rules for
   preventing double customers and double subscriptions in the database. Load
   this skill whenever adding, modifying, or debugging any Stripe code (prices,
-  checkout sessions, portal sessions, webhooks, subscription logic) in this
-  repo.
+  checkout sessions, portal sessions, webhooks, subscription logic).
 ---
 
 # Stripe
 
-This repo uses **Stripe Checkout** for new purchases and the **Stripe Billing Portal** for subscription management (upgrade, downgrade, cancel, switch monthly↔yearly). We do not build our own billing UI.
+Use **Stripe Checkout** for new purchases and the **Stripe Billing Portal** for subscription management (upgrade, downgrade, cancel, switch monthly↔yearly). Do not build a custom billing UI.
 
 Core rules, in priority order:
 
 1. **One Stripe customer per `Org`**. Store the customer id in `Org.stripeCustomerId` and reuse it on every checkout/portal call.
-2. **Never hardcode `price_xxx` ids** in app code. Use **`lookup_key`** and fetch prices at runtime.
+2. **Prefer `lookup_key`** over hardcoded `price_xxx` ids. Fetch prices at runtime when possible.
 3. **Every Price uses `currency_options` for EUR** on top of a USD base. Same integer value for both — see [Multi-currency](#multi-currency).
 4. **One active Subscription row per `Org`**. Before creating a checkout session, check the DB and redirect existing subscribers to the portal instead.
 5. **All Stripe-facing HTTP code lives inside spiceflow sub-apps** (`website/src/lib/spiceflow-*.tsx`). Not react-router actions. The webhook route is also a spiceflow route — spiceflow handlers receive a standard `Request` object, so `await request.text()` gives the raw body needed for Stripe's signature verification.
 6. **Return errors as values, never throw.** All Stripe/Drizzle calls are wrapped with `.catch()` into tagged errore errors (`StripeApiError`, `DbError`, `PriceNotFoundError`, etc.). `constructEvent` and other sync-throwing APIs go through `errore.try`. Handlers check `instanceof Error`, early-return, and map errors to HTTP responses via `errore.matchError` at the HTTP boundary only. **Always read the [errore skill](../errore/SKILL.md) before writing or modifying error handling code in Stripe routes** — it covers tagged errors, `.catch()` boundary rules, flat control flow, cause chains, and the `matchError` exhaustive handler.
 
+## CLI auth and multiple accounts
+
+The Stripe CLI stores credentials in `~/.config/stripe/config.toml`. By default, `stripe login` writes to a `[default]` section and all commands use it.
+
+For **multiple Stripe accounts** (e.g. separate stores, test vs prod, client projects), use `--project-name` to namespace each one:
+
+```bash
+stripe login --project-name=myapp-prod
+stripe login --project-name=myapp-sandbox
+```
+
+This creates separate sections in `config.toml`. Then pass `--project-name` on every command to target the right account:
+
+```bash
+stripe products create --name="Pro" --project-name=myapp-prod
+stripe listen --forward-to http://localhost:8040/api/webhook --project-name=myapp-prod
+```
+
+Without `--project-name`, the CLI uses `[default]`. All CLI commands in this skill omit it for brevity; add it when working with multiple accounts.
+
 ## Env vars
 
-This repo runs on **Vite + spiceflow**, not Next.js. Vite does not expose `process.env` to client code — in the browser you must use `import.meta.env.VITE_*`, and only variables prefixed `VITE_` are inlined into the client bundle. On the server (Node.js) `process.env` works normally.
+For **Vite + spiceflow** apps (not Next.js): Vite does not expose `process.env` to client code — in the browser you must use `import.meta.env.VITE_*`, and only variables prefixed `VITE_` are inlined into the client bundle. On the server (Node.js) `process.env` works normally.
 
 Only three Stripe env vars should exist. The publishable key is the only one that runs in the browser:
 
@@ -56,7 +75,7 @@ const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
 
 **Never prefix `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` with `VITE_`.** Anything starting with `VITE_` is inlined into the client bundle and visible in devtools. If you accidentally rename the secret key to `VITE_STRIPE_SECRET_KEY`, you leak it to every visitor.
 
-**Never add `STRIPE_PRICE_ID_FOO` env vars for each plan.** They bind code to a specific Stripe account at deploy time and block acquisition-readiness. Use `lookup_key` instead and the code stays identical across accounts.
+**Prefer `lookup_key` over `STRIPE_PRICE_ID_FOO` env vars for each plan.** Env vars bind code to a specific Stripe account at deploy time. With `lookup_key` the code stays identical across accounts.
 
 ### TypeScript types for `import.meta.env`
 
@@ -98,7 +117,7 @@ Copy the `whsec_...` it prints and set `STRIPE_WEBHOOK_SECRET` in `.env.local`. 
 
 ## Creating products and prices via CLI
 
-**Always use `lookup_key`** so app code references a stable string instead of a generated `price_xxx` id. This makes it safe to rotate prices, migrate accounts, or change numbers without redeploys.
+**Prefer `lookup_key`** so app code references a stable string instead of a generated `price_xxx` id. This makes it safe to rotate prices, migrate accounts, or change numbers without redeploys.
 
 ### Naming convention
 
@@ -221,85 +240,6 @@ Existing subscriptions stay on the old price. New checkouts use the new price. N
 
 If Step 2 fails (for example because `transfer_lookup_key` isn't supported on that price type), the old price still owns the lookup key and nothing is broken — you can safely delete the dangling new price via `stripe prices update $NEW_PRICE -d active=false` and retry.
 
-## Looking up prices by lookup_key at runtime
-
-Never hardcode `price_xxx`. Create a typed helper and cache the lookup inside a module. All functions follow the [errore](../errore/SKILL.md) convention — return errors as values, never throw.
-
-```ts
-// website/src/lib/stripe.ts
-import Stripe from 'stripe'
-import * as errore from 'errore'
-import { env } from 'website/src/lib/env'
-
-export const stripe = new Stripe(env.STRIPE_SECRET_KEY!, {})
-
-// Domain errors for every Stripe-adjacent failure. Each call site
-// ends up with a typed union like `StripeApiError | PriceNotFoundError | T`
-// so callers can branch exhaustively via matchError.
-export class StripeApiError extends errore.createTaggedError({
-  name: 'StripeApiError',
-  message: 'Stripe API call failed: $operation',
-}) {}
-
-export class PriceNotFoundError extends errore.createTaggedError({
-  name: 'PriceNotFoundError',
-  message: 'Stripe price with lookup_key=$lookupKey not found. Create it with the CLI — see skills/stripe/SKILL.md.',
-}) {}
-
-// The complete list of lookup keys used in the app. Adding a new plan
-// means adding a new member here and creating it via the CLI — nothing else.
-export const priceLookupKeys = [
-  'pro_monthly',
-  'pro_yearly',
-] as const
-
-export type PriceLookupKey = (typeof priceLookupKeys)[number]
-
-// Module-level cache as a Promise so concurrent callers share one in-flight
-// request. On error, reset to null so the next call retries.
-type PriceCache = Map<PriceLookupKey, Stripe.Price>
-let priceCachePromise: Promise<PriceCache | StripeApiError> | null = null
-
-async function loadPriceCache(): Promise<PriceCache | StripeApiError> {
-  const response = await stripe.prices
-    .list({
-      lookup_keys: [...priceLookupKeys],
-      active: true,
-      expand: ['data.product'],
-      limit: 100,
-    })
-    .catch((e) => new StripeApiError({ operation: 'prices.list', cause: e }))
-  if (response instanceof Error) return response
-
-  return new Map(
-    response.data.map((p) => [p.lookup_key as PriceLookupKey, p]),
-  )
-}
-
-export async function getPriceByLookupKey(lookupKey: PriceLookupKey) {
-  priceCachePromise ??= loadPriceCache()
-  const cache = await priceCachePromise
-  if (cache instanceof Error) {
-    priceCachePromise = null // retry on next call
-    return cache
-  }
-
-  const price = cache.get(lookupKey)
-  if (!price) return new PriceNotFoundError({ lookupKey })
-  return price
-}
-```
-
-Call sites look like:
-
-```ts
-const price = await getPriceByLookupKey('pro_monthly')
-if (price instanceof Error) return price
-// TypeScript knows price is Stripe.Price here
-```
-
-The `z.enum(priceLookupKeys)` on the `/checkout` route also gives compile-time plan validation at the HTTP boundary.
-
 ## Single customer per Org
 
 **Rule: create a Stripe Customer once per `Org`, store its id in `Org.stripeCustomerId`, reuse it forever.** This is the single biggest lever for preventing duplicate customers, duplicate subscriptions, and broken portal sessions.
@@ -326,7 +266,7 @@ export class OrgNotFoundError extends errore.createTaggedError({
 
 /**
  * Get or create the Stripe customer for an org. Idempotent — safe to call
- * from any flow. This is the ONLY place in the codebase where
+ * from any flow. This is the ONLY place where
  * `stripe.customers.create` should be called.
  */
 export async function getOrCreateStripeCustomer({
@@ -372,285 +312,204 @@ if (customerId instanceof Error) return customerId
 
 Never call `stripe.customers.create` anywhere else. Never pass `customer_email` to Checkout without also checking for an existing `stripeCustomerId` first — that creates a second customer row in Stripe on repeat purchases and the portal breaks (each customer has its own separate subscriptions).
 
-## Spiceflow routes
+## Server actions
 
-All Stripe endpoints — including the webhook — live inside a single spiceflow sub-app. Handlers follow the errore pattern: check each result with `instanceof Error`, early return, keep the happy path at root indentation.
+Checkout and portal flows are **server actions**, not API routes. Server actions are simpler: no route definition, no `errorToResponse` mapper, no separate client file. They auto re-render the page after completing and use `redirect()` to navigate to Stripe URLs.
+
+The **webhook** must stay as a spiceflow `.post()` route because Stripe sends raw HTTP POST requests with signature headers. Server actions are browser-only with CSRF origin checks.
 
 ```tsx
-// website/src/lib/spiceflow-billing.tsx
-import { Spiceflow } from 'spiceflow'
-import * as errore from 'errore'
-import { z } from 'zod'
-import { db } from 'db'
-import { env } from 'website/src/lib/env'
+// src/actions/billing.tsx
+'use server'
+
+import { db, schema } from 'db'
+import { env } from 'src/lib/env'
 import {
   stripe,
   getOrCreateStripeCustomer,
-  getPriceByLookupKey,
-  priceLookupKeys,
-  StripeApiError,
-  DbError,
-} from 'website/src/lib/stripe'
+} from 'src/lib/stripe'
+import { getSession } from 'src/lib/auth'
+import { redirect } from 'spiceflow'
 
-// Returned when the upstream Stripe API call succeeds but the response
-// shape is not what we expect (e.g. missing session.url).
-export class StripeResponseError extends errore.createTaggedError({
-  name: 'StripeResponseError',
-  message: 'Unexpected Stripe response: $reason',
-}) {}
+/**
+ * Start a Checkout Session for a new subscription, or redirect to the
+ * portal if the org already has one. Prevents double subscriptions by
+ * checking the DB before creating a session.
+ */
+export async function startCheckout(priceId: string, returnPath = '/billing') {
+  const session = await getSession()
+  if (!session) throw new Error('Unauthorized')
 
-const errorToResponse = (error: Error) =>
-  errore.matchError(error, {
-    StripeApiError: (e) => new Response(e.message, { status: 502 }),
-    StripeResponseError: (e) => new Response(e.message, { status: 502 }),
-    DbError: (e) => new Response(e.message, { status: 500 }),
-    OrgNotFoundError: (e) => new Response(e.message, { status: 404 }),
-    PriceNotFoundError: (e) => new Response(e.message, { status: 404 }),
-    Error: (e) => new Response(e.message, { status: 500 }),
+  const { orgId, email } = session
+  const customerId = await getOrCreateStripeCustomer({ orgId, email })
+  if (customerId instanceof Error) throw customerId
+
+  // If already subscribed, short-circuit to the portal
+  const existing = await db.query.subscriptions.findFirst({
+    where: {
+      orgId,
+      status: { in: ['active', 'trialing', 'past_due'] },
+    },
   })
 
-export const billingApp = new Spiceflow({ basePath: '/billing' })
-  .state('orgId', Promise.resolve(''))
-  .state('userEmail', Promise.resolve(''))
+  if (existing) {
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: new URL(returnPath, env.PUBLIC_URL).toString(),
+    })
+    throw redirect(portal.url)
+  }
 
-  // Create a Checkout Session OR redirect to the portal if the org
-  // already has an active subscription. Prevents double subscriptions
-  // by construction.
-  .post(
-    '/checkout',
-    async ({ request, state }) => {
-      const orgId = await state.orgId
-      if (!orgId) return new Response('Unauthorized', { status: 401 })
+  const checkoutSession = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    customer: customerId,
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: new URL(returnPath, env.PUBLIC_URL).toString(),
+    cancel_url: new URL(returnPath, env.PUBLIC_URL).toString(),
+    allow_promotion_codes: true,
+    client_reference_id: orgId,
+    // Metadata on BOTH the session and the subscription so webhooks
+    // can always resolve orgId regardless of event type.
+    metadata: { orgId },
+    subscription_data: { metadata: { orgId } },
+  })
 
-      const email = await state.userEmail
-      const body = await request.json()
+  if (!checkoutSession.url) throw new Error('Checkout session has no URL')
+  throw redirect(checkoutSession.url)
+}
 
-      const customerId = await getOrCreateStripeCustomer({ orgId, email })
-      if (customerId instanceof Error) return errorToResponse(customerId)
+/**
+ * Open the Billing Portal for an existing customer. Used by the
+ * "Manage subscription" button.
+ */
+export async function openPortal(returnPath = '/billing') {
+  const session = await getSession()
+  if (!session) throw new Error('Unauthorized')
 
-      // 1. If already subscribed, short-circuit to the portal
-      const existing = await db.query.subscriptions
-        .findFirst({
-          where: {
-            orgId,
-            status: { in: ['active', 'trialing', 'past_due'] },
-          },
-        })
-        .catch(
-          (e) =>
-            new DbError({ operation: 'subscriptions.findFirst', cause: e }),
-        )
-      if (existing instanceof Error) return errorToResponse(existing)
+  const { orgId, email } = session
+  const customerId = await getOrCreateStripeCustomer({ orgId, email })
+  if (customerId instanceof Error) throw customerId
 
-      if (existing) {
-        const portal = await stripe.billingPortal.sessions
-          .create({
-            customer: customerId,
-            return_url: new URL(body.returnPath, env.PUBLIC_URL).toString(),
-          })
-          .catch(
-            (e) =>
-              new StripeApiError({
-                operation: 'billingPortal.sessions.create',
-                cause: e,
-              }),
-          )
-        if (portal instanceof Error) return errorToResponse(portal)
-        return { url: portal.url, mode: 'portal' as const }
-      }
+  const portal = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: new URL(returnPath, env.PUBLIC_URL).toString(),
+  })
 
-      // 2. Otherwise start a new Checkout
-      const price = await getPriceByLookupKey(body.lookupKey)
-      if (price instanceof Error) return errorToResponse(price)
+  throw redirect(portal.url)
+}
+```
 
-      const session = await stripe.checkout.sessions
-        .create({
-          mode: 'subscription',
-          customer: customerId,
-          line_items: [{ price: price.id, quantity: 1 }],
-          success_url: new URL(body.returnPath, env.PUBLIC_URL).toString(),
-          cancel_url: new URL(body.returnPath, env.PUBLIC_URL).toString(),
-          allow_promotion_codes: true,
-          client_reference_id: orgId,
-          // Metadata is written to BOTH the checkout session AND the
-          // resulting subscription so webhooks can always resolve orgId.
-          metadata: { orgId },
-          subscription_data: {
-            metadata: { orgId },
-          },
-        })
-        .catch(
-          (e) =>
-            new StripeApiError({
-              operation: 'checkout.sessions.create',
-              cause: e,
-            }),
-        )
-      if (session instanceof Error) return errorToResponse(session)
-      if (!session.url) {
-        return errorToResponse(
-          new StripeResponseError({ reason: 'checkout session has no url' }),
-        )
-      }
+Server action errors are caught by the nearest `ErrorBoundary`. If `getOrCreateStripeCustomer` returns an error, throwing it propagates to the client with a sanitized message.
 
-      return { url: session.url, mode: 'checkout' as const }
-    },
-    {
-      body: z.object({
-        lookupKey: z.enum(priceLookupKeys),
-        returnPath: z.string().default('/billing/done'),
-      }),
-    },
+## Billing page
+
+Use `.loader()` to fetch subscription data server-side, and `useLoaderData()` in client components to read it without prop drilling.
+
+```tsx
+// src/main.tsx
+import { Spiceflow } from 'spiceflow'
+import { db } from 'db'
+import { getSession } from 'src/lib/auth'
+import { BillingPage } from './app/billing-page'
+
+export const app = new Spiceflow()
+  // ... layout, other pages ...
+
+  .loader('/billing', async ({ request, redirect }) => {
+    const session = await getSession(request)
+    if (!session) throw redirect('/login')
+
+    const subscription = await db.query.subscriptions.findFirst({
+      where: {
+        orgId: session.orgId,
+        status: { in: ['active', 'trialing', 'past_due'] },
+      },
+    })
+
+    return { subscription, orgId: session.orgId }
+  })
+  .page('/billing', async () => {
+    return <BillingPage />
+  })
+
+declare module 'spiceflow/react' {
+  interface SpiceflowRegister { app: typeof app }
+}
+```
+
+The client component reads loader data via `useLoaderData` and calls server actions directly:
+
+```tsx
+// src/app/billing-page.tsx
+'use client'
+
+import { useLoaderData } from 'spiceflow/react'
+import { startCheckout, openPortal } from '../actions/billing'
+
+export function BillingPage() {
+  const { subscription } = useLoaderData('/billing')
+
+  if (subscription) {
+    return (
+      <div>
+        <h1>Your Plan</h1>
+        <p>Status: {subscription.status}</p>
+        <p>Plan: {subscription.variantName}</p>
+        <button onClick={() => openPortal()}>
+          Manage Subscription
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h1>Choose a Plan</h1>
+      <button onClick={() => startCheckout('price_pro_monthly')}>
+        Pro Monthly
+      </button>
+      <button onClick={() => startCheckout('price_pro_yearly')}>
+        Pro Yearly
+      </button>
+    </div>
   )
-
-  // Open the portal for an existing customer. Used by the "Manage
-  // subscription" button inside the app.
-  .post(
-    '/portal',
-    async ({ request, state }) => {
-      const orgId = await state.orgId
-      if (!orgId) return new Response('Unauthorized', { status: 401 })
-
-      const body = await request.json()
-      const email = await state.userEmail
-
-      const customerId = await getOrCreateStripeCustomer({ orgId, email })
-      if (customerId instanceof Error) return errorToResponse(customerId)
-
-      // Find the most recent active sub for the upgrade flow, if requested.
-      const sub = body.forSubscriptionUpgrade
-        ? await db.query.subscriptions
-            .findFirst({
-              where: {
-                orgId,
-                status: { in: ['active', 'trialing'] },
-              },
-              orderBy: { createdAt: 'desc' },
-            })
-            .catch(
-              (e) =>
-                new DbError({
-                  operation: 'subscriptions.findFirst',
-                  cause: e,
-                }),
-            )
-        : null
-      if (sub instanceof Error) return errorToResponse(sub)
-
-      const portal = await stripe.billingPortal.sessions
-        .create({
-          customer: customerId,
-          return_url: new URL(body.returnPath, env.PUBLIC_URL).toString(),
-          flow_data:
-            sub && body.forSubscriptionUpgrade
-              ? {
-                  type: 'subscription_update',
-                  subscription_update: { subscription: sub.subscriptionId },
-                }
-              : undefined,
-        })
-        .catch(
-          (e) =>
-            new StripeApiError({
-              operation: 'billingPortal.sessions.create',
-              cause: e,
-            }),
-        )
-      if (portal instanceof Error) return errorToResponse(portal)
-
-      return { url: portal.url }
-    },
-    {
-      body: z.object({
-        returnPath: z.string().default('/billing/done'),
-        forSubscriptionUpgrade: z.boolean().optional(),
-      }),
-    },
-  )
-
-export type BillingApp = typeof billingApp
+}
 ```
 
 Notes on the pattern:
 
-- **`errorToResponse`** is a single `matchError` call that maps tagged domain errors to HTTP status codes. Add a new case whenever you introduce a new tagged error. The required `Error` fallback handles untagged `Error` instances.
-- **Happy path at root**: every `instanceof Error` check is followed by an early return. The successful `return { url, mode }` is at the top indentation level, never buried inside an `if`.
-- **Never use `try/catch`** for Stripe or Drizzle calls. `.catch()` converts the thrown error into a typed domain error at the boundary. Your handler logic becomes a sequence of `const x = await ...; if (x instanceof Error) return ...`.
-- **`.catch()` always wraps in a tagged error with `cause`** — never `.catch((e) => e as Error)`. The original error is preserved in `cause` for debugging.
-
-Type-safe client usage from other parts of the app. The spiceflow client is a proxy-style typed client from `spiceflow/client` — access routes as `client.path.method(body)` and destructure `{ data, error }` from the response. Combine with errore's "wrap the error in a tagged domain error" pattern for a full errors-as-values flow.
-
-```ts
-// website/src/lib/billing-client.ts
-import { createSpiceflowFetch } from 'spiceflow/client'
-import * as errore from 'errore'
-import type { PriceLookupKey } from 'website/src/lib/stripe'
-
-export class BillingClientError extends errore.createTaggedError({
-  name: 'BillingClientError',
-  message: 'Billing API call failed: $operation',
-}) {}
-
-// Type safety comes from SpiceflowRegister — add
-// `declare module 'spiceflow/react' { interface SpiceflowRegister { app: typeof spiceflowApp } }`
-// in the server entry file (website/src/lib/spiceflow-plugins.server.tsx)
-const safeFetch = createSpiceflowFetch(env.PUBLIC_URL!)
-
-export async function startCheckout(lookupKey: PriceLookupKey) {
-  const result = await safeFetch('/api/plugins/billing/checkout', {
-    method: 'POST',
-    body: { lookupKey, returnPath: '/billing/done' },
-  })
-  if (result instanceof Error) return new BillingClientError({ operation: 'checkout', cause: result })
-
-  window.location.href = result.url
-  return null
-}
-```
-
-Call site on the client:
-
-```ts
-const result = await startCheckout('pro_monthly')
-if (result instanceof Error) {
-  console.error('Checkout failed:', result.message)
-  toast.error('Could not start checkout — please try again')
-}
-```
-
-Notes:
-
-- The `z.enum(priceLookupKeys)` on the `/checkout` route gives **autocomplete on every call site** and fails compilation if you typo a plan name. TypeScript infers the body shape from the route definition.
-- **Wrap the error in a tagged domain error**, don't return it as-is. Wrapping in `BillingClientError` gives you `_tag`, typed properties, and a `cause` chain for debugging.
-- **Check with `instanceof Error`** — `createSpiceflowFetch` returns `Error | Data` directly following the errore convention. No `{ data, error }` destructuring. On error, the returned `SpiceflowFetchError` has `status`, `value` (parsed error body), and `response` (raw `Response`) properties.
+- **Server actions use `throw redirect(url)`** to navigate to Stripe URLs. Since every server action triggers a page re-render, using `redirect` avoids flashing the re-rendered current page before navigating.
+- **Loader data stays fresh.** After a server action completes, the page re-renders with fresh loader data automatically. No manual `router.refresh()` needed.
+- **`useLoaderData('/billing')`** is type-safe. TypeScript infers the return type from the loader registered at that path. If you rename a field in the loader, every component that reads it gets a compile error.
+- **No `errorToResponse` mapper needed.** Server actions throw errors directly; the nearest `ErrorBoundary` catches them. No HTTP status code mapping required.
+- **No separate client file.** Import server actions directly from `'use server'` files into client components. No `createSpiceflowFetch` wrapper needed for these flows.
 
 ## Webhook handler
 
-The webhook is a **spiceflow route**, just like `/checkout` and `/portal`. Spiceflow handlers receive a standard Web `Request`, so `await request.text()` gives you the exact raw body bytes that Stripe signed — which is what `stripe.webhooks.constructEvent` needs for signature verification.
+The webhook is a **spiceflow route** (not a server action). Stripe sends raw HTTP POST requests with signature headers, so it needs a proper endpoint. Spiceflow handlers receive a standard Web `Request`, so `await request.text()` gives you the exact raw body bytes that Stripe signed — which is what `stripe.webhooks.constructEvent` needs for signature verification.
 
 Do **not** parse the body with `await request.json()` before verifying the signature. JSON parsing normalizes whitespace and key order, which breaks the HMAC check. Always call `await request.text()` first.
 
 The handler uses the errore pattern: `constructEvent` is a throwing sync API, so wrap it with `errore.try`. Every DB write is a `.catch()` boundary with a tagged error. Handler dispatch is a sequence of early returns, no `try/catch` for control flow.
 
 ```ts
-// website/src/lib/spiceflow-billing.tsx — same sub-app as /checkout and /portal
+// src/lib/stripe-webhook.tsx
+import { Spiceflow } from 'spiceflow'
 import * as errore from 'errore'
 import {
   stripe,
   handleCheckoutSessionCompleted,
   handleSubscriptionChange,
-} from 'website/src/lib/stripe'
-import { env } from 'website/src/lib/env'
-import { notifyError } from 'website/src/lib/errors'
+} from 'src/lib/stripe'
+import { env } from 'src/lib/env'
+import { notifyError } from 'src/lib/errors'
 
 export class WebhookSignatureError extends errore.createTaggedError({
   name: 'WebhookSignatureError',
   message: 'Stripe webhook signature verification failed',
 }) {}
 
-export const billingApp = new Spiceflow({ basePath: '/billing' })
-  // ... /checkout and /portal routes above ...
-
+export const webhookApp = new Spiceflow({ basePath: '/api/stripe' })
   .post('/webhook', async ({ request }) => {
     const sig = request.headers.get('stripe-signature')
     if (!sig) return new Response('No signature', { status: 400 })
@@ -699,15 +558,15 @@ export const billingApp = new Spiceflow({ basePath: '/billing' })
   })
 ```
 
-And the dispatchers in `website/src/lib/stripe.ts`, following the same errore conventions:
+And the dispatchers in `src/lib/stripe.ts`, following the same errore conventions:
 
 ```ts
-// website/src/lib/stripe.ts
+// src/lib/stripe.ts
 import Stripe from 'stripe'
 import * as orm from 'drizzle-orm'
 import * as errore from 'errore'
 import { db, schema } from 'db'
-import { stripe, StripeApiError, DbError } from 'website/src/lib/stripe'
+import { stripe, StripeApiError, DbError } from 'src/lib/stripe'
 
 export class OrgResolutionError extends errore.createTaggedError({
   name: 'OrgResolutionError',
@@ -902,14 +761,14 @@ async function resolveStripeOrgId({
 ```bash
 # Replace with your deployed URL
 stripe webhook_endpoints create \
-  --url="https://your-site.example/api/plugins/billing/webhook" \
+  --url="https://your-site.example/api/stripe/webhook" \
   -d "enabled_events[]=checkout.session.completed" \
   -d "enabled_events[]=customer.subscription.created" \
   -d "enabled_events[]=customer.subscription.updated" \
   -d "enabled_events[]=customer.subscription.deleted"
 ```
 
-Capture the returned `secret` field (only shown once) as `STRIPE_WEBHOOK_SECRET`. For local development, use `stripe listen --forward-to http://localhost:8040/api/plugins/billing/webhook` and use its `whsec_` instead.
+Capture the returned `secret` field (only shown once) as `STRIPE_WEBHOOK_SECRET`. For local development, use `stripe listen --forward-to http://localhost:8040/api/stripe/webhook` and use its `whsec_` instead.
 
 ### Idempotency on upserts
 
@@ -936,43 +795,38 @@ Fallback chain (three layers, from most reliable to least):
 
 Never rely only on email — it's the last resort because users can change email in Stripe Checkout and break the mapping. The customer metadata (step 2) is the strongest fallback because `getOrCreateStripeCustomer` is the single place that creates customers and it always sets `metadata: { orgId }`.
 
-### Mounting the billing sub-app
+### Mounting the webhook
 
-Register `billingApp` in the parent spiceflow router via `.use(billingApp)`. The final webhook URL is the parent router's `basePath` + `/billing/webhook`.
+Register the webhook sub-app in the parent spiceflow router via `.use()`. Only the webhook needs a route; checkout and portal flows use server actions.
 
 ```ts
-// website/src/lib/spiceflow-plugins.server.tsx
-import { billingApp } from 'website/src/lib/spiceflow-billing'
+// src/main.tsx
+import { webhookApp } from 'src/lib/stripe-webhook'
 
-export const spiceflowApp = new Spiceflow({
-  disableSuperJsonUnlessRpc: false,
-  basePath: '/api/plugins',
-})
-  // ... other sub-apps ...
-  .use(billingApp) // ← /api/plugins/billing/checkout, /portal, /webhook
+export const app = new Spiceflow()
+  // ... pages, layouts, other sub-apps ...
+  .use(webhookApp) // ← /api/stripe/webhook
 ```
 
-The webhook is publicly reachable — it does not need session auth. Stripe authenticates via the `stripe-signature` header and `constructEvent`. If your parent router has an auth middleware that reads `state.orgId`, make sure the webhook handler never awaits that state so it runs fine for unauthenticated Stripe requests. The common pattern is a middleware that resolves `state.orgId` to an empty string when no session key is present.
+The webhook is publicly reachable — it does not need session auth. Stripe authenticates via the `stripe-signature` header and `constructEvent`. If the parent router has an auth middleware, make sure the webhook handler is not blocked by it.
 
 ## Preventing double subscriptions
 
 Two layers of defense, both required:
 
-**Layer 1 — DB check before checkout.** Inside the `/checkout` route, query `db.query.subscriptions` for an active row for this `orgId`. If one exists, return the portal URL instead of creating a new Checkout Session. This is the primary guard.
+**Layer 1 — DB check before checkout.** Inside the `startCheckout` server action, query `db.query.subscriptions` for an active row for this `orgId`. If one exists, redirect to the portal instead of creating a new Checkout Session. This is the primary guard.
 
 ```ts
-const existing = await db.query.subscriptions
-  .findFirst({
-    where: {
-      orgId,
-      status: { in: ['active', 'trialing', 'past_due'] },
-    },
-  })
-  .catch(
-    (e) => new DbError({ operation: 'subscriptions.findFirst', cause: e }),
-  )
-if (existing instanceof Error) return errorToResponse(existing)
-if (existing) return openPortal(existing.customerId)
+const existing = await db.query.subscriptions.findFirst({
+  where: {
+    orgId,
+    status: { in: ['active', 'trialing', 'past_due'] },
+  },
+})
+if (existing) {
+  const portal = await stripe.billingPortal.sessions.create({ ... })
+  throw redirect(portal.url)
+}
 ```
 
 **Layer 2 — Single Stripe customer per org.** Because `Org.stripeCustomerId` is reused across every checkout, Stripe itself won't let the same customer subscribe twice to the same recurring price. Even if the DB check somehow races, Stripe returns an error and we never end up with two parallel subs for the same plan.
@@ -981,7 +835,7 @@ if (existing) return openPortal(existing.customerId)
 
 ## Preventing double customers
 
-Same pattern: `getOrCreateStripeCustomer({ orgId })` is the only function in the codebase that calls `stripe.customers.create`. Grep for it as a code review check:
+Same pattern: `getOrCreateStripeCustomer({ orgId })` should be the only function that calls `stripe.customers.create`. Grep for it as a code review check:
 
 ```bash
 rg "stripe\.customers\.create" website/src
@@ -1057,32 +911,32 @@ From `db/src/schema.ts` (drizzle). Table names use snake_case, accessed via `sch
 
 ```ts
 // db/src/schema.ts
-import * as pgCore from 'drizzle-orm/pg-core'
+import * as s from 'drizzle-orm/pg-core'
 import { defineRelations } from 'drizzle-orm'
 
-export const orgs = pgCore.pgTable('orgs', {
-  orgId:            pgCore.text('org_id').primaryKey().notNull(),
-  stripeCustomerId: pgCore.text('stripe_customer_id'),  // ← single source of truth for the customer
-  name:             pgCore.text('name'),
+export const orgs = s.pgTable('orgs', {
+  orgId:            s.text('org_id').primaryKey().notNull(),
+  stripeCustomerId: s.text('stripe_customer_id'),  // ← single source of truth for the customer
+  name:             s.text('name'),
   // ...
 })
 
-export const subscriptions = pgCore.pgTable('subscriptions', {
-  subscriptionId: pgCore.text('subscription_id').notNull(),
-  variantId:      pgCore.text('variant_id').notNull(),       // ← Stripe price id (historical name from LemonSqueezy)
-  productId:      pgCore.text('product_id').notNull(),       // ← Stripe product id
-  customerId:     pgCore.text('customer_id'),                // ← Stripe customer id, denormalized from Org
-  orgId:          pgCore.text('org_id').notNull().references(() => orgs.orgId),
-  status:         pgCore.text('status').notNull(),           // active, trialing, canceled, past_due, ...
-  provider:       pgCore.text('provider').notNull(),         // stripe | lemonsqueezy (legacy)
-  metadata:       pgCore.jsonb('metadata'),
-  email:          pgCore.text('email'),
-  orderId:        pgCore.text('order_id'),
-  variantName:    pgCore.text('variant_name'),
-  createdAt:      pgCore.timestamp('created_at').defaultNow(),
+export const subscriptions = s.pgTable('subscriptions', {
+  subscriptionId: s.text('subscription_id').notNull(),
+  variantId:      s.text('variant_id').notNull(),       // ← Stripe price id (historical name from LemonSqueezy)
+  productId:      s.text('product_id').notNull(),       // ← Stripe product id
+  customerId:     s.text('customer_id'),                // ← Stripe customer id, denormalized from Org
+  orgId:          s.text('org_id').notNull().references(() => orgs.orgId),
+  status:         s.text('status').notNull(),           // active, trialing, canceled, past_due, ...
+  provider:       s.text('provider').notNull(),         // stripe | lemonsqueezy (legacy)
+  metadata:       s.jsonb('metadata'),
+  email:          s.text('email'),
+  orderId:        s.text('order_id'),
+  variantName:    s.text('variant_name'),
+  createdAt:      s.timestamp('created_at').defaultNow(),
 }, (table) => [
-  pgCore.primaryKey({ columns: [table.subscriptionId, table.variantId] }),  // idempotent upsert key for webhooks
-  pgCore.index('subscriptions_org_id_idx').on(table.orgId),
+  s.primaryKey({ columns: [table.subscriptionId, table.variantId] }),  // idempotent upsert key for webhooks
+  s.index('subscriptions_org_id_idx').on(table.orgId),
 ])
 
 export const relations = defineRelations({ orgs, subscriptions }, (r) => ({
@@ -1102,13 +956,12 @@ The composite primary key `(subscriptionId, variantId)` lets a single subscripti
 
 ## Common gotchas
 
-- **`disableSuperJsonUnlessRpc: false`**: spiceflow sub-apps in this repo use this flag so they can return plain JSON over HTTP for direct redirects. Keep it when you add billing routes.
+
 - **Portal can't switch currency.** Once a sub is USD, it stays USD. If a user wants EUR they have to cancel and re-subscribe. Don't try to build a "change currency" button — Stripe won't let you.
 - **`tax_behavior` must match across prices of the same product.** Set it to `exclusive` on every price in the CLI commands above. If one price is `unspecified` and another is `exclusive`, the portal refuses to let users switch between them.
 - **`customer_email` vs `customer`.** Never pass `customer_email` if you have a `customer` id. Passing both makes Stripe ignore `customer_email`, which creates confusing UX bugs.
-- **Stripe CLI is a live API.** Everything in this skill runs against the key in `~/.config/stripe/config.toml`. Test against a sandbox (`stripe login --project-name=sandbox`) before running price-creation commands against production.
-- **Webhooks must return 2xx quickly** (< 5s). If you need to run heavy work, enqueue it to QStash (see `website/src/lib/qstash.ts`) and return 200 immediately.
+- **Stripe CLI is a live API.** Everything in this skill runs against the active account in `~/.config/stripe/config.toml`. Test against a sandbox before running price-creation commands against production (see [CLI auth](#cli-auth-and-multiple-accounts)).
+- **Webhooks must return 2xx quickly** (< 5s). If you need to run heavy work, enqueue it to `waitUntil`
 - **Webhook raw body**: call `await request.text()` exactly once in the webhook handler. Calling `request.json()` first (or letting a Zod `body` schema parse the request) consumes the stream and breaks signature verification. Do not add a `body:` schema on the webhook route.
 - **`Subscription.variantId` is the Stripe price id.** The name is historical from the LemonSqueezy days. Do not confuse it with the lookup key.
-- **Price cache invalidates on error.** `priceCachePromise` stores the in-flight Promise so concurrent calls share one API request. When it resolves to an error, the module resets `priceCachePromise = null` so the next call retries. Don't "fix" this by keeping the error cached — it would permanently break price lookups until a process restart.
-- **Errors as values.** Every Stripe/Drizzle call in this codebase returns `Error | T` via `.catch((e) => new TaggedError({ cause: e }))`. Never throw from a helper function. Never use `try/catch` around Stripe calls — it just replaces one early return with two nested blocks. See the [errore skill](../errore/SKILL.md) for the full pattern.
+- **Errors as values in helpers.** Stripe/Drizzle helper functions (like `getOrCreateStripeCustomer`) should return `Error | T` via `.catch((e) => new TaggedError({ cause: e }))`. Server actions can then check `instanceof Error` and `throw` to propagate to the `ErrorBoundary`. See the [errore skill](../errore/SKILL.md) for the full pattern.
