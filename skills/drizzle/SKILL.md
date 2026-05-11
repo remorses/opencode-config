@@ -282,6 +282,7 @@ const usersWithPosts = await db.query.users.findMany({
 - Use `orderBy` as object: `{ createdAt: 'desc' }`
 - Use `findFirst` (adds `LIMIT 1`) or `findMany`
 - **NEVER use `orm.inArray()`, `orm.eq()`, or other operator functions inside `db.query` `where`** — the query API only accepts object-style filters. `orm.inArray(schema.users.id, ids)` will fail with a type error. Instead, use `{ id: { in: ids } }` or loop with `findFirst` per ID.
+- **Do not use `columns` to select specific fields.** Listing every column you want adds noise, rarely helps performance on small rows, and makes the returned object not conform to drizzle Zod schemas (`createSelectSchema`). The only valid use is **omitting** a large field like a binary blob or long text body, and in that case use the exclusion form: `columns: { blobField: false }`. This keeps the query clean and returns everything except the excluded field.
 
 **Writes: use `db.insert`, `db.update`, `db.delete`** — no query API for writes.
 
@@ -290,6 +291,31 @@ const usersWithPosts = await db.query.users.findMany({
 await db.update(schema.accounts)
   .set({ accessToken: newToken, updatedAt: Date.now() })
   .where(orm.eq(schema.accounts.id, accountId))
+  .limit(1)
+```
+
+## CRITICAL: Safe updates and deletes
+
+**Every `db.update()` and `db.delete()` MUST have a `.where()` clause.** Never call `.update().set(...)` or `.delete()` without `.where()`. A missing where silently affects every row in the table. There is no drizzle config to enforce this at runtime; it is a discipline rule.
+
+**Every single-row update/delete MUST have `.limit(1)`.** This caps the SQL statement at the database level so even if the where clause is wrong (e.g. a field resolved to `undefined` and matched unexpectedly), at most 1 row is affected. Only skip `.limit(1)` when you are intentionally updating or deleting multiple rows (bulk status change, batch cleanup, etc.).
+
+```ts
+// Single-row update — always .where() + .limit(1)
+await db.update(schema.users)
+  .set({ name: 'New Name' })
+  .where(orm.eq(schema.users.id, userId))
+  .limit(1)
+
+// Single-row delete — always .where() + .limit(1)
+await db.delete(schema.sessions)
+  .where(orm.eq(schema.sessions.id, sessionId))
+  .limit(1)
+
+// Bulk update — .where() required, .limit(1) intentionally omitted
+await db.update(schema.notifications)
+  .set({ read: true })
+  .where(orm.eq(schema.notifications.userId, userId))
 ```
 
 ## CRUD examples
@@ -357,11 +383,13 @@ const accounts = await db.query.accounts.findMany({
 await db.update(schema.accounts)
   .set({ name: 'New Name', updatedAt: Date.now() })
   .where(orm.eq(schema.accounts.id, accountId))
+  .limit(1)
 
 // Update with returning (get back the updated row)
 const [updated] = await db.update(schema.accounts)
   .set({ status: 'archived' })
   .where(orm.eq(schema.accounts.id, accountId))
+  .limit(1)
   .returning()
 ```
 
@@ -375,6 +403,7 @@ await db.update(schema.users).set(userParam).where(orm.eq(schema.users.id, userP
 await db.update(schema.users)
   .set({ name: userParam.name, updatedAt: Date.now() })
   .where(orm.eq(schema.users.id, userParam.id))
+  .limit(1)
 ```
 
 ### Delete
@@ -383,10 +412,12 @@ await db.update(schema.users)
 // Delete by condition
 await db.delete(schema.boards)
   .where(orm.eq(schema.boards.id, boardId))
+  .limit(1)
 
 // Delete with returning (get back the deleted row)
 const [deleted] = await db.delete(schema.boards)
   .where(orm.eq(schema.boards.id, boardId))
+  .limit(1)
   .returning()
 ```
 
@@ -396,6 +427,7 @@ With `onDelete: 'cascade'` on foreign keys, deleting a parent automatically dele
 // Deleting an account cascades to all its boards
 await db.delete(schema.accounts)
   .where(orm.eq(schema.accounts.id, accountId))
+  .limit(1)
 ```
 
 ### Upsert (insert or update on conflict)
@@ -663,6 +695,7 @@ export const relations = defineRelations({ projects, environments }, (r) => ({
 await db.update(schema.projects)
   .set({ name: 'New Name' })
   .where(orm.eq(schema.projects.projectId, projectId))
+  .limit(1)
 ```
 
 ### Foreign keys with cascade delete
@@ -944,7 +977,7 @@ Only use `db.batch()` when you genuinely need atomicity (all-or-nothing). Never 
 ```ts
 const [newUsers, updatedPosts, allComments] = await db.batch([
   db.insert(users).values({ name: 'Alice' }).returning(),
-  db.update(posts).set({ status: 'published' }).where(orm.eq(posts.id, 1)),
+  db.update(posts).set({ status: 'published' }).where(orm.eq(posts.id, 1)).limit(1),
   db.query.comments.findMany(),
 ])
 ```
