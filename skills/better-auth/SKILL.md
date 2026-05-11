@@ -15,6 +15,8 @@ better-auth is the most comprehensive authentication framework for TypeScript. I
 
 Full docs: https://better-auth.com/llms.txt
 
+When you need docs for a better-auth feature not covered in this skill (specific plugin API, config options, edge cases), use WebFetch to fetch `https://better-auth.com/llms.txt`. It contains the full better-auth documentation in a single file optimized for LLMs.
+
 ## URL construction
 
 Always use `new URL(path, base)` instead of string concatenation or template literals for building URLs:
@@ -38,10 +40,10 @@ With drizzle-orm v0 (stable):
 pnpm add better-auth @better-auth/drizzle-adapter
 ```
 
-With drizzle-orm v1 (beta) — requires the PR #6913 build and the `/relations-v2` subpath:
+With drizzle-orm v1 (beta) — requires the PR #9489 build and the `/relations-v2` subpath:
 
 ```bash
-pnpm add better-auth @better-auth/drizzle-adapter@"https://pkg.pr.new/better-auth/better-auth/@better-auth/drizzle-adapter@6913"
+pnpm add better-auth@"https://pkg.pr.new/better-auth@9489" @better-auth/drizzle-adapter@"https://pkg.pr.new/@better-auth/drizzle-adapter@9489"
 pnpm add drizzle-orm@beta
 ```
 
@@ -975,14 +977,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
 The official `@better-auth/drizzle-adapter` on npm targets `drizzle-orm` v0.x and does **not** work with `drizzle-orm@beta` (v1.0.0-beta). The adapter relies on v0 APIs (`db._.fullSchema`, `db.query`) that changed in v1 — you get errors like `"model 'user' was not found in the schema object"`.
 
-**To use drizzle-orm@beta (v1)**, install the adapter from PR #6913 which adds v1 support:
+**To use drizzle-orm@beta (v1)**, install both packages from PR #9489 which adds v1 support:
 
 ```bash
-pnpm add @better-auth/drizzle-adapter@"https://pkg.pr.new/better-auth/better-auth/@better-auth/drizzle-adapter@6913"
+pnpm add better-auth@"https://pkg.pr.new/better-auth@9489" @better-auth/drizzle-adapter@"https://pkg.pr.new/@better-auth/drizzle-adapter@9489"
 pnpm add drizzle-orm@beta
 ```
 
-This is a pre-release build from https://github.com/better-auth/better-auth/pull/6913 — it works but is not yet merged into better-auth main. Track progress at https://github.com/better-auth/better-auth/issues/6766.
+This is a pre-release build from https://github.com/better-auth/better-auth/pull/9489 — it works but is not yet merged into better-auth main. Track progress at https://github.com/better-auth/better-auth/issues/6766.
 
 Once the PR is merged, switch back to `pnpm add @better-auth/drizzle-adapter@latest`.
 
