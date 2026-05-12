@@ -280,7 +280,10 @@ export function UserMenu() {
   return (
     <div>
       <span>{session.user.name}</span>
-      <a href="/api/auth/sign-out">Sign out</a>
+      <button onClick={async () => {
+        await authClient.signOut()
+        window.location.href = '/login'
+      }}>Sign out</button>
     </div>
   )
 }
@@ -892,9 +895,7 @@ Use a layout to enforce auth for a group of pages. The session is available from
       <aside className="w-64 border-r p-4">
         <div className="text-sm text-muted-foreground">{user.email}</div>
         <nav>{/* sidebar links */}</nav>
-        <a href="/api/auth/sign-out" className="text-sm text-muted-foreground mt-auto">
-          Sign out
-        </a>
+        {/* Use a client component with authClient.signOut() for sign-out */}
       </aside>
       <main className="flex-1 p-6">{children}</main>
     </div>
@@ -944,25 +945,22 @@ API routes don't use loaders — use `state.session` directly:
 })
 ```
 
-### Sign out link
+### Sign out button
 
-For server-rendered apps, link directly to the BetterAuth sign-out endpoint:
-
-```tsx
-<a href="/api/auth/sign-out">Sign out</a>
-```
-
-Or use the client method for SPA-style sign-out with a redirect:
+**Do NOT use `<a href="/api/auth/sign-out">`** — the GET sign-out endpoint does not work reliably. Always use the client method which POSTs to the correct endpoint:
 
 ```tsx
 'use client'
-import { authClient } from '../lib/auth-client'
+import { createAuthClient } from 'better-auth/react'
+
+const authClient = createAuthClient()
 
 function SignOutButton() {
   return (
-    <button onClick={() => authClient.signOut({
-      fetchOptions: { onSuccess: () => window.location.href = '/login' },
-    })}>
+    <button onClick={async () => {
+      await authClient.signOut()
+      window.location.href = '/login'
+    }}>
       Sign out
     </button>
   )
