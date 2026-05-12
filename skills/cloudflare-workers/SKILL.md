@@ -289,6 +289,34 @@ wrangler secret put API_KEY --env preview
 
 Prefer the bulk upload scripts above over manual `secret put` commands.
 
+## KV operations: always use `--remote`
+
+**`wrangler kv` commands default to local storage**, not the deployed remote KV. If you `kv key list`, `kv key get`, or `kv key put` without `--remote`, you're reading/writing to a local SQLite file that the deployed worker never sees. This causes confusing debugging sessions where writes appear to succeed but data seems missing.
+
+```bash
+# BAD — reads/writes local storage only
+wrangler kv key list --namespace-id abc123
+wrangler kv key get --namespace-id abc123 "my-key"
+wrangler kv key put --namespace-id abc123 "my-key" "value"
+
+# GOOD — reads/writes the actual deployed KV
+wrangler kv key list --namespace-id abc123 --remote
+wrangler kv key get --namespace-id abc123 "my-key" --remote
+wrangler kv key put --namespace-id abc123 "my-key" "value" --remote
+```
+
+When debugging whether a Worker's KV writes are persisting, always use `--remote` on the verification commands. The Worker itself always writes to the remote KV; only the wrangler CLI defaults to local.
+
+### KV consistency model
+
+- **`KV.get()`** is strongly consistent in the datacenter that wrote the key. Cross-datacenter reads are eventually consistent (up to 60s).
+- **`KV.list()`** is always eventually consistent, even in the same datacenter. Recently written keys may not appear for several seconds.
+- Use `KV.getWithMetadata(key)` (checking `value !== null`) instead of `KV.list()` when verifying that specific keys exist after writing them.
+
+## Dynamic workers with LOADER
+
+See ./dynamic-workers.md
+
 ## Importing non-JS files as text
 
 For things like `.txt`, `.md`, and `.sql`, tell Wrangler/Vite to import them as text with `rules`, then add a TypeScript declaration file. Do **not** silence the import with `// @ts-expect-error`.
