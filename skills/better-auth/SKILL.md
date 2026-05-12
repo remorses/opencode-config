@@ -87,8 +87,12 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
   },
-  // enable experimental joins for 2-3x perf on getSession
-  experimental: { joins: true },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutes
+    },
+  },
 })
 ```
 
@@ -108,6 +112,12 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
   emailAndPassword: { enabled: true },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutes
+    },
+  },
 })
 ```
 
@@ -230,7 +240,7 @@ export const app = new Spiceflow()
   })
 ```
 
-This runs on every request including landing pages — that's fine. When no session cookie is present, `getSession` just parses the cookie header and returns `null` immediately. No database query, no crypto, no async work. It's as cheap as a `Map.get()` call.
+This runs on every request including landing pages. When no session cookie is present, `getSession` returns `null` immediately (no DB query). When a session exists and cookie caching is enabled (which it should always be), `getSession` reads the signed cookie and skips the database entirely. The DB is only hit once every `maxAge` interval (default 5 minutes) to refresh the cache.
 
 Now **every page, layout, and client component** can access the session type-safely:
 
@@ -530,7 +540,7 @@ if (!session) {
 
 ## Session caching
 
-Enable cookie caching to avoid hitting the database on every `getSession` call:
+**Always enable cookie caching.** Without it, every `getSession` call hits the database. With cookie caching, the session is stored in a signed cookie and `getSession` just verifies the signature; zero database queries on most requests. This is especially important in Spiceflow apps where the `/*` loader calls `getSession` on every single page load.
 
 ```ts
 export const auth = betterAuth({
@@ -549,7 +559,9 @@ export const auth = betterAuth({
 })
 ```
 
-To bypass the cache for sensitive operations:
+Every `betterAuth()` config in this skill and in new projects must include `session.cookieCache.enabled: true`. Omitting it means a database round-trip per request, which adds latency and load for no reason.
+
+To bypass the cache for sensitive operations (e.g. before a destructive action):
 
 ```ts
 const session = await auth.api.getSession({
@@ -1094,6 +1106,16 @@ better-auth uses AsyncLocalStorage. Enable it in `wrangler.jsonc`:
 ```
 
 Or for just AsyncLocalStorage: `["nodejs_als"]`.
+
+### Bundle size: always use `better-auth/minimal`
+
+For Cloudflare Workers and edge runtimes, **always import from `better-auth/minimal`** instead of `better-auth`. The default entrypoint bundles Kysely (~400 KB) for when no database adapter is provided. Since Cloudflare projects always use an explicit adapter (drizzle, prisma, etc.), Kysely is dead code.
+
+```ts
+import { betterAuth } from 'better-auth/minimal'
+```
+
+The API is identical. Plugins are imported from `better-auth/plugins` as usual. Saves ~400 KB from the bundle.
 
 ## Social providers
 
