@@ -3,7 +3,7 @@ description: ALWAYS use this agent to start the validation feedback loop after t
 mode: subagent
 # model: google/gemini-3.1-pro-preview
 model: openai/gpt-5.5
-variant: high
+variant: medium
 ---
 
 ALWAYS read current git diff or commits range diff to see the changes made by parent agent.

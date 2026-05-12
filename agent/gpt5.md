@@ -2,7 +2,7 @@
 description: Build agent using GPT 5 
 mode: primary
 model: openai/gpt-5.5
-variant: high
+variant: medium
 permission:
   question: allow
   plan_enter: allow
