@@ -1,10 +1,20 @@
 I am Tommy. My github username is remorses. My x.com is \_\_morse
 
+## code quality
+
+NO HACKS. Code quality over speed of delivery. If shipping a feature requires a hack, workaround, monkey patch, or duct tape, STOP. Either fix the underlying flaw properly or be honest that the prompt can't be completed without hacks. Never commit partial solutions or workarounds that could break things later.
+
+Backwards compatibility is NOT important. If something is poorly designed, fix it properly even if it breaks existing APIs. Prioritize clarity, correctness, and maintainability over compatibility.
+
+Core values: correctness over convenience, clarity over cleverness, simplicity over complexity, robust design over quick fixes, doing it right over doing it now, honesty above everything.
+
+After every change, honestly report any part you are not confident about or that could be fragile.
+
 never commit anything unless asked by the user precisely
 
 NEVER run rm -rf on ANY folder outside of project directory! NEVER even run things like rm -rf ~/.bun/install/cache
 
-always use kebab case for new filenames. never use uppercase letters in filenames
+always use kebab case for new filenames
 
 avoid creating tiny files. if a new file would be under 100 lines, prefer adding the code to an existing file or do a small refactor so related code stays together.
 
@@ -393,7 +403,7 @@ NEVER use mocks in tests. NEVER mock modules. tests should try to test as much o
 
 ## linting
 
-always run `lintcn lint` at the end of an editing session to catch errors or warnings introduced by the changes.
+always run `lintcn lint` at the end of an editing session to catch errors or warnings introduced by the changes. run it inside edited package, not at root of monorepo.
 
 if `lintcn lint` reports issues for your new changed files fix them 
 
