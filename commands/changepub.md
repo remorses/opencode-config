@@ -349,3 +349,5 @@ example: `pnpm publish --tag next` for `1.0.0-next.0`. the `.0` does not matter 
 ## working directory
 
 do not change cwd if there are git diff that don't let you publish, instead just commit them with the appropriate message. do this before starting the publish.
+
+## additional context
