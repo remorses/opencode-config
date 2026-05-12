@@ -70,6 +70,34 @@ export default {
 } satisfies ExportedHandler<Env>
 ```
 
+## Background tasks with `waitUntil`
+
+All background promises (fire-and-forget work like analytics, logging, cache writes, webhook processing) MUST use `waitUntil`. Never do `void somePromise()` or `somePromise().catch(...)` directly; the Workers runtime kills the isolate as soon as the response is sent, so untracked promises are silently dropped.
+
+**Inside a spiceflow route or middleware**, use `waitUntil` from the handler context:
+
+```ts
+export const app = new Spiceflow().route({
+  method: 'POST',
+  path: '/webhook',
+  async handler({ request, waitUntil }) {
+    const payload = await request.json()
+    waitUntil(processWebhookInBackground(payload))
+    return { ok: true }
+  },
+})
+```
+
+**Outside a route** (e.g. inside a Durable Object, a utility function, or the top-level fetch handler), import `waitUntil` from `cloudflare:workers`:
+
+```ts
+import { waitUntil } from 'cloudflare:workers'
+
+async function doSomething() {
+  waitUntil(trackEvent('something_happened'))
+}
+```
+
 ## Configuration: wrangler.jsonc
 
 Always use `wrangler.jsonc` (not `wrangler.toml`). Newer features are exclusive to the JSON format.
