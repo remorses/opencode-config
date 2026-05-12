@@ -1015,7 +1015,43 @@ export const auth = betterAuth({
 })
 ```
 
+### TS2742 from exported `getAuth()` in app packages
 
+If a private app exports a BetterAuth instance factory like `getAuth()` and `tsc` fails with `TS2742`, first check whether the app package is emitting declaration files.
+
+The error looks like this:
+
+```txt
+The inferred type of 'getAuth' cannot be named without a reference to '../node_modules/better-auth/dist/types/auth.d.mts'. This is likely not portable. A type annotation is necessary.
+```
+
+This usually happens when `declaration`, `declarationMap`, `emitDeclarationOnly`, or `composite` forces TypeScript to emit `.d.ts` files for an app package. The inferred BetterAuth return type is large and can include transitive pnpm/pkg-pr-new internals, so TypeScript cannot print a portable public type.
+
+For private application packages, prefer disabling declaration emit instead of writing a fake wrapper type:
+
+```json
+{
+  "compilerOptions": {
+    "noEmit": true
+  }
+}
+```
+
+Then keep `getAuth()` exported normally:
+
+```ts
+export function getAuth() {
+  const db = getDb()
+  return betterAuth({
+    database: drizzleAdapter(db, { provider: 'sqlite' }),
+    // ...
+  })
+}
+```
+
+Only keep declaration emit for packages that are actually consumed as libraries. If a package is only a Vite/Spiceflow app, Vite emits the runtime build and `tsc --noEmit` is the right typecheck path.
+
+If the package must emit declarations, add an explicit real exported BetterAuth type annotation instead of hand-writing a partial auth shape. Also try `pnpm dedupe better-auth @better-auth/core @better-auth/drizzle-adapter`, but do not expect dedupe to fix TS2742 when declaration emit is the root cause.
 
 ## Server-side API calls and cookies
 
