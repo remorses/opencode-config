@@ -2,7 +2,7 @@ I am Tommy. My github username is remorses. My x.com is \_\_morse
 
 ## code quality
 
-NO HACKS. Code quality over speed of delivery. If shipping a feature requires a hack, workaround, monkey patch, or duct tape, STOP. Either fix the underlying flaw properly or be honest that the prompt can't be completed without hacks. Never commit partial solutions or workarounds that could break things later.
+NO HACKS. Code quality and simplicity over speed of delivery. If shipping a feature requires a hack, workaround, monkey patch, or duct tape, STOP. Either fix the underlying flaw properly or be honest that the prompt can't be completed without hacks. Never commit partial solutions or workarounds that could break things later.
 
 Backwards compatibility is NOT important. If something is poorly designed, fix it properly even if it breaks existing APIs. Prioritize clarity, correctness, and maintainability over compatibility.
 
