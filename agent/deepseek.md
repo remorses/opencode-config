@@ -1,7 +1,7 @@
 ---
-description: Build agent using Mimo
+description: Build agent deepseek
 mode: primary
-model: opencode-go/mimo-v2-pro
+model: opencode-go/deepseek-v4-pro
 permission:
   question: allow
   plan_enter: allow
