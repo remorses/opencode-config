@@ -104,6 +104,53 @@ When `.optional()` is called on a schema with `.meta({ id })`, Zod emits
 This is valid JSON Schema; every tool handles it correctly.
 Do not bother unwrapping it unless you have a specific downstream consumer that breaks.
 
+## External `$ref` via `.meta()` for IDE autocomplete
+
+`.meta()` fields are copied verbatim into the JSON Schema output. Use `.meta({ $ref: '...' })`
+to inject an external `$ref` URL that points to a remote schema. IDEs fetch the remote
+schema and use it for autocomplete suggestions (e.g. a list of valid icon names).
+
+```ts
+const lucideIconNameSchema = z
+  .string()
+  .meta({ $ref: 'https://example.com/schemas/lucide-icons.json' })
+
+const fontawesomeIconNameSchema = z
+  .string()
+  .meta({ $ref: 'https://example.com/schemas/fontawesome-icons.json' })
+
+export const iconSchema = z
+  .union([lucideIconNameSchema, fontawesomeIconNameSchema, z.string(), iconObjectSchema])
+  .describe('The icon to be displayed')
+  .meta({ id: 'iconSchema' })
+```
+
+This produces a union where the first two branches carry external `$ref` URLs:
+
+```json
+{
+  "anyOf": [
+    { "type": "string", "$ref": "https://example.com/schemas/lucide-icons.json" },
+    { "type": "string", "$ref": "https://example.com/schemas/fontawesome-icons.json" },
+    { "type": "string" },
+    { "type": "object", "properties": { "name": { ... } } }
+  ]
+}
+```
+
+The remote schema at that URL should be a JSON Schema with an `enum` array listing
+all valid values. IDEs like VS Code fetch it and offer those values as autocomplete.
+
+Serve the remote schemas with CORS headers so browser-based editors can fetch them:
+
+```ts
+import lucideIconsSchema from './generated/lucide-icons-schema.json' with { type: 'json' }
+
+app.get('/schemas/lucide-icons.json', () =>
+  Response.json(lucideIconsSchema, { headers: { 'access-control-allow-origin': '*' } }),
+)
+```
+
 ## Handling transforms with `io: "input"`
 
 `z.transform()` is unrepresentable in JSON Schema because JSON Schema describes
