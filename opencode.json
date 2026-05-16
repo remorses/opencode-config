@@ -9,6 +9,7 @@
     "paths": ["/Users/morse/Documents/GitHub/kimakivoice/cli/skills"]
   },
 
+  // "model": "google/gemini-flash-latest",
 
   // "mode": {
   //   "build": {
