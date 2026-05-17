@@ -127,6 +127,37 @@ Once all pairs are collapsed, define the semantic tokens in your CSS:
 }
 ```
 
+## Replace scoped Radix packages with unified `radix-ui`
+
+Tremor pulls in many scoped `@radix-ui/react-*` packages (accordion, checkbox, dialog, popover, select, slider, tabs, toggle, etc.). Replace them all with the single unified `radix-ui` package.
+
+```bash
+# Remove all scoped packages
+pnpm remove @radix-ui/react-accordion @radix-ui/react-checkbox @radix-ui/react-dialog \
+  @radix-ui/react-hover-card @radix-ui/react-label @radix-ui/react-navigation-menu \
+  @radix-ui/react-popover @radix-ui/react-radio-group @radix-ui/react-scroll-area \
+  @radix-ui/react-select @radix-ui/react-slider @radix-ui/react-slot @radix-ui/react-switch \
+  @radix-ui/react-tabs @radix-ui/react-toggle @radix-ui/react-toggle-group @radix-ui/react-tooltip
+
+# Install unified package
+pnpm add radix-ui
+```
+
+Then update imports across the codebase:
+
+```diff
+-import * as SelectPrimitive from '@radix-ui/react-select'
++import { Select as SelectPrimitive } from 'radix-ui'
+
+-import * as DialogPrimitive from '@radix-ui/react-dialog'
++import { Dialog as DialogPrimitive } from 'radix-ui'
+
+-import { Slot } from '@radix-ui/react-slot'
++import { Slot } from 'radix-ui'
+```
+
+The unified package re-exports everything from the scoped packages, so the component APIs are identical. This cuts tens of dependencies down to one.
+
 ## Note about chartUtils.ts data colors
 
 Tremor's `chartUtils.ts` maps chart series names to color palette arrays. These are raw palette references like `blue-500`, `emerald-500`, `violet-500`. They should stay as raw palette colors, not semantic tokens. Chart colors are data-driven and theme-independent by design.
