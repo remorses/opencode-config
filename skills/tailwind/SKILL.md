@@ -862,6 +862,25 @@ key mappings: `bg-white-0` → `background`, `text-strong-950` → `foreground`,
 
 after renaming, the project uses 17 semantic color tokens (15 standard shadcn + success, warning, info, overlay) instead of ~90.
 
+## porting Tremor to shadcn
+
+Tremor uses raw Tailwind palette colors with explicit `dark:` variants for every light/dark pair (e.g. `text-gray-900 dark:text-gray-50`). `windlint rename` can collapse these pairs into shadcn semantic tokens using compound pair mode.
+
+see [porting-tremor-to-shadcn.md](porting-tremor-to-shadcn.md) for the full mapping table and recommended order of operations. the key commands:
+
+```bash
+windlint rename 'color-gray-900 dark:color-gray-50' color-foreground
+windlint rename 'color-white dark:color-gray-950' color-background
+windlint rename 'color-gray-200 dark:color-gray-800' color-border
+windlint rename 'color-gray-100 dark:color-gray-800' color-accent
+windlint rename 'color-gray-500 dark:color-gray-500' color-muted-foreground
+windlint rename 'color-indigo-500 dark:color-indigo-500' color-primary
+```
+
+compound pair mode renames the primary token and deletes the dark companion. CSS variable declarations are left untouched. use `--only text` or `--only bg` to restrict renaming to a specific utility root when the same palette color maps to different semantic tokens depending on context.
+
+chart colors, status badges (yellow/emerald/purple), and one-off decorative colors should stay as raw palette classes.
+
 ## scrollbars
 
 always set all scrollbars styles to transparent and thin.
