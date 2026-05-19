@@ -20,6 +20,18 @@ avoid creating tiny files. if a new file would be under 100 lines, prefer adding
 
 ALWAYS use the right package manager for ts repos. you can see the right one based on lock files like bun.lock. for example bun publish instead of npm publish.
 
+## pnpm minimum release age
+
+pnpm delays installing newly published packages by default (`minimumReleaseAge: 1440`, i.e. 1 day). This is a supply chain security feature. If a package doesn't seem to update even though a new version was just published, the **minimum release age** config is likely blocking it.
+
+To fix: add the package to the exclude list by running the global script with extra args:
+
+```bash
+bun ~/.config/pnpm/update-minimum-release-age-exclude.ts package-name @some-scope/pkg
+```
+
+The script fetches all packages maintained by the npm `xmorse` account, collapses scoped packages into `@scope/*` globs, and merges any extra packages passed as CLI args. It writes to both `~/.config/pnpm/config.yaml` (pnpm 11) and `~/.npmrc` (pnpm 10). The `~/.config/pnpm/` directory is a git repo.
+
 ## pnpm/bun workspaces
 
 always prefer root folders for all packages and setting workspaces: ./\*. without a parent packages/ folder
