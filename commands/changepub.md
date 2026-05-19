@@ -218,13 +218,19 @@ Detect the package manager from the lockfile and use ONLY that tool:
 - `bun.lock` or `bun.lockb` → `bun publish` (NEVER `npm publish`)
 - `package-lock.json` → `npm publish` (only valid option)
 
-Run publish from the package directory:
+Run publish from **inside the package directory** (use `workdir` in bash tool, NOT `--dir` or `--filter`). `pnpm publish` does not support `--dir`. Do NOT run from the monorepo root.
 
 ```bash
-# pnpm project — run from the package folder
-pnpm publish --access public --no-git-checks
+# pnpm — cd into the package folder first, then publish
+# CORRECT:
+cd vite && pnpm publish --access public --no-git-checks
 
-# bun project
+# WRONG — these do NOT work:
+# pnpm --dir vite publish        ← npm parses flags wrong
+# pnpm publish --dir vite        ← --dir is not a publish flag
+# pnpm --filter @pkg/name publish ← does not resolve workspace refs
+
+# bun project — also from inside the package folder
 bun publish --access public
 ```
 
