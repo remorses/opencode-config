@@ -13,6 +13,18 @@ Automate `wrangler login` when the OAuth token is expired and the agent
 cannot run interactive commands. Uses playwriter to click through the
 Cloudflare consent page in the user's existing Chrome session.
 
+## Prerequisites
+
+The user **must already be logged in to Cloudflare** in their browser before
+you attempt this flow. The Cloudflare OAuth consent page is protected by a
+Turnstile captcha that agents cannot bypass. If the user is not logged in,
+Cloudflare will show a login page with Turnstile, and the automation will
+fail.
+
+**If Cloudflare is not already logged in:** stop immediately and ask the
+user to log in to `https://dash.cloudflare.com` in their browser first,
+then retry.
+
 ## When to use
 
 - `wrangler whoami` fails or returns an auth error
@@ -26,6 +38,12 @@ doesn't eat your main context. Pass this as the prompt:
 
 ```
 Automate wrangler login via playwriter. Follow these steps exactly:
+
+IMPORTANT: This only works if the user is already logged in to Cloudflare
+in their browser. The consent page has a Turnstile captcha that agents
+cannot solve. If at any point you see a Turnstile challenge, a login form,
+or a CAPTCHA, STOP and tell the user to log in to https://dash.cloudflare.com
+in their browser first, then retry.
 
 1. Start wrangler login in a tuistory background session:
    bunx tuistory launch "pnpm exec wrangler login" -s wrangler-login
