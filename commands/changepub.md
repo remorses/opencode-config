@@ -210,13 +210,36 @@ Collect all issue references from the changeset files being consumed and append 
 
 ## Step 5: Publish to npm
 
-Use the correct package manager based on the lockfile:
+**NEVER use `npm publish` if the project uses pnpm or bun.** `npm` does not understand `workspace:^` references and will publish them as literal strings, breaking the package for every consumer. This is not a theoretical risk; it has caused broken releases.
 
-- `pnpm-lock.yaml` → `pnpm publish`
-- `bun.lock` or `bun.lockb` → `bun publish`
-- `package-lock.json` → `npm publish` (last resort)
+Detect the package manager from the lockfile and use ONLY that tool:
 
-Using the wrong package manager leaves workspace references unresolved and breaks the published package.
+- `pnpm-lock.yaml` → `pnpm publish` (NEVER `npm publish`)
+- `bun.lock` or `bun.lockb` → `bun publish` (NEVER `npm publish`)
+- `package-lock.json` → `npm publish` (only valid option)
+
+Run publish from the package directory:
+
+```bash
+# pnpm project — run from the package folder
+pnpm publish --access public --no-git-checks
+
+# bun project
+bun publish --access public
+```
+
+After publishing, immediately verify no `workspace:` references leaked:
+
+```bash
+npm view packagename@x.y.z dependencies --json | grep workspace
+# must return empty — if it returns anything, the publish is broken
+```
+
+If a broken version was published, bump patch, republish correctly, and deprecate the broken version:
+
+```bash
+npm deprecate 'packagename@x.y.z' 'Broken: unresolved workspace references. Use x.y.z+1 instead.'
+```
 
 **After publishing**, regenerate the lockfile:
 
