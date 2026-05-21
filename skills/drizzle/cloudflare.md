@@ -250,7 +250,7 @@ D1 needs flat `.sql` files in `migrations_dir`. Drizzle-orm does not read migrat
 
 If `drizzle-kit generate` fails (interactive prompts on renames), write the SQL directly. Read existing migration files and `schema.ts` to understand current and desired state.
 
-**Statement separator:** use `--> statement-breakpoint` between SQL statements. D1 wrangler splits files on this marker.
+D1 splits statements on **semicolons** like any SQL parser. The `--> statement-breakpoint` comments in drizzle-kit output are just visual separators that D1 ignores; you can keep or remove them.
 
 #### Apply migrations
 
