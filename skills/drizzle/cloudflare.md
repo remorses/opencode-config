@@ -232,22 +232,27 @@ wrangler d1 create my-app-db
 wrangler d1 create my-app-preview-db
 ```
 
-### D1 migrations with Wrangler
+### D1 migrations: use drizzle-kit generate, then create flat SQL files
 
-Drizzle-kit generates migrations as subdirectories (`<timestamp>_<name>/migration.sql`), but **wrangler D1 only recognizes flat `.sql` files** in `migrations_dir`. It does not search subdirectories. This is a known incompatibility: drizzle-team/drizzle-orm#5266 and cloudflare/workers-sdk#13257.
+D1 needs flat `.sql` files in `migrations_dir`. Drizzle-orm does not read migration files at runtime; D1 tracks applied migrations via `wrangler d1 migrations apply`.
 
-**Best practice:** automate flattening with a post-generate script.
+**Use `drizzle-kit generate` as a starting point**, then create the flat D1 migration file from it. Drizzle-kit outputs subdirectories (`timestamp_name/migration.sql`) that D1 cannot read directly, so copy the SQL into a flat file, improve it (add comments, data migrations, simplify), and delete the generated subdirectory.
 
-```json
-{
-  "scripts": {
-    "generate": "drizzle-kit generate && tsx scripts/flatten-migrations.ts ./drizzle",
-    "flatten": "tsx scripts/flatten-migrations.ts ./drizzle"
-  }
-}
-```
+**Workflow:**
 
-**Apply migrations:**
+1. Edit `schema.ts`
+2. Run `drizzle-kit generate`
+3. Read the generated SQL in `drizzle/timestamp_name/migration.sql`
+4. Create a flat file: `drizzle/NNNN_kebab-description.sql` (zero-padded sequence number, higher than all existing)
+5. Copy and improve the generated SQL
+6. Delete the generated subdirectory
+7. Apply with `wrangler d1 migrations apply`
+
+If `drizzle-kit generate` fails (interactive prompts on renames), write the SQL directly. Read existing migration files and `schema.ts` to understand current and desired state.
+
+**Statement separator:** use `--> statement-breakpoint` between SQL statements. D1 wrangler splits files on this marker.
+
+#### Apply migrations
 
 ```bash
 wrangler d1 migrations apply DB --remote
@@ -523,7 +528,7 @@ This means enums are safe and cheap to evolve over time on D1 and SQLite. Prefer
 
 ### Apply migrations to D1
 
-Use Wrangler, not `drizzle-kit migrate`:
+Use Wrangler, not `drizzle-kit migrate`. See the "D1 migrations" section above for the full manual migration workflow.
 
 ```bash
 wrangler d1 migrations apply DB --remote
@@ -533,7 +538,7 @@ wrangler d1 migrations apply DB --local
 
 ### Durable Objects migrations
 
-For DO, drizzle-kit generates a `migrations.js` bundle that imports all `.sql` files. Apply it in the thin DO constructor:
+For DO, write migration `.sql` files manually and also update `migrations.js` with the new import entry. Apply in the thin DO constructor:
 
 ```ts
 import * as durable from 'drizzle-orm/durable-sqlite'

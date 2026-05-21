@@ -1112,59 +1112,44 @@ With `db.batch()` this is handled automatically because statements execute in or
 
 This also applies to **deletes in reverse order**: delete children first, then parents. Otherwise you get FK violations on the delete side too (unless `onDelete: Cascade` handles it).
 
-## Migrations & SQL export
+## Migrations
 
-Docs: Overview https://orm.drizzle.team/docs/kit-overview | Generate https://orm.drizzle.team/docs/drizzle-kit-generate | Migrate https://orm.drizzle.team/docs/drizzle-kit-migrate | Push https://orm.drizzle.team/docs/drizzle-kit-push | Export https://orm.drizzle.team/docs/drizzle-kit-export | Config https://orm.drizzle.team/docs/drizzle-config-file
+### Use drizzle-kit generate as a starting point, then write the final migration manually
 
-### Generate migration files
+Drizzle-orm does not read migration files at runtime; they are pure output. The database's own migration system (D1's `wrangler d1 migrations apply`, Postgres `drizzle-kit migrate`, libSQL `drizzle-kit migrate`) tracks which files have been applied.
 
-```bash
-pnpm drizzle-kit generate
-```
+**Use `drizzle-kit generate` to get the SQL diff as a starting point.** Then review, improve, and adapt it into the final migration file. Never blindly commit the generated output. Improvements include: adding comments, simplifying SQLite ALTER TABLE sequences, adding data migrations or backfills, and working around SQLite DDL limitations.
 
-Creates numbered `.sql` files in the `out` directory (e.g. `./drizzle/0000_dear_lord_tyger.sql`).
+**Workflow:**
 
-### Non-interactive `drizzle-kit generate` (CI / agents)
+1. Edit `schema.ts` with the new table/column definitions
+2. Run `drizzle-kit generate` to get a starting point SQL diff
+3. Read the generated SQL and adapt it into the final migration file
+4. For D1: create a flat `.sql` file (D1 cannot read drizzle-kit's subdirectory format); see `./cloudflare.md`
+5. For Postgres/libSQL: the generated file can be used directly after review
+6. Apply the migration with the database's native tool
 
-`drizzle-kit generate` prompts interactively when it detects a table/column rename vs. create+drop ambiguity (e.g. "Is `secret_event` created or renamed from `secret`?"). This fails in non-TTY environments (CI, piped shells, coding agents) with:
+If `drizzle-kit generate` fails (interactive prompts on renames, TTY errors in CI), write the migration SQL directly instead. Read existing migration files and `schema.ts` to understand the current and desired state.
 
-```
-Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or process.stdout.isTTY is false)
-```
+**Before writing any migration, always read:**
+- All existing `.sql` migration files in the migrations directory (to know the current DB state)
+- The `schema.ts` file (to know the desired state)
+- The type mapping for your dialect (see `./cloudflare.md` for SQLite/D1, or the Postgres section below)
 
-**There is no official `--non-interactive` or `--auto-approve` flag yet** (tracked in drizzle-team/drizzle-orm#5307 and #4941). Workarounds:
+This is critical because each migration builds on all previous ones. You cannot write correct SQL without knowing what tables, columns, indexes, and constraints currently exist.
 
-1. **Write migration SQL manually** — for simple changes (drop table + create table), write the `.sql` file and update `migrations.js` yourself. This is the most reliable approach for agents:
+For **D1/SQLite** projects, see `./cloudflare.md` for the full migration guide, type mapping table, SQLite DDL limitations, and how to verify migrations with `drizzle-kit push`.
 
-```bash
-# Create the migration directory with a timestamp-based name
-mkdir -p drizzle/20260415130000_my_migration
-
-# Write the SQL file
-cat > drizzle/20260415130000_my_migration/migration.sql << 'SQL'
-DROP TABLE `old_table`;
---> statement-breakpoint
-CREATE TABLE `new_table` ( ... );
-SQL
-
-# Add the import to migrations.js
-# (append the new import + entry to the migrations object)
-```
-
-2. **Use `expect` or `script`** — wrap drizzle-kit in a TTY simulator to auto-answer prompts. Fragile and not recommended.
-
-3. **Use `--name` to name migrations** — doesn't skip prompts but helps identify them:
-
-```bash
-pnpm drizzle-kit generate --name=event-sourced-secrets
-```
-
-When writing migrations manually for Durable Objects, remember to also update `migrations.js` with the new import entry so `migrator.migrate()` picks it up at runtime. The snapshot.json is only needed by drizzle-kit for computing future diffs — the migration will run fine without it, and the next interactive `drizzle-kit generate` will regenerate a fresh snapshot.
+For **Durable Objects**, write migrations manually and also update `migrations.js` with the new import entry so `migrator.migrate()` picks it up at runtime.
 
 ### Apply migrations
 
 ```bash
-# Apply to database (Postgres, libSQL)
+# D1 — use wrangler, not drizzle-kit
+wrangler d1 migrations apply DB --remote
+wrangler d1 migrations apply DB --local
+
+# Postgres, libSQL/Turso — use drizzle-kit
 doppler run -- pnpm drizzle-kit migrate
 
 # Dev only — push schema directly, no migration files
@@ -1184,4 +1169,4 @@ This is useful for:
 - Sharing schema with DBAs or external tools
 - Bootstrapping a fresh database without running incremental migrations
 
-Cloudflare-specific migration and external-access guidance lives in `./cloudflare.md`.
+Cloudflare-specific migration rules, SQLite type mapping, and DDL limitations live in `./cloudflare.md`.
