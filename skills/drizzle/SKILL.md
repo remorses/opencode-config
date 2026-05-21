@@ -1138,7 +1138,7 @@ If `drizzle-kit generate` fails (interactive prompts on renames, TTY errors in C
 
 This is critical because each migration builds on all previous ones. You cannot write correct SQL without knowing what tables, columns, indexes, and constraints currently exist.
 
-For **D1/SQLite** projects, see `./cloudflare.md` for the full migration guide, type mapping table, SQLite DDL limitations, and how to verify migrations with `drizzle-kit push`.
+For **D1/SQLite** projects, see `./cloudflare.md` for the full D1 migration workflow.
 
 For **Durable Objects**, write migrations manually and also update `migrations.js` with the new import entry so `migrator.migrate()` picks it up at runtime.
 
