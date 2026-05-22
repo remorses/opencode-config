@@ -194,6 +194,31 @@ If multiple versions accumulated since last publish, merge them into one changel
 - If a feature was added then removed, don't mention it
 - If a feature was added then bug-fixed, just mention the added feature
 
+### Verify examples against source code
+
+Before committing the changelog, **read the actual source code, README, and docs** to verify every example is accurate. Never guess or hallucinate identifiers like model IDs, flag names, command names, enum values, or API endpoints.
+
+Specifically:
+
+1. **Read the README** — check that CLI examples, flag names, and option values match what the README documents
+2. **Read relevant source files** — for CLIs, read the command definitions to verify flag names and accepted values. For libraries, read the public API surface to verify function signatures, parameter names, and types
+3. **Run help commands** — if the tool has a `--help` flag or a `models`/`list` command, run it to get the real identifiers instead of inventing them
+4. **Cross-check every code snippet** — every model ID, flag name, enum value, URL, and command in the changelog must exist in the source. If you're not sure, grep for it
+
+```bash
+# Example: verify CLI flags exist
+node bin.js --help
+node bin.js <subcommand> --help
+
+# Example: verify model/enum IDs
+grep -r 'some-model-id' src/
+
+# Example: check README examples match
+cat README.md | grep -A5 'some-feature'
+```
+
+This prevents publishing changelogs and release notes with wrong identifiers that confuse users.
+
 ## Step 4: Commit the Release
 
 If any changeset `.md` files reference GitHub issues with `Fixes #123`, `Closes #456`, or similar keywords, include those references in the commit message body. GitHub closes issues automatically when the commit containing these keywords lands on the default branch.
