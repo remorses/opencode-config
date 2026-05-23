@@ -85,7 +85,12 @@ function buildPrompt(isVideo: boolean, customPrompt?: string): string {
 }
 
 const readMedia = tool({
-  description: `Describe an image or video file using Gemini vision.`,
+  description: `Describe an image or video file using Gemini vision.
+
+Video files must be under ~15 MB (base64 overhead pushes the 20 MB request limit).
+For larger or longer videos, split them first with ffmpeg before calling this tool:
+  ffmpeg -i input.mp4 -t 300 -c copy part1.mp4
+  ffmpeg -i input.mp4 -ss 300 -t 300 -c copy part2.mp4`,
 
   args: {
     path: tool.schema
