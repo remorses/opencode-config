@@ -894,6 +894,10 @@ compound pair mode renames the primary token and deletes the dark companion. CSS
 
 chart colors, status badges (yellow/emerald/purple), and one-off decorative colors should stay as raw palette classes.
 
+## resource-aware fade-in
+
+when an element depends on an external resource (custom font, video, WebGL canvas), it should stay invisible until the resource loads, then fade in with a CSS transition. this prevents jarring flashes where text reflows on font swap or a canvas pops in mid-render. see [resource-aware-fade-in.md](resource-aware-fade-in.md) for the full pattern with font and video examples.
+
 ## scrollbars
 
 always set all scrollbars styles to transparent and thin.
