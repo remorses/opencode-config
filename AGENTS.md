@@ -537,8 +537,6 @@ prefer a **varied, organic layout**. not every label needs to be inside a box. m
 
 all connections between nodes must use directional arrows. never use plain lines (───) without an arrowhead. always verify alignment by counting characters precisely: every box border (┌┐└┘) must match the width of its content lines (│...│). use the diagram-fixer agent after creating diagrams.
 
-never put ASCII diagrams in SKILL.md files. those files are written for agents, which do not benefit much from diagrams; prefer short prose or a small list instead. diagrams are for human-facing docs like READMEs and docs pages.
-
 If you need to embed rules for agents or complex topics you can use details html block to toggle them so the user does not need to see walls of text or non important content while skimming the document.
 
 
