@@ -145,6 +145,8 @@ The returned `prod_xxx` id doesn't need to leak into code — we look up by prod
 
 Run each of the two commands below **separately**, one at a time. After each one, confirm the response contains the expected `lookup_key` and `unit_amount` before moving on. `$PRODUCT_ID` is a placeholder — replace it with the id you exported above.
 
+Set `tax_behavior=exclusive` on BOTH the top-level (USD) and the EUR `currency_options` entry — otherwise EUR defaults to `unspecified` and the mismatch can block portal plan-switching.
+
 ```bash
 # 1. Monthly — $10/mo + €10/mo
 stripe prices create \
@@ -153,6 +155,7 @@ stripe prices create \
   --unit-amount=1000 \
   -d "recurring[interval]=month" \
   -d "currency_options[eur][unit_amount]=1000" \
+  -d "currency_options[eur][tax_behavior]=exclusive" \
   -d "lookup_key=pro_monthly" \
   -d "nickname=Pro Monthly" \
   -d "tax_behavior=exclusive"
@@ -168,17 +171,19 @@ stripe prices create \
   --unit-amount=10000 \
   -d "recurring[interval]=year" \
   -d "currency_options[eur][unit_amount]=10000" \
+  -d "currency_options[eur][tax_behavior]=exclusive" \
   -d "lookup_key=pro_yearly" \
   -d "nickname=Pro Yearly" \
   -d "tax_behavior=exclusive"
 ```
 
-After both succeed, verify the catalog:
+After both succeed, verify the catalog. Pass `--expand "data.currency_options"` or the EUR amounts will NOT show in the output (Stripe omits `currency_options` unless explicitly expanded):
 
 ```bash
 stripe prices list \
   --lookup-keys pro_monthly \
-  --lookup-keys pro_yearly
+  --lookup-keys pro_yearly \
+  --expand "data.currency_options"
 ```
 
 You should see both prices. If one is missing, create the missing one manually — do not re-run the whole block or you'll get "lookup_key already exists" errors.
@@ -965,3 +970,15 @@ The composite primary key `(subscriptionId, variantId)` lets a single subscripti
 - **Webhook raw body**: call `await request.text()` exactly once in the webhook handler. Calling `request.json()` first (or letting a Zod `body` schema parse the request) consumes the stream and breaks signature verification. Do not add a `body:` schema on the webhook route.
 - **`Subscription.variantId` is the Stripe price id.** The name is historical from the LemonSqueezy days. Do not confuse it with the lookup key.
 - **Errors as values in helpers.** Stripe/Drizzle helper functions (like `getOrCreateStripeCustomer`) should return `Error | T` via `.catch((e) => new TaggedError({ cause: e }))`. Server actions can then check `instanceof Error` and `throw` to propagate to the `ErrorBoundary`. See the [errore skill](../errore/SKILL.md) for the full pattern.
+- **`currency_options` is NOT returned by default.** `stripe prices list` / `stripe prices retrieve` omit `currency_options` unless you pass `--expand currency_options` (or `--expand data.currency_options` for list). Verifying EUR pricing without the expand shows nothing and looks like the EUR amount failed to save when it actually did. Always verify multi-currency with the expand:
+  ```bash
+  stripe prices retrieve $PRICE_ID --expand currency_options
+  stripe prices list --lookup-keys pro_monthly --expand "data.currency_options"
+  ```
+- **`tax_behavior` on EUR lives under `currency_options`, not the top level.** When EUR is added via `currency_options[eur][unit_amount]`, the top-level `tax_behavior=exclusive` only applies to the base USD price. The EUR currency option defaults to `tax_behavior: unspecified` unless you also pass `currency_options[eur][tax_behavior]=exclusive`. A mismatch (USD exclusive, EUR unspecified) can block portal plan-switching, so set it on both:
+  ```bash
+  -d "currency_options[eur][unit_amount]=9900" \
+  -d "currency_options[eur][tax_behavior]=exclusive"
+  ```
+- **`is_default` on a portal config cannot be set via the API/CLI.** The `is_default` field is read-only — you cannot pass it to `billing_portal configurations create/update`. Only the Stripe Dashboard (Settings → Billing → Customer portal) controls which config is default, and `billingPortal.sessions.create` uses that default unless you pass an explicit `configuration` id. So: either set the default in the Dashboard, or pin the `bpc_...` id in the session-create call. Creating a new config via CLI does NOT make it the default.
+- **The dashboard-managed default portal config drops API-set `subscription_update.products`.** Updating the default config (the one with `is_default: true`) via the API to add a `products` array silently does not persist — the field comes back empty/absent. Configure the portal's switchable product/price list in the **Dashboard** for the default config, or create + pin a non-default config that does persist `products`.
