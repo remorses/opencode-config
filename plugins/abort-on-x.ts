@@ -7,7 +7,7 @@
 
 import type { Plugin } from "@opencode-ai/plugin";
 
-export const AbortOnXPlugin: Plugin = async ({ client }) => {
+export const AbortOnXPlugin: Plugin = async ({ client,  }) => {
   return {
     "chat.message": async (input, output) => {
       // Extract text from message parts
@@ -21,7 +21,7 @@ export const AbortOnXPlugin: Plugin = async ({ client }) => {
       if (text.toLowerCase() !== "x") return;
 
       // Clear parts so "x" isn't sent to the LLM
-      output.parts.length = 0;
+      // output.parts.length = 0;
 
       try {
         await client.session.abort({ path: { id: input.sessionID } });
