@@ -477,6 +477,26 @@ after I ask you to push, call the tool kimaki_archive_thread so the thread is re
 
 if i ask you to copy something use pbcopy command to do it. don't tell me to run the command to copy. you must run the pbcopy command yourself.
 
+## downloading Discord CDN URLs
+
+Discord attachment URLs contain query parameters (`ex`, `is`, `hm`) for authentication and expiration. When downloading with curl or any shell command, always wrap the full URL in **single quotes** to prevent the shell from interpreting `&` as a background operator.
+
+```bash
+# correct: single quotes preserve the full URL
+curl -sL -o image.png 'https://cdn.discordapp.com/attachments/123/456/file.png?ex=abc&is=def&hm=ghi'
+
+# WRONG: unquoted & splits the command, downloads a broken file
+curl -sL -o image.png https://cdn.discordapp.com/attachments/123/456/file.png?ex=abc&is=def&hm=ghi
+```
+
+after downloading, always verify the file is valid before using it:
+
+```bash
+file image.png  # should say "PNG image data", not "ASCII text"
+```
+
+if the file is tiny (< 100 bytes) or `file` reports "ASCII text", the URL was likely mangled by the shell or the link expired. Discord CDN links expire after ~24 hours for external access.
+
 ## editing skills
 
 To edit skills search for the skill path in cwd or the appropriate repo. NEVER inside `/Users/morse/Documents/GitHub/kimakivoice/cli/skills` if the skill references it. that folder contains skills synced from other repos, those files are generated. NEVER edit them.
