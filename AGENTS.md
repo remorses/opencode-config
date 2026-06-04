@@ -479,14 +479,10 @@ if i ask you to copy something use pbcopy command to do it. don't tell me to run
 
 ## downloading Discord CDN URLs
 
-Discord attachment URLs contain query parameters (`ex`, `is`, `hm`) for authentication and expiration. When downloading with curl or any shell command, always wrap the full URL in **single quotes** to prevent the shell from interpreting `&` as a background operator.
+Discord attachment URLs have query parameters (`ex`, `is`, `hm`) for auth and expiration. Always wrap the full URL in **single quotes** so the shell doesn't interpret `&` as a background operator.
 
 ```bash
-# correct: single quotes preserve the full URL
 curl -sL -o image.png 'https://cdn.discordapp.com/attachments/123/456/file.png?ex=abc&is=def&hm=ghi'
-
-# WRONG: unquoted & splits the command, downloads a broken file
-curl -sL -o image.png https://cdn.discordapp.com/attachments/123/456/file.png?ex=abc&is=def&hm=ghi
 ```
 
 after downloading, always verify the file is valid before using it:
