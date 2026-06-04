@@ -655,6 +655,36 @@ export function SecretsTable() { ... }
 
 **when to create a new ui component:** if you find the same visual pattern (same markup structure + same tailwind classes) in 2+ places, extract it. one-off patterns can stay inline. the `components/ui/` folder is for generic, reusable primitives. domain-specific components live in `components/` without the `ui/` prefix.
 
+## close dialogs on client-side navigation
+
+controlled dialogs (`open` + `onOpenChange`) stay open after a client-side redirect because React state persists across navigations. Wrap the primitive `Dialog.Root` so it auto-closes when the pathname changes. This fixes every dialog in the app without per-dialog wiring.
+
+The pattern works with any router that exposes a reactive pathname hook. The example below uses Spiceflow's `useRouterState()`, but swap it for `usePathname()` (Next.js), `useLocation()` (React Router), etc.
+
+```tsx
+// components/ui/dialog.tsx
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { useEffect, useRef } from "react";
+import { useRouterState } from "spiceflow/react"; // or usePathname, useLocation
+
+export function Dialog(props: DialogPrimitive.Root.Props) {
+  const { pathname } = useRouterState();
+  const prevPathname = useRef(pathname);
+  const { onOpenChange } = props;
+
+  useEffect(() => {
+    if (prevPathname.current !== pathname) {
+      prevPathname.current = pathname;
+      onOpenChange?.(false, undefined as never);
+    }
+  }, [pathname, onOpenChange]);
+
+  return <DialogPrimitive.Root {...props} />;
+}
+```
+
+Apply the same pattern to `Sheet`, `Drawer`, and `AlertDialog` if they also use controlled state.
+
 ## shadcn icons — `data-icon` attribute
 
 in shadcn buttons, use `data-icon="inline-start"` (prefix) or `data-icon="inline-end"` (suffix) on icons. **no sizing classes on icons inside shadcn components** — they handle icon sizing via CSS.
