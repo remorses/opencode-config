@@ -57,7 +57,7 @@ template now includes a federation example.
 6. **One changeset per logical change.** If a PR has two unrelated changes, create two changeset files.
 7. **Use descriptive filenames.** Prefer `fix-auth-token-refresh.md` over random names like `cool-lions-dance.md`. Keep filenames concise, kebab-case, and focused on the logical change.
 8. **Check recent GitHub issues before writing.** List the last 20 issues with `gh issue list --state all --limit 20` before deciding there is no issue to reference. Do not rely only on commit messages.
-9. **Reference fixed issues.** When a change fixes a GitHub issue, include `Fixes #123` (or `Closes #123`) on its own line in the changeset description. At publish time, the `changepub` command collects these references and includes them in the release commit message body. GitHub closes the issues automatically when that commit lands on the default branch. This also creates a clickable link in the CHANGELOG for users to find context.
+9. **Reference fixed issues.** When a change fixes a GitHub issue, include `Fixes #123` (or `Closes #123`) on its own line in the changeset description. At publish time, the [`changepub`](https://github.com/remorses/opencode-config/blob/main/commands/changepub.md) command collects these references and includes them in the release commit message body. GitHub closes the issues automatically when that commit lands on the default branch. This also creates a clickable link in the CHANGELOG for users to find context.
 
 ## What goes in the description
 
