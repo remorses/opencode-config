@@ -761,19 +761,50 @@ async function resolveStripeOrgId({
 
 **Do not add a Zod `body` schema to the webhook route.** Zod would try to parse the body as JSON, which either double-consumes the stream or normalizes whitespace and breaks HMAC verification. The raw-text handler above is the only correct pattern.
 
-**Register the webhook URL with Stripe** once the route is mounted:
+**Register the webhook URL with Stripe** once the route is mounted. Create **one endpoint per deployed environment** — production and preview have different hostnames, so they need separate endpoints, each with its own `whsec_` stored in that environment's secrets. Scope `enabled_events` to only what your handler processes (the handler silently drops unknown types, but a tight list keeps the dashboard clean):
 
 ```bash
-# Replace with your deployed URL
+# Production
 stripe webhook_endpoints create \
+  --api-key "$STRIPE_SECRET_KEY" \
   --url="https://your-site.example/api/stripe/webhook" \
-  -d "enabled_events[]=checkout.session.completed" \
+  -d "enabled_events[]=customer.subscription.created" \
+  -d "enabled_events[]=customer.subscription.updated" \
+  -d "enabled_events[]=customer.subscription.deleted"
+
+# Preview (separate endpoint, separate secret)
+stripe webhook_endpoints create \
+  --api-key "$STRIPE_SECRET_KEY" \
+  --url="https://preview.your-site.example/api/stripe/webhook" \
   -d "enabled_events[]=customer.subscription.created" \
   -d "enabled_events[]=customer.subscription.updated" \
   -d "enabled_events[]=customer.subscription.deleted"
 ```
 
-Capture the returned `secret` field (only shown once) as `STRIPE_WEBHOOK_SECRET`. For local development, use `stripe listen --forward-to http://localhost:8040/api/stripe/webhook` and use its `whsec_` instead.
+> **Always pass `--api-key "$STRIPE_SECRET_KEY"` explicitly.** Without it, the CLI falls back to the `[default]` profile in `~/.config/stripe/config.toml` — which may point at a different account (and the interactive `delete` confirmation banner shows that wrong account's name/mode). Passing the key from your secrets manager guarantees every command hits the intended account.
+
+For local development, use `stripe listen --forward-to http://localhost:8040/api/stripe/webhook` and use its `whsec_` instead.
+
+#### The webhook secret is shown ONLY on create — capture it immediately
+
+The `secret` field (`whsec_...`) is returned **only in the `webhook_endpoints create` response**. `webhook_endpoints retrieve` and `update` return the secret **masked/absent** — there is no way to read it back later. If you miss it, you must **delete the endpoint and recreate it** (or roll the secret in the Dashboard).
+
+So capture it in the same command that creates the endpoint, and pipe it **straight into your secrets manager via stdin** so the value never lands in shell history, logs, or an agent's context:
+
+```bash
+# Create + capture the secret directly into the secrets manager (sigillo example).
+# The whsec_ value flows create -> stdin -> set, never printed.
+resp=$(stripe webhook_endpoints create \
+  --api-key "$STRIPE_SECRET_KEY" \
+  --url="https://your-site.example/api/stripe/webhook" \
+  -d "enabled_events[]=customer.subscription.created" \
+  -d "enabled_events[]=customer.subscription.updated" \
+  -d "enabled_events[]=customer.subscription.deleted")
+echo "$resp" | python3 -c 'import json,sys; sys.stdout.write(json.load(sys.stdin)["secret"])' \
+  | sigillo secrets set STRIPE_WEBHOOK_SECRET -c prod
+```
+
+After storing it, sync to your deploy target (`wrangler secret put STRIPE_WEBHOOK_SECRET`, etc.) per environment.
 
 ### Idempotency on upserts
 
