@@ -34,26 +34,33 @@ const url = process.env.BETTER_AUTH_URL + '/api/auth'
 
 ## Installation
 
-With drizzle-orm v0 (stable):
+### Recommended: `better-auth-drizzle-adapter` (works with drizzle v0 and v1)
+
+Always use `better-auth-drizzle-adapter` (npm) instead of the official `@better-auth/drizzle-adapter`. Three reasons:
+
+1. **drizzle-orm v1 support.** The official `@better-auth/drizzle-adapter` only works with drizzle-orm v0 (^0.45). It crashes on drizzle-orm v1 (1.0.0-beta) with `"model 'user' was not found in the schema object"`. The community adapter is vendored from PR #9489 which adds relations-v2 support.
+
+2. **SQL null bug fixed.** Both the official adapter and the upstream PR code use `eq(column, null)` which generates `column = NULL` in SQL. This is never true (SQL null semantics). It silently breaks device authorization, refresh-token rotation, and any operation using `{ value: null }` WHERE clauses. `better-auth-drizzle-adapter@>=1.0.3` fixes this with `isNull()`/`isNotNull()`.
+
+3. **postgres-js deleteMany fix.** The official adapter's `deleteMany` returns 0 on postgres-js because `Result` extends `Array` and `res.length` is 0 for DELETE without RETURNING. Fixed in `>=1.0.4`.
 
 ```bash
-pnpm add better-auth @better-auth/drizzle-adapter
+pnpm add better-auth better-auth-drizzle-adapter
 ```
-
-With drizzle-orm v1 (beta) — requires the PR #9489 build and the `/relations-v2` subpath:
-
-```bash
-pnpm add better-auth@"https://pkg.pr.new/better-auth@9489" @better-auth/drizzle-adapter@"https://pkg.pr.new/@better-auth/drizzle-adapter@9489"
-pnpm add drizzle-orm@beta
-```
-
-**Important:** With drizzle-orm v1, you must import from the `/relations-v2` subpath:
 
 ```ts
-import { drizzleAdapter } from '@better-auth/drizzle-adapter/relations-v2'
+import { betterAuth } from 'better-auth/minimal'
+import { drizzleAdapter } from 'better-auth-drizzle-adapter'
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, { provider: 'sqlite' }), // or 'pg'
+  // ...
+})
 ```
 
-The default export (`@better-auth/drizzle-adapter`) only works with drizzle-orm v0.
+Use `better-auth/minimal` on Cloudflare Workers to avoid bundling Kysely (~400KB). The `/minimal` entry strips the built-in database layer, so a drizzle adapter is required.
+
+Source: https://github.com/remorses/better-auth-drizzle-adapter
 
 ## Server config
 
@@ -64,17 +71,12 @@ Create `src/lib/auth.ts` (or `lib/auth.ts`). Export the auth instance as `auth`.
 ```ts
 // src/lib/auth.ts
 import { betterAuth } from 'better-auth'
-import { drizzleAdapter } from '@better-auth/drizzle-adapter' // or 'better-auth/adapters/drizzle' for v0
+import { drizzleAdapter } from 'better-auth-drizzle-adapter'
 import { db } from 'db' // drizzle instance from your db workspace package
-import * as schema from 'db/schema' // your drizzle schema
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg',
-    schema,
-    // pass schema if your table names differ from better-auth defaults:
-    // schema: { ...schema, user: schema.users },
-    // or use usePlural: true if all tables are plural
   }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
@@ -96,18 +98,16 @@ export const auth = betterAuth({
 })
 ```
 
-### Drizzle adapter (SQLite)
+### Drizzle adapter (SQLite / Cloudflare D1)
 
 ```ts
-import { betterAuth } from 'better-auth'
-import { drizzleAdapter } from '@better-auth/drizzle-adapter' // or '/relations-v2' for drizzle-orm v1
+import { betterAuth } from 'better-auth/minimal'
+import { drizzleAdapter } from 'better-auth-drizzle-adapter'
 import { db } from 'db'
-import * as schema from 'db/schema'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'sqlite',
-    schema, // not needed with /relations-v2 if schema is passed to drizzle()
   }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
@@ -654,9 +654,11 @@ export const deviceCode = s.sqliteTable('device_code', {
 **Verification page (Spiceflow):**
 
 The device flow verification page must:
-1. Check the user code is valid via `auth.api.deviceVerify()`
+1. Check the user code is valid via `auth.api.deviceVerify()` **with request headers**
 2. Require the user to be signed in (redirect to login if not)
 3. Provide approve/deny actions via server actions
+
+**`deviceVerify` must receive `headers: request.headers`.** Without headers, better-auth cannot claim the device code for the authenticated session. The subsequent `deviceApprove` or `deviceDeny` call will fail with `"Device code has not been claimed by a verifying session; call GET /device with the user_code while signed in before approving or denying"`. This is a silent bug: the verify call itself succeeds and returns the device info, but skips the session-linking step that the approve/deny endpoints require.
 
 ```tsx
 import { getActionRequest, json, parseFormData, Spiceflow, redirect } from 'spiceflow'
@@ -683,10 +685,11 @@ export const app = new Spiceflow()
         return <div>Open this page from the CLI login flow.</div>
       }
 
-      // 1. Validate the device code
+      // 1. Validate AND claim the device code for this session
       const auth = getAuth()
       const device = await auth.api.deviceVerify({
         query: { user_code: userCode },
+        headers: request.headers, // REQUIRED: links device code to the authenticated session
       }).catch(() => null)
 
       if (!device) {
@@ -818,6 +821,36 @@ const response = await fetch('https://myapp.com/api/me', {
 - **api-key** — API key authentication
 
 See https://better-auth.com/llms.txt for full plugin docs.
+
+## Error handling with onAPIError
+
+Use `onAPIError.onError` to capture auth errors with your observability stack. Without this, auth errors (failed OAuth callbacks, expired sessions, DB issues) are silently logged to console and never reach your error tracker.
+
+```ts
+import { betterAuth } from 'better-auth'
+import { captureException } from '@strada.sh/sdk' // or Sentry, etc.
+
+export const auth = betterAuth({
+  // ... your config ...
+  onAPIError: {
+    onError(error) {
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        { tags: { source: 'better-auth' } },
+      )
+    },
+  },
+})
+```
+
+The `onAPIError` config is a top-level `betterAuth()` option (not nested under `advanced`). Available fields:
+
+- **`onError?: (error: unknown, ctx: AuthContext) => void`** — called on every API error (except redirects). The `error` is `unknown`, so wrap non-Error values. When set, this **replaces** better-auth's default error logging, so include your own logging if needed.
+- **`throw?: boolean`** — re-throw the error instead of swallowing (for frameworks that catch at a higher level)
+- **`errorURL?: string`** — redirect URL for OAuth error pages (defaults to `/api/auth/error`)
+- **`customizeDefaultErrorPage?`** — style the built-in error page
+
+If using the `strataBetterAuth()` plugin from `@strada.sh/sdk/better-auth`, error capture is already wired up automatically. You don't need to add `onAPIError` manually.
 
 ## Spiceflow page examples
 
@@ -985,35 +1018,24 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
 ## Drizzle ORM v1 (beta) compatibility
 
-The official `@better-auth/drizzle-adapter` on npm targets `drizzle-orm` v0.x and does **not** work with `drizzle-orm@beta` (v1.0.0-beta). The adapter relies on v0 APIs (`db._.fullSchema`, `db.query`) that changed in v1 — you get errors like `"model 'user' was not found in the schema object"`.
+The official `@better-auth/drizzle-adapter` does **not** work with `drizzle-orm@beta` (v1.0.0-beta). It relies on v0 APIs (`db._.fullSchema`, `db.query`) that changed in v1 and crashes with `"model 'user' was not found in the schema object"`.
 
-**To use drizzle-orm@beta (v1)**, install both packages from PR #9489 which adds v1 support:
+Use `better-auth-drizzle-adapter` instead. It's vendored from better-auth PR #9489 (relations-v2 support) with additional bug fixes for `eq(null)` SQL generation and postgres-js `deleteMany` row counts.
 
 ```bash
-pnpm add better-auth@"https://pkg.pr.new/better-auth@9489" @better-auth/drizzle-adapter@"https://pkg.pr.new/@better-auth/drizzle-adapter@9489"
-pnpm add drizzle-orm@beta
+pnpm add better-auth better-auth-drizzle-adapter drizzle-orm@beta
 ```
 
-This is a pre-release build from https://github.com/better-auth/better-auth/pull/9489 — it works but is not yet merged into better-auth main. Track progress at https://github.com/better-auth/better-auth/issues/6766.
-
-Once the PR is merged, switch back to `pnpm add @better-auth/drizzle-adapter@latest`.
-
-Usage requires the `/relations-v2` subpath import. The default export does not work with drizzle-orm v1:
-
 ```ts
-// GOOD — drizzle-orm v1
-import { drizzleAdapter } from '@better-auth/drizzle-adapter/relations-v2'
-
-// BAD — only works with drizzle-orm v0
-import { drizzleAdapter } from '@better-auth/drizzle-adapter'
+import { drizzleAdapter } from 'better-auth-drizzle-adapter'
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db, {
-    provider: 'pg', // or 'sqlite'
-  }),
+  database: drizzleAdapter(db, { provider: 'pg' }), // or 'sqlite'
   // ...
 })
 ```
+
+No subpath import needed. Works with both drizzle-orm v0 and v1. Source and bug tracker: https://github.com/remorses/better-auth-drizzle-adapter
 
 ### TS2742 from exported `getAuth()` in app packages
 
@@ -1051,7 +1073,7 @@ export function getAuth() {
 
 Only keep declaration emit for packages that are actually consumed as libraries. If a package is only a Vite/Spiceflow app, Vite emits the runtime build and `tsc --noEmit` is the right typecheck path.
 
-If the package must emit declarations, add an explicit real exported BetterAuth type annotation instead of hand-writing a partial auth shape. Also try `pnpm dedupe better-auth @better-auth/core @better-auth/drizzle-adapter`, but do not expect dedupe to fix TS2742 when declaration emit is the root cause.
+If the package must emit declarations, add an explicit real exported BetterAuth type annotation instead of hand-writing a partial auth shape. Also try `pnpm dedupe better-auth @better-auth/core better-auth-drizzle-adapter`, but do not expect dedupe to fix TS2742 when declaration emit is the root cause.
 
 ## Server-side API calls and cookies
 
