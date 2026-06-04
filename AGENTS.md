@@ -40,7 +40,9 @@ instead of using workspace:\* use workspace:^ for local packages versions. so if
 
 ## type checking
 
-to type check typescript projects try to use their typecheck package.json script if present. if not try build. this is preferable than `tsc`. also try to never pass --noEmit. so that our typechecking path does both things: check and emit the compiled assets. otherwise the dist folders would remain stale even after our changes.
+to type check typescript projects try to use their typecheck package.json script if present or `build`. never pass `--noEmit`. so that our typechecking path does both things: check and emit the compiled assets. otherwise the dist folders would remain stale even after our changes.
+
+my projects usually have `noImplicitAny` false. this makes it easier to write typescript code, if you see many issues related to that config field missing, add it in tsconfig.json.
 
 ## scripts
 
