@@ -14,16 +14,36 @@ Read it when the project is **deployed on Cloudflare** or uses any of these:
 
 For environments where the connection depends on runtime bindings, prefer a factory or conditional exports instead of `process.env` branches inside one file.
 
+**Do NOT use `drizzle-orm/d1` at runtime.** The D1 driver's `mapGetResult()` is broken: when `db.batch()` runs a `findFirst()` that returns no results, the driver passes `undefined` to `customResultMapper` which crashes in `mapRelationalRow` with `TypeError: Cannot read properties of undefined (reading 'id')` (drizzle-team/drizzle-orm#2721). The `sqlite-proxy` driver has this guard and works correctly. Import the `D1Database` **type** from `drizzle-orm/d1` for typing, but use `drizzle-orm/sqlite-proxy` for the runtime driver.
+
 ```ts
-// Cloudflare D1 — simplest option, just pass the binding
-import { drizzle } from 'drizzle-orm/d1'
+// Cloudflare D1 — sqlite-proxy runtime, D1Database type only from drizzle-orm/d1
 import { env } from 'cloudflare:workers'
+import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import type { D1Database } from 'drizzle-orm/d1'
 import * as schema from './schema.ts'
 
 export { schema }
 
-export function getDb() {
-  return drizzle(env.DB, { schema, relations: schema.relations })
+export function getDb(d1: D1Database = env.DB) {
+  return drizzle(
+    async (sql, params, method) => {
+      const stmt = d1.prepare(sql).bind(...params)
+      if (method === 'run') { await stmt.run(); return { rows: [] as any[] } }
+      const { results } = await stmt.all()
+      if (method === 'get') return { rows: results[0] as any }
+      return { rows: results as any[] }
+    },
+    async (queries) => {
+      const stmts = queries.map((q) => d1.prepare(q.sql).bind(...q.params))
+      const results = await d1.batch(stmts)
+      return results.map((r, i) => {
+        if (queries[i]!.method === 'get') return { rows: r.results[0] as any }
+        return { rows: r.results as any[] }
+      })
+    },
+    { schema, relations: schema.relations },
+  )
 }
 ```
 
@@ -35,7 +55,7 @@ This is the canonical runtime example for remote D1 access from Node.js or Bun.
 
 **Important:** in Drizzle beta, `driver: 'd1-http'` exists in **drizzle-kit config**, but there is **no public runtime import** `drizzle-orm/d1-http`. The Drizzle repo itself handles `d1-http` in `drizzle-kit/src/cli/connections.ts` by importing `drizzle-orm/sqlite-proxy` and calling the Cloudflare D1 HTTP API with `fetch()`. So the runtime pattern for Node.js/Bun scripts should be `drizzle-orm/sqlite-proxy`, not `drizzle-orm/d1-http`.
 
-**Rule:** Wrangler/Workers should resolve a `workerd` entry that uses `drizzle-orm/d1`. Local scripts should resolve the default entry that uses `drizzle-orm/sqlite-proxy` over the Cloudflare D1 HTTP API.
+**Rule:** Both Workers and Node entrypoints use `drizzle-orm/sqlite-proxy` as the runtime driver. Import `D1Database` as a **type only** from `drizzle-orm/d1` for typing the binding parameter. The Workers entrypoint calls D1 APIs directly via inline callbacks; the Node entrypoint calls the D1 HTTP API.
 
 ```ts
 // db/src/schema.ts
@@ -52,15 +72,38 @@ export const relations = {}
 ```ts
 // db/src/workerd.ts
 import { env } from 'cloudflare:workers'
-import { drizzle } from 'drizzle-orm/d1'
+import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import type { D1Database } from 'drizzle-orm/d1'
 import * as schema from './schema.ts'
 
 export { schema }
 
-export const db = drizzle(env.DB, {
-  schema,
-  relations: schema.relations,
-})
+export function getDb(d1: D1Database = env.DB) {
+  return drizzle(
+    async (sql, params, method) => {
+      const stmt = d1.prepare(sql).bind(...params)
+      if (method === 'run') {
+        await stmt.run()
+        return { rows: [] as any[] }
+      }
+      const { results } = await stmt.all()
+      // sqlite-proxy expects a falsy value for `get` no-row results.
+      // Returning [] is truthy and produces { id: undefined } in findFirst.
+      // https://github.com/drizzle-team/drizzle-orm/issues/5461
+      if (method === 'get') return { rows: results[0] as any }
+      return { rows: results as any[] }
+    },
+    async (queries) => {
+      const stmts = queries.map((q) => d1.prepare(q.sql).bind(...q.params))
+      const results = await d1.batch(stmts)
+      return results.map((r, i) => {
+        if (queries[i]!.method === 'get') return { rows: r.results[0] as any }
+        return { rows: r.results as any[] }
+      })
+    },
+    { schema, relations: schema.relations },
+  )
+}
 ```
 
 ```ts
@@ -147,13 +190,7 @@ If editor/type resolution in the Worker package picks the default entry instead 
 
 ### Cloudflare D1
 
-No URL needed inside Workers. Use the D1 binding from `wrangler.jsonc`.
-
-```ts
-import { drizzle } from 'drizzle-orm/d1'
-
-const db = drizzle(env.DB, { schema, relations: schema.relations })
-```
+No URL needed inside Workers. Use the D1 binding from `wrangler.jsonc` via `sqlite-proxy` callbacks (see workerd.ts example in the "One db import path" section above).
 
 ### Cloudflare Hyperdrive
 
@@ -193,7 +230,7 @@ Docs: D1 https://orm.drizzle.team/docs/connect-cloudflare-d1 | Durable Objects h
 
 ### Cloudflare D1
 
-D1 is Cloudflare's managed SQLite database. It's the simplest option for Cloudflare Workers. No Durable Objects, no proxy layers. Just pass the D1 binding directly to Drizzle, as shown above.
+D1 is Cloudflare's managed SQLite database. It's the simplest option for Cloudflare Workers. No Durable Objects, no proxy layers. Use `drizzle-orm/sqlite-proxy` with inline D1 callbacks as shown above (NOT `drizzle-orm/d1` which has batch bugs).
 
 **Prefer D1 over Durable Objects** for new projects unless you specifically need DO features like single-point-of-serialization, WebSocket hibernation, or PITR.
 
@@ -319,7 +356,7 @@ await db.insert(schema.users).values({
 })
 ```
 
-This is why the conditional-exports pattern above matters. The script imports the **same `db` symbol** as Worker code, but Node resolves `drizzle-orm/sqlite-proxy` while Wrangler resolves `drizzle-orm/d1`.
+This is why the conditional-exports pattern above matters. The script imports the **same `db` symbol** as Worker code. Both entrypoints use `drizzle-orm/sqlite-proxy`; the Workers one calls D1 APIs directly while the Node one calls the D1 HTTP API.
 
 The empty-row `get` edge case also lives in that canonical example. Keep the `undefined` return for no-row `get` results so `findFirst()` does not produce malformed objects. See https://github.com/drizzle-team/drizzle-orm/issues/5461.
 
@@ -342,7 +379,7 @@ const [users, posts] = await db.batch([
 If switching an existing worker from DO to D1:
 
 1. Create D1 databases with `wrangler d1 create`
-2. Replace `drizzle-orm/sqlite-proxy` with `drizzle-orm/d1` in `db.ts`
+2. Keep `drizzle-orm/sqlite-proxy` in `db.ts` but change the callbacks from DO RPC to direct D1 binding calls (see workerd.ts example above)
 3. Replace `durable_objects` bindings with `d1_databases` in `wrangler.jsonc`
 4. Add a `deleted_classes` migration tag to remove old DO classes
 5. Delete the DO class file, remove its export from `app.tsx`
