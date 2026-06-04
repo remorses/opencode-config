@@ -2,7 +2,7 @@
 # this is a copy of oracle agent using mythos instead of oracle
 description: this is a copy of oracle agent using Anthropic mythos instead of oracle. use this when the main oracle agent fails or does not start.
 mode: subagent
-model: anthropic/claude-opus-4-7
+model: anthropic/claude-opus-4-8
 variant: high
 ---
 
