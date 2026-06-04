@@ -25,21 +25,35 @@ import * as schema from './schema.ts'
 
 export { schema }
 
+// Convert D1 object rows to positional arrays for sqlite-proxy.
+// Same logic as drizzle-orm's internal d1ToRawMapping.
+function d1ToRawRows(results: Record<string, unknown>[]) {
+  return results.map((row) => Object.keys(row).map((k) => row[k]))
+}
+
 export function getDb(d1: D1Database = env.DB) {
   return drizzle(
     async (sql, params, method) => {
       const stmt = d1.prepare(sql).bind(...params)
       if (method === 'run') { await stmt.run(); return { rows: [] as any[] } }
-      const { results } = await stmt.all()
-      if (method === 'get') return { rows: results[0] as any }
-      return { rows: results as any[] }
+      // raw() returns positional arrays which sqlite-proxy expects.
+      // all() returns objects which break mapResultRow (indexes by position).
+      const rows = await stmt.raw()
+      // sqlite-proxy expects a falsy value for `get` no-row results.
+      // Returning [] is truthy and produces { id: undefined } in findFirst.
+      // https://github.com/drizzle-team/drizzle-orm/issues/5461
+      if (method === 'get') return { rows: rows[0] as any }
+      return { rows: rows as any[] }
     },
     async (queries) => {
+      // D1 batch() is atomic but only returns object rows (no raw()),
+      // so convert to positional arrays for sqlite-proxy.
       const stmts = queries.map((q) => d1.prepare(q.sql).bind(...q.params))
       const results = await d1.batch(stmts)
       return results.map((r, i) => {
-        if (queries[i]!.method === 'get') return { rows: r.results[0] as any }
-        return { rows: r.results as any[] }
+        const rows = d1ToRawRows(r.results as Record<string, unknown>[])
+        if (queries[i]!.method === 'get') return { rows: rows[0] as any }
+        return { rows: rows as any[] }
       })
     },
     { schema, relations: schema.relations },
@@ -78,6 +92,11 @@ import * as schema from './schema.ts'
 
 export { schema }
 
+// Convert D1 object rows to positional arrays for sqlite-proxy.
+function d1ToRawRows(results: Record<string, unknown>[]) {
+  return results.map((row) => Object.keys(row).map((k) => row[k]))
+}
+
 export function getDb(d1: D1Database = env.DB) {
   return drizzle(
     async (sql, params, method) => {
@@ -86,19 +105,21 @@ export function getDb(d1: D1Database = env.DB) {
         await stmt.run()
         return { rows: [] as any[] }
       }
-      const { results } = await stmt.all()
+      // raw() returns positional arrays which sqlite-proxy expects.
+      const rows = await stmt.raw()
       // sqlite-proxy expects a falsy value for `get` no-row results.
-      // Returning [] is truthy and produces { id: undefined } in findFirst.
       // https://github.com/drizzle-team/drizzle-orm/issues/5461
-      if (method === 'get') return { rows: results[0] as any }
-      return { rows: results as any[] }
+      if (method === 'get') return { rows: rows[0] as any }
+      return { rows: rows as any[] }
     },
     async (queries) => {
+      // D1 batch() only returns objects, convert for sqlite-proxy.
       const stmts = queries.map((q) => d1.prepare(q.sql).bind(...q.params))
       const results = await d1.batch(stmts)
       return results.map((r, i) => {
-        if (queries[i]!.method === 'get') return { rows: r.results[0] as any }
-        return { rows: r.results as any[] }
+        const rows = d1ToRawRows(r.results as Record<string, unknown>[])
+        if (queries[i]!.method === 'get') return { rows: rows[0] as any }
+        return { rows: rows as any[] }
       })
     },
     { schema, relations: schema.relations },
@@ -113,18 +134,17 @@ import * as schema from './schema.ts'
 
 export { schema }
 
-async function remoteCallback(
-  sql: string,
-  params: any[],
-  method: 'run' | 'all' | 'values' | 'get',
-) {
+async function queryD1(sql: string, params: any[], method: string) {
+  // sqlite-proxy expects positional arrays, so always use 'raw'
+  // endpoint for reads. 'query' returns objects which break mapResultRow.
+  const endpoint = method === 'run' ? 'query' : 'raw'
   const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID!}/d1/database/${process.env.CLOUDFLARE_DATABASE_ID!}/${method === 'values' ? 'raw' : 'query'}`,
+    `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID!}/d1/database/${process.env.CLOUDFLARE_DATABASE_ID!}/${endpoint}`,
     {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.CLOUDFLARE_D1_TOKEN!}`,
+        'content-type': 'application/json',
+        authorization: `Bearer ${process.env.CLOUDFLARE_D1_TOKEN!}`,
       },
       body: JSON.stringify({ sql, params }),
     },
@@ -133,23 +153,30 @@ async function remoteCallback(
   const data = await response.json() as {
     success: boolean
     errors?: { code: number; message: string }[]
-    result: Array<{ results: any[] | { rows: any[] } }>
+    result?: { results: any[] | { rows: any[] } }[]
   }
 
   if (!data.success) {
-    throw new Error(data.errors?.map((error) => `${error.code}: ${error.message}`).join('\n') ?? 'Unknown D1 error')
+    throw new Error(data.errors?.map((e) => `${e.code}: ${e.message}`).join('\n') ?? 'Unknown D1 error')
   }
 
-  const result = data.result[0]?.results
+  const result = data.result?.[0]?.results
   const rows = Array.isArray(result) ? result : (result?.rows ?? [])
 
   // sqlite-proxy expects a falsy rows value for `get` no-row results.
-  // Returning [] is truthy and can produce `{ id: undefined }` in findFirst.
+  // Returning [] is truthy and produces `{ id: undefined }` in findFirst.
   // https://github.com/drizzle-team/drizzle-orm/issues/5461
-  return { rows: method === 'get' && rows.length === 0 ? undefined : rows }
+  if (method === 'get') return { rows: rows[0] }
+  return { rows }
 }
 
-export const db = drizzle(remoteCallback, { schema, relations: schema.relations })
+export function getDb() {
+  return drizzle(
+    (sql, params, method) => queryD1(sql, params, method),
+    async (queries) => Promise.all(queries.map((q) => queryD1(q.sql, q.params, q.method))),
+    { schema, relations: schema.relations },
+  )
+}
 ```
 
 ```json
