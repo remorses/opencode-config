@@ -528,6 +528,8 @@ await db.insert(schema.accounts)
   .onConflictDoNothing({ target: schema.accounts.id })
 ```
 
+Use `onConflictDoNothing()` in **delete-then-create patterns** (e.g. "delete all children, recreate from scratch") where concurrent requests can race. Without it, two overlapping requests both delete and then both try to insert, causing unique constraint violations and deadlocks. This is the lightweight alternative to wrapping everything in a serializable transaction, which causes contention under load.
+
 ## Type inference
 
 Docs: https://orm.drizzle.team/docs/goodies
