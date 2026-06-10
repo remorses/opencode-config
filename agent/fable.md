@@ -1,5 +1,5 @@
 ---
-description: Build agent using Mythos distilled aka Opus 4.7
+description: Build agent using Mythos Fable
 mode: primary
 model: anthropic/claude-fable-5
 variant: medium
