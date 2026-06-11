@@ -367,7 +367,16 @@ If publish fails due to TypeScript errors or other issues, fix them and retry.
 
 ## Output
 
-After publishing, report what you did and include the GitHub release link.
+After publishing, report what you did and include:
+- the GitHub release link
+- links to any GitHub issues that were closed by the release (full URLs like `https://github.com/owner/repo/issues/123`)
+
+The GitHub release notes should also mention closed issues at the bottom, linking to each one. For example:
+
+```
+Fixes https://github.com/owner/repo/issues/123
+Fixes https://github.com/owner/repo/issues/456
+```
 
 also make sure that we always use `workspace:^` instead of `workspace:*` for workspace dependencies in package.json. using :\* will use the pinned package in released npm package.json files, instead of ^.
 
