@@ -179,8 +179,9 @@ When `upper` is an **object** `{ x, y }`, the bezier is:
 ```tsx
 function jitterEasingToBezier(easing) {
   if (easing.name !== 'custom:path:v1') {
-    // Named easing, use egaki presets or jitter-easings.ts lookup
-    return getJitterEasing(easing.name, easing.config?.intensity ?? 50)
+    // Named easing: use the egaki preset for that name (see mapping table)
+    // e.g. impulseOvershoot(easing.config?.intensity ?? 50)
+    return lookupEgakiPreset(easing.name)(easing.config?.intensity ?? 50)
   }
   const [p1, p2] = easing.config.controlPoints
   const x1 = typeof p1.upper === 'object' ? p1.upper.x : p1.upper
@@ -256,8 +257,8 @@ The engine builders (`pathPreset`, `springPreset`, `bouncePreset`, `cubicBezier`
 | `impulse:standard:v1` | `EASE.impulseSlow` | `impulseSlowEasing(i)` |
 | `impulseAndOvershoot:standard:v1` | `EASE.impulseOvershoot` | `impulseOvershootEasing(i)` |
 
-The raw easing data is also available in [`jitter-easings.ts`](./jitter-easings.ts)
-if you need the lookup-by-Jitter-name approach for automated conversion scripts.
+For automated conversion scripts, build a `Record<JitterEasingName, EasingPreset>`
+from this table using the continuous preset functions exported by `egaki/video`.
 
 ## Additive animation model
 
