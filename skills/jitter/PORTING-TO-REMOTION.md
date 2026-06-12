@@ -5,7 +5,9 @@ framework. Covers scene extraction, concept mapping, exact easing curves, and
 frame-by-frame comparison workflow.
 
 Working examples: `modular-example/` (bento grid), `mirror-example/` (social
-media showcase with mirrored galleries) in the egaki repo.
+media showcase with mirrored galleries), `testimonial-example/` (frosted glass
+card with masked text reveal, heart fill, customizable via MDX props) in the
+egaki repo.
 
 ## Extracting the scene graph
 
@@ -204,10 +206,32 @@ interpolate(frame, [0, 60], [0, 1], { easing: EASE.smooth })
 interpolate(frame, [0, 60], [0, 1], { easing: EASE.bounce })
 interpolate(frame, [0, 60], [0, 1], { easing: EASE.overshootElastic })
 
-// Custom intensity (0-100, snapped to nearest 25)
+// Custom intensity 0-100
 interpolate(frame, [0, 60], [0, 1], { easing: smoothEasing(75) })
 interpolate(frame, [0, 60], [0, 1], { easing: bounceEasing(100) })
 ```
+
+### Non-standard intensities (continuous presets)
+
+Jitter's intensity dial is **continuous**, and real scenes use values like 96
+or 71, not just multiples of 25. egaki ports Jitter's actual curve engine, so
+the 14 spring/bounce/overshoot preset functions accept ANY intensity 0-100
+(configs interpolated in control-point space, exactly like Jitter):
+
+```tsx
+import { impulseOvershoot, overshoot, naturalThrow } from 'egaki/video'
+
+// exact Jitter curve at intensity 96 — no snapping, no approximation
+const cardPulseEasing = impulseOvershoot(96)
+const heartEasing = impulseOvershoot(71)
+```
+
+Always use the continuous preset functions when the scene's `easing.config.intensity`
+is not a multiple of 25. Never approximate by rounding to the nearest preset level.
+The engine builders (`pathPreset`, `springPreset`, `bouncePreset`, `cubicBezier`,
+`polybezier`) are also exported from `egaki/video` for custom curves.
+
+`smooth:standard:v1` at intensity 50 is exactly `Easing.bezier(0.5, 0, 0, 1)`.
 
 ### Jitter name to egaki name mapping
 
@@ -372,6 +396,51 @@ function AnimatedText({ text, startMs, letterDurationMs, offsetMs, travelY, easi
 }
 ```
 
+### textIn with `effect: 'slideAndMask'`
+
+Besides `'appear'`, textIn can have `effect: 'slideAndMask'`: each word slides
+up into view through its own clipping mask, with **no opacity fade**. Implement
+with a per-word `inline-block` + `overflow: hidden` wrapper and an inner span
+translated by its own height:
+
+```tsx
+{text.split(' ').map((word, i) => {
+  const wordStartMs = startMs + i * offsetMs
+  const progress = interpClamp({ frame, startMs: wordStartMs,
+    endMs: wordStartMs + nodeDurationMs, from: 0, to: 1, fps, easing })
+  return (
+    <span key={i}>
+      <span style={{ display: 'inline-block', overflow: 'hidden', verticalAlign: 'top' }}>
+        <span style={{ display: 'inline-block', transform: `translateY(${(1 - progress) * 100}%)` }}>
+          {word}
+        </span>
+      </span>
+      {i < words.length - 1 ? ' ' : null}
+    </span>
+  )
+})}
+```
+
+Keep the literal space **outside** the overflow-hidden wrapper so the browser
+can wrap lines naturally at the same points as Jitter.
+
+## Value mapping gotchas
+
+- **`lineHeight` is a percent of fontSize.** A text layer with `fontSize: 32`
+  and `lineHeight: 108.79` renders at `32 * 1.0879 = 34.8px` line height.
+- **`blurRadius` ≈ 2x the CSS blur sigma.** Jitter `blurRadius: 109` matches
+  CSS `filter: blur(54.5px)`.
+- **Tailwind preflight clamps images.** The egaki player ships Tailwind's
+  preflight (`img { max-width: 100% }`), which silently shrinks absolutely
+  positioned images sized larger than their parent. Always set
+  `maxWidth: 'none'` on every `<img>`.
+- **Scale ops where content must stay put.** When Jitter scales a mask rect
+  (e.g. a card pulsing to 1.1x) but the card's text stays in place, do NOT use
+  `transform: scale` (it would scale the content too if applied to a shared
+  parent, or shift the mask if applied separately). Animate the rect's
+  width/height/borderRadius anchored at its center instead, and keep content
+  positioned in artboard coordinates.
+
 ## Image asset optimization
 
 Jitter's CloudFront CDN serves **original-resolution** images. Some can be 8K
@@ -417,3 +486,38 @@ timing or easing mismatches early.
 produce all-black frames for complex scenes with many nested transforms. Pass
 `allowHtmlInCanvas: false` to force software rasterization, or compare using
 player screenshots (`page.screenshot()`) instead of SDK screenshots.
+
+### Prefer DOM screenshots over SDK screenshots for comparison
+
+The SDK's software rasterizer (`allowHtmlInCanvas: false`) **ignores zero-size
+`overflow: hidden` masks**: a mask div animated to 0x0 still paints its
+children, so elements that should be hidden (pre-reveal portraits, fill masks)
+appear in SDK screenshots and produce false mismatches. For pixel comparison,
+seek the player and screenshot the player element with Playwright instead:
+
+```javascript
+await page.evaluate((f) => window.egakiSDK.seekTo(f), frame)
+const el = await page.$('.__remotion-player')
+await el.screenshot({ path: `/tmp/dom-${ms}.png` })
+```
+
+### Aligning the two screenshots
+
+Two cropping steps are needed before images can be diffed:
+
+- **Jitter renderer PNGs have transparent margins.** `renderFrame()` output is
+  larger than the artboard; find the content bbox (e.g. with PIL `getbbox()`)
+  and crop to it.
+- **Letterbox bars in the player.** When the artboard aspect ratio differs
+  from the 16:9 composition, the scaled artboard is centered with bars on the
+  sides. Crop the DOM screenshot to the artboard area (offsets scale with the
+  screenshot's device-pixel width) before resizing to match the reference.
+
+```python
+from PIL import Image
+ref = Image.open('ref.png').convert('RGB').crop(ref_content_bbox)
+dom = Image.open('dom.png').convert('RGB')
+w, h = dom.size
+x0, x1 = round(offset_x / 1920 * w), round((1920 - offset_x) / 1920 * w)
+dom = dom.crop((x0, 0, x1, h)).resize(ref.size)
+```
