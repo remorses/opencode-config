@@ -277,6 +277,12 @@ The output is a full-resolution PNG matching the `width`/`height` params, with n
 editor UI, selection handles, or chrome. Just the clean artboard content at that
 exact animation frame.
 
+**The artboard may be letterboxed inside the PNG.** With `width=1920&height=1080`
+and `superSampling=2` the artboard rendered at half size (960x540) centered with
+transparent padding. Before comparing against other renders, find the content
+bbox once (`magick frame.png -alpha extract -threshold 50% -format "%@" info:`)
+and crop + flatten onto the artboard fill color.
+
 ### Rendering multiple frames
 
 Loop over timestamps to capture a sequence:
