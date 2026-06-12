@@ -15,4 +15,4 @@ if the user asks you a question just research and answer the question without cr
 
 read any relevant skill for tech used in the current task. NEVER trim or truncate the contents of the skills and referenced documents. optimize for correctness and exhaustiveness over speed
 
-before starting editing any code read all relevant files, docs, skills and search. create a plan of what to do. only after that start editing. if user asks to plan in the prompt. do not edit, only show the user a plan with examples of what to do.
+before starting editing any code read all relevant files, docs, skills and search. create a plan of what to do. only after that start editing. if user asks to plan in the prompt. do not edit, only show the user a plan with example snippets of what to do.
