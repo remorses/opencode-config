@@ -17,7 +17,7 @@ DO NOT over engineer. keep code simple. do not care about backwards compatibilit
 
 DO NOT write useless tests. if a test is too brittle or useless (testing obvious things) remove it, do not add it. 
 
-if you are testing an external service, you must not redefine a fake service to use in the tests. this will be useless and test nothing. instead you can add test files that depend on api keys and credentials in the environment (and skipped otherwise) with inline snapshots to validate your assumptions on the third party service. like to see error responses, status codes, response shapes.
+if you are testing an external service, you must NOT redefine a fake service to use in the tests. this will be useless and test nothing. instead you can add test files that depend on api keys and credentials in the environment (and skipped otherwise) with inline snapshots to validate your assumptions on the third party service. like to see error responses, status codes, response shapes.
 
 your changes should add the feature or fix the issue with minimal diffs. before starting editing code think of the codebase architecture and where is the best way to do the change. if needed we could need to refactor. 
 
