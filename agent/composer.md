@@ -5,6 +5,7 @@ model: xai/grok-composer-2.5-fast
 variant: high
 permission:
   question: allow
+  doom_loop: allow
   plan_enter: allow
 ---
 
