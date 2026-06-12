@@ -115,6 +115,21 @@ groups.forEach(g => {
 | resize ops | animate `width`/`height` from 0 to natural size |
 | textIn ops | per-letter staggered animation (see textIn section) |
 
+### Code style: inline single-use constants
+
+Do NOT create named constants or config objects for values used only once.
+The extracted scene values (positions, sizes, colors, font settings, op
+timings) should be hardcoded inline at their use site with a short comment
+referencing the Jitter layer/op. Named constants like `BAR_START_WIDTH = 80`
+or objects like `const ICON = { x: 20, y: 20, size: 40 }` that are spread
+into a single style block just add indirection — write `left: 20, top: 20,
+width: 40, height: 40` directly in the JSX instead.
+
+Only name a value when it is genuinely reused (e.g. the query string used by
+both the stagger table and the render loop, or the artboard dimensions used
+by both the scale math and the wrapper div). Derived computations (scale
+factors, offsets) also stay as consts since inlining the math would hurt.
+
 ### Composition size
 
 egaki's Remotion composition is hardcoded to **1920x1080 at 30fps**. If the Jitter
