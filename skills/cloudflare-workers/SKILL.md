@@ -345,6 +345,19 @@ When debugging whether a Worker's KV writes are persisting, always use `--remote
 
 See ./dynamic-workers.md
 
+## CORS for static assets
+
+Cloudflare Workers Static Assets are served by the CDN **before** Worker code runs. CORS headers set in Worker code don't apply to static files. This breaks cross-origin `<canvas>` image drawing, `@font-face` loading, and `fetch()` reads from other origins.
+
+Fix: create a `public/_headers` file (Vite copies it to the build output, which becomes `assets.directory`):
+
+```
+/*
+  Access-Control-Allow-Origin: *
+```
+
+Cloudflare reads `_headers` and applies the rules to all static asset responses. The file itself is not served. See [Cloudflare headers docs](https://developers.cloudflare.com/workers/static-assets/headers/).
+
 ## Importing non-JS files as text
 
 For things like `.txt`, `.md`, and `.sql`, tell Wrangler/Vite to import them as text with `rules`, then add a TypeScript declaration file. Do **not** silence the import with `// @ts-expect-error`.
