@@ -90,6 +90,8 @@ export const auth = betterAuth({
     },
   },
   session: {
+    expiresIn: 60 * 60 * 24 * 365, // 1 year
+    updateAge: 60 * 60 * 24, // refresh expiry every 1 day of activity
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60, // 5 minutes
@@ -113,6 +115,8 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL!,
   emailAndPassword: { enabled: true },
   session: {
+    expiresIn: 60 * 60 * 24 * 365, // 1 year
+    updateAge: 60 * 60 * 24, // refresh expiry every 1 day of activity
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60, // 5 minutes
@@ -549,8 +553,8 @@ if (!session) {
 export const auth = betterAuth({
   // ...
   session: {
-    expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24, // refresh expiry every 1 day
+    expiresIn: 60 * 60 * 24 * 365, // 1 year
+    updateAge: 60 * 60 * 24, // refresh expiry every 1 day of activity
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60, // 5 minutes
@@ -572,6 +576,23 @@ const session = await auth.api.getSession({
   query: { disableCookieCache: true },
 })
 ```
+
+## Session expiration — always set to 1 year
+
+**Always set `session.expiresIn` to 1 year** in every better-auth project. The default is only 7 days, which forces users to re-login every week. This is especially painful for CLI tools using the device flow, where re-authenticating means opening a browser and approving again.
+
+```ts
+session: {
+  expiresIn: 60 * 60 * 24 * 365, // 1 year
+  updateAge: 60 * 60 * 24, // refresh expiry every 1 day of activity
+},
+```
+
+`updateAge` means the session expiry timestamp gets pushed forward on every day of activity. Active users effectively never expire; only truly idle sessions (no API call for a full year) will need to re-authenticate.
+
+This applies to all session types: browser cookies, CLI device-flow bearer tokens, and any other session created by better-auth. There is no per-auth-method session config in better-auth; `expiresIn` is global.
+
+If you omit `expiresIn`, better-auth defaults to `60 * 60 * 24 * 7` (7 days). Never rely on this default.
 
 ## Plugins
 
