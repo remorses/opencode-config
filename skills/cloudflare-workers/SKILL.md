@@ -279,10 +279,13 @@ CLOUDFLARE_ENV=preview doppler run -c preview -- vite dev
 CLOUDFLARE_ENV=preview doppler run -c preview -- vite build && wrangler deploy --env preview
 ```
 
+Add **`CLOUDFLARE_INCLUDE_PROCESS_ENV=true`** to your Doppler config so wrangler automatically picks up all Doppler-injected env vars as Worker bindings during local dev. Without it, `doppler run` populates `process.env` but wrangler ignores those values. Sigillo (`sigillo run`) sets this automatically; Doppler requires it to be added manually.
+
 Rules:
 
 - **Prefer Doppler over `.env` / `.dev.vars`** for local development.
 - **Put shell env vars before `doppler run`, never after.**
+- **Add `CLOUDFLARE_INCLUDE_PROCESS_ENV=true`** in Doppler so wrangler sees the injected env vars.
 - Read runtime values from `import { env } from 'cloudflare:workers'`, not `process.env`, even though `process.env` may be populated under `nodejs_compat`.
 
 ### Upload secrets from Doppler to Cloudflare
