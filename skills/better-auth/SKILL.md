@@ -1157,10 +1157,12 @@ When a server-side layout or route needs to redirect an unauthenticated user to 
   const auth = createAuth({ env: state.env, baseURL: new URL(request.url).origin })
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session) {
+    // Use the current path so users return to the page they tried to visit
+    const callbackURL = new URL(request.url).pathname
     const { response: result, headers } = await auth.api.signInSocial({
       body: {
         provider: 'discord',
-        callbackURL: '/dashboard',
+        callbackURL,
       },
       headers: request.headers,
       returnHeaders: true,
