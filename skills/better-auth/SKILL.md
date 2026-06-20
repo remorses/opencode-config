@@ -926,12 +926,31 @@ export function LoginButton({ callbackURL = '/' }: { callbackURL?: string }) {
 }
 ```
 
-### Root redirect for authenticated users
+### Dashboard redirect for authenticated users
+
+**Never redirect `/` to a dashboard automatically.** The landing page should always render for all users (authenticated or not). Instead, add a `/dash` or `/dashboard` link in your navbar that resolves the user's default destination.
+
+The `/dash` route should resolve the full target path in a single query and issue **one redirect** directly to the final URL. Never chain redirects (e.g. `/dash` → `/orgs/{id}` → `/projects/{id}` → `/projects/{id}/envs/dev`). Each redirect is a separate worker invocation with its own DB queries, and on Cloudflare Workers with D1 the latency compounds fast; users far from the database region will see multi-second page loads.
 
 ```ts
-.get('/', async ({ state }) => {
-  if (!state.session) return redirect('/login')
-  return redirect('/dashboard')
+// Resolve org → project → env in one hop, redirect to the final URL
+.get('/dash', async ({ state, request }) => {
+  if (!state.session) return redirect('/login?redirect=/dash')
+  const db = getDb()
+  const org = await db.query.orgMember.findFirst({
+    where: { userId: state.session.user.id },
+    with: { org: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!org) return redirect('/dash/new-org')
+  const project = await db.query.project.findFirst({
+    where: { orgId: org.orgId },
+    with: { environments: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!project) return redirect(`/dash/orgs/${org.orgId}`)
+  const envSlug = project.environments?.[0]?.slug ?? '_'
+  return redirect(`/dash/projects/${project.id}/envs/${envSlug}`)
 })
 ```
 
