@@ -1145,6 +1145,44 @@ This causes `state_mismatch` errors on OAuth callbacks because BetterAuth stores
 
 **`headers` parameter** — always pass the original `request.headers` when the API call needs request context (cookies, user agent, IP). Without it, BetterAuth can't read existing cookies or set new ones with the correct domain.
 
+## Server-side social sign-in redirect (protected layouts)
+
+**Never redirect to `/api/auth/sign-in/social?provider=discord&callbackURL=/dashboard` as a GET URL.** There is no GET endpoint at that path. Better-auth's social sign-in is a POST endpoint consumed by the client SDK internally. Redirecting the browser to it returns a 404.
+
+When a server-side layout or route needs to redirect an unauthenticated user to a social provider (e.g. Discord OAuth), call `auth.api.signInSocial()` programmatically and redirect to the returned OAuth URL:
+
+```ts
+// In a Spiceflow layout that guards /dashboard/*
+.layout('/dashboard/*', async ({ children, request, state }) => {
+  const auth = createAuth({ env: state.env, baseURL: new URL(request.url).origin })
+  const session = await auth.api.getSession({ headers: request.headers })
+  if (!session) {
+    const { response: result, headers } = await auth.api.signInSocial({
+      body: {
+        provider: 'discord',
+        callbackURL: '/dashboard',
+      },
+      headers: request.headers,
+      returnHeaders: true,
+    })
+    if (!result?.url) {
+      throw new Response('Failed to initiate sign-in', { status: 500 })
+    }
+    const redirect = new Response(null, {
+      status: 302,
+      headers: { Location: result.url },
+    })
+    for (const cookie of headers.getSetCookie()) {
+      redirect.headers.append('Set-Cookie', cookie)
+    }
+    throw redirect
+  }
+  return <DashboardLayout>{children}</DashboardLayout>
+})
+```
+
+`returnHeaders: true` is required to capture the CSRF state cookie that better-auth sets. Without forwarding those cookies, the OAuth callback fails with `state_mismatch`.
+
 ## SQLite/D1 date binding issue
 
 BetterAuth passes `Date` objects for timestamp columns (`createdAt`, `updatedAt`, `expiresAt`). This crashes on Cloudflare D1 because D1's `.bind()` only accepts `string | number | null | ArrayBuffer`.
