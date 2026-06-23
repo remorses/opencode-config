@@ -283,11 +283,14 @@ export default defineConfig({
       "binding": "DB",
       "database_name": "my-app-db",
       "database_id": "<id-from-wrangler-d1-create>",
-      "migrations_dir": "./drizzle"
+      "migrations_dir": "./drizzle",
+      "migrations_pattern": "drizzle/*/migration.sql"
     }
   ]
 }
 ```
+
+The `migrations_pattern` glob tells wrangler to discover migrations inside drizzle-kit's nested subdirectories (`drizzle/0001_some_name/migration.sql`). Without it, wrangler only looks for top-level `.sql` files. The pattern **must start with** the `migrations_dir` value. Each migration's name is recorded in the `d1_migrations` table as the path relative to `migrations_dir` (e.g. `0001_some_name/migration.sql`).
 
 **Creating D1 databases:**
 
@@ -296,25 +299,24 @@ wrangler d1 create my-app-db
 wrangler d1 create my-app-preview-db
 ```
 
-### D1 migrations: use drizzle-kit generate, then create flat SQL files
+### D1 migrations: use drizzle-kit generate directly
 
-D1 needs flat `.sql` files in `migrations_dir`. Drizzle-orm does not read migration files at runtime; D1 tracks applied migrations via `wrangler d1 migrations apply`.
+Since **wrangler 4.98.0**, D1 supports nested migration layouts via `migrations_pattern`. Drizzle-kit's default output (`drizzle/timestamp_name/migration.sql` subdirectories) works directly with D1; no flattening or post-processing is needed.
 
-**Use `drizzle-kit generate` as a starting point**, then create the flat D1 migration file from it. Drizzle-kit outputs subdirectories (`timestamp_name/migration.sql`) that D1 cannot read directly, so copy the SQL into a flat file, improve it (add comments, data migrations, simplify), and delete the generated subdirectory.
+Drizzle-orm does not read migration files at runtime; D1 tracks applied migrations via `wrangler d1 migrations apply`.
 
 **Workflow:**
 
 1. Edit `schema.ts`
 2. Run `drizzle-kit generate`
-3. Read the generated SQL in `drizzle/timestamp_name/migration.sql`
-4. Create a flat file: `drizzle/NNNN_kebab-description.sql` (zero-padded sequence number, higher than all existing)
-5. Copy and improve the generated SQL
-6. Delete the generated subdirectory
-7. Apply with `wrangler d1 migrations apply`
+3. Review the generated SQL in `drizzle/timestamp_name/migration.sql`; edit if needed (add comments, data migrations, simplify SQLite ALTER TABLE sequences)
+4. Apply with `wrangler d1 migrations apply`
 
-If `drizzle-kit generate` fails (interactive prompts on renames), write the SQL directly. Read existing migration files and `schema.ts` to understand current and desired state.
+If `drizzle-kit generate` fails (interactive prompts on renames, TTY errors in CI), write the migration SQL directly. Read existing migration files and `schema.ts` to understand the current and desired state.
 
 D1 splits statements on **semicolons** like any SQL parser. The `--> statement-breakpoint` comments in drizzle-kit output are just visual separators that D1 ignores; you can keep or remove them.
+
+**Existing projects using the flat-file hack:** if the project already has flat `.sql` files (e.g. `0001_init.sql`) from a previous flattening workflow, **keep using flat files for that project**. Switching to `migrations_pattern` mid-project requires renaming every entry in the `d1_migrations` table to match the new nested paths, otherwise wrangler tries to re-apply all migrations. The risk of getting that wrong is not worth the convenience. Only use `migrations_pattern` for new projects or projects that have never applied flat migrations to D1.
 
 #### Apply migrations
 
