@@ -310,6 +310,38 @@ pnpm secrets:prod
 
 Do **not** loop over `wrangler secret put` one key at a time. It is interactive and hangs in scripts. Always use `wrangler secret bulk`.
 
+### First deploy: secrets chicken-and-egg
+
+`wrangler secret bulk` and `wrangler secret put` require the worker to already have at least one deployed version. But `wrangler deploy` with `secrets.required` refuses to deploy if secrets aren't set yet. This creates a chicken-and-egg problem on first deploy.
+
+**Fix:** use `--secrets-file` on the first deploy. This flag passes secrets inline during deploy, creating the worker and setting secrets in one shot. No need to temporarily remove `secrets.required`.
+
+Use `sigillo run --mount` to write secrets to a temp file that only exists while the command runs. The `--mount-format env` flag writes a `KEY=value` file that `--secrets-file` expects:
+
+```bash
+# Preview — sigillo mounts secrets as a temp .env file, wrangler reads it
+sigillo run -c preview \
+  --mount /tmp/pw-secrets.env --mount-format env \
+  -- wrangler deploy --env preview --secrets-file /tmp/pw-secrets.env
+
+# Production
+sigillo run -c prod \
+  --mount /tmp/pw-secrets.env --mount-format env \
+  -- wrangler deploy --secrets-file /tmp/pw-secrets.env
+```
+
+The mounted file is created before the command starts and cleaned up after it exits. Secrets never stay on disk.
+
+For the full build + deploy chain, combine `--mount` with `--command` so vite build and wrangler deploy share the same sigillo session:
+
+```bash
+CLOUDFLARE_ENV=preview sigillo run -c preview \
+  --mount /tmp/pw-secrets.env --mount-format env \
+  --command 'vite build && wrangler deploy --env preview --secrets-file /tmp/pw-secrets.env'
+```
+
+After the first deploy, subsequent deploys work normally because the worker and its secrets already exist. `wrangler secret bulk` also works from this point on for updating secrets.
+
 ### Production / preview secret values
 
 ```bash
@@ -501,8 +533,8 @@ For projects using D1, bake migrations into the deploy chain. The remote migrati
 ```json
 {
   "scripts": {
-    "deploy": "pnpm db:migrate:preview && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
-    "deploy:prod": "pnpm db:migrate:prod && vite build && wrangler deploy"
+    "deploy": "pnpm db:migrate:preview && tsc && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "pnpm db:migrate:prod && tsc && vite build && wrangler deploy"
   }
 }
 ```
@@ -519,8 +551,8 @@ For projects without D1 (no migrations needed):
 ```json
 {
   "scripts": {
-    "deploy": "CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
-    "deploy:prod": "vite build && wrangler deploy"
+    "deploy": "tsc && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "tsc && vite build && wrangler deploy"
   }
 }
 ```
@@ -829,6 +861,10 @@ const getOrgIdForProject = memoize({
 | OAuth client id by hostname | Encryption keys (CPU, not I/O) |
 | Environment resolution (id/slug) | Write operations |
 
+## Always typecheck before building
+
+**Always run `tsc` before `vite build`** in build and deploy scripts. Vite does not typecheck; it only transpiles. Without `tsc`, type errors slip through to production silently. The `build` script should be `tsc && vite build`, and deploy scripts should include `tsc &&` before the `vite build` step.
+
 ## package.json scripts
 
 Standard scripts for a Worker package (with D1):
@@ -837,14 +873,14 @@ Standard scripts for a Worker package (with D1):
 {
   "scripts": {
     "dev": "pnpm db:migrate:local && vite dev",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "typecheck": "tsc",
     "types": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:prod": "echo \"D1 pre-migration timestamp: $(date +%s)\" && wrangler d1 migrations apply DB --remote",
     "db:migrate:preview": "echo \"D1 pre-migration timestamp: $(date +%s)\" && wrangler d1 migrations apply DB --remote --env preview",
-    "deploy": "pnpm db:migrate:preview && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
-    "deploy:prod": "pnpm db:migrate:prod && vite build && wrangler deploy"
+    "deploy": "pnpm db:migrate:preview && tsc && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "pnpm db:migrate:prod && tsc && vite build && wrangler deploy"
   }
 }
 ```
@@ -855,11 +891,11 @@ Standard scripts for a Worker package (without D1):
 {
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "typecheck": "tsc",
     "types": "wrangler types",
-    "deploy": "CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
-    "deploy:prod": "vite build && wrangler deploy"
+    "deploy": "tsc && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
+    "deploy:prod": "tsc && vite build && wrangler deploy"
   }
 }
 ```
