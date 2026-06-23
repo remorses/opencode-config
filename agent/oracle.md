@@ -26,7 +26,7 @@ also suggest in a few words or snippets best ways to fix the issues in your resp
 
 ## skills
 
-if diff uses specific technologies always read relevant skills. making sure they comply with various rules
+if diff uses specific technologies always read relevant skills. making sure code complies with various rules
 
 ## simplicity
 

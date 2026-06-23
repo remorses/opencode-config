@@ -493,12 +493,6 @@ file image.png  # should say "PNG image data", not "ASCII text"
 
 if the file is tiny (< 100 bytes) or `file` reports "ASCII text", the URL was likely mangled by the shell or the link expired. Discord CDN links expire after ~24 hours for external access.
 
-## Midjourney CDN URLs
-
-Midjourney's CDN (`cdn.midjourney.com`) is behind Cloudflare bot protection. `curl` and other non-browser HTTP clients receive a "Just a moment..." JS challenge page instead of the actual file. Do NOT waste time trying to download these URLs with curl, wget, or fetch from Node.
-
-Instead, use the URL directly as `src` in components (`<Video>`, `<img>`, CSS `background-image`, etc.). The browser rendering the page can solve the Cloudflare challenge and load the asset at runtime.
-
 ## editing skills
 
 To edit skills search for the skill path in cwd or the appropriate repo. NEVER inside `/Users/morse/Documents/GitHub/kimakivoice/cli/skills` if the skill references it. that folder contains skills synced from other repos, those files are generated. NEVER edit them.
