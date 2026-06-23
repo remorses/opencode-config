@@ -1114,6 +1114,10 @@ With `db.batch()` this is handled automatically because statements execute in or
 
 This also applies to **deletes in reverse order**: delete children first, then parents. Otherwise you get FK violations on the delete side too (unless `onDelete: Cascade` handles it).
 
+## Always typecheck before building
+
+**Always run `tsc` before `vite build`** in build and deploy scripts. Vite does not typecheck; it only transpiles. Schema mismatches (wrong column types, missing relations, broken `$inferSelect` usage) will slip through to production silently without `tsc`. Your `build` script should be `tsc && vite build`.
+
 ## Migrations
 
 ### Use drizzle-kit generate as a starting point, then write the final migration manually
