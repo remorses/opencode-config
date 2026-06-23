@@ -201,6 +201,7 @@
       "/private/tmp": "allow",
       "/private/tmp/*": "allow",
       "env:$TMPDIR": "allow",
+      "/Users/morse/.agents/*": "allow",
       "env:$TMPDIR/*": "allow"
     },
     "webfetch": "allow"
