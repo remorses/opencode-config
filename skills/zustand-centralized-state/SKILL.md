@@ -239,7 +239,7 @@ This keeps lifecycle ownership explicit: transitions decide when controller
 references appear/disappear; handlers/subscribe perform side effects like
 `controller.abort()` based on state transitions.
 
-### 7. Centralize side effects in subscribe
+### 7. Centralize side effects in subscribe (for non React apps)
 
 Side effects (I/O, UI updates, cleanup, logging) go in a single `subscribe()`
 callback that reacts to state changes. Side effects are **derived from state**, not
@@ -261,6 +261,8 @@ store.subscribe((state, prevState) => {
   }
 })
 ```
+
+React apps should just use the Zustand hook instead of this pattern. this is a special pattern for using store in non React declarative ways. for example using zustand as state manager for a chrome extension to sync icons changes (side effects) with state
 
 ## The Pattern
 
@@ -997,8 +999,17 @@ around and derive the answer when you need it.
 | Derive over cache | Compute indexes and aggregates on demand |
 | Centralize state | One `createStore()`, one state type, one source of truth |
 | Pure transitions | `setState((state) => newState)` with no side effects |
-| Centralize side effects | One `subscribe()` for all reactive effects |
+| Centralize side effects for non React apps | One `subscribe()` for all reactive effects |
 | State vs I/O boundary | Prefer separation, but co-location is valid for safer cleanup |
 | Test with data | State in -> state out, no mocks needed |
 | Encapsulate state | Keep state local to its owner (closure, component), promote to global only when needed |
 | Derive from events | Keep a bounded event buffer, derive "state" with pure functions instead of mutable flags |
+
+
+## Rules
+
+don't wrap setState calls into useless abstractions. just call setstate directly.
+
+## React
+
+in react apps you can just use Zustand has a hook directly. no need to use .subscribe there.
