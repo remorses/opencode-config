@@ -686,6 +686,8 @@ The device flow verification page must:
 import { getActionRequest, parseFormData, Spiceflow, redirect } from 'spiceflow'
 import { router } from 'spiceflow/react'
 import { z } from 'zod'
+import * as orm from 'drizzle-orm'
+import * as schema from 'db/schema'
 
 const devicePageQuerySchema = z.object({
   user_code: z.string().optional(),
@@ -693,6 +695,20 @@ const devicePageQuerySchema = z.object({
 })
 
 const deviceUserCodeSchema = z.object({ userCode: z.string().min(1) })
+
+// Direct DB update: auth.api.deviceApprove/deviceDeny don't work with drizzle adapter
+async function updateDeviceAuthorization({ userCode, userId, status }: {
+  userCode: string; userId: string; status: 'approved' | 'denied'
+}) {
+  const cleanUserCode = userCode.replaceAll('-', '')
+  const db = getDb()
+  const device = await db.query.deviceCode.findFirst({ where: { userCode: cleanUserCode } })
+  if (!device || device.expiresAt < Date.now()) throw new Error('Device code is invalid or expired')
+  if (device.status !== 'pending') throw new Error('Device code was already processed')
+  await db.update(schema.deviceCode)
+    .set({ status, userId })
+    .where(orm.eq(schema.deviceCode.id, device.id))
+}
 
 export const app = new Spiceflow()
   // ... auth middleware ...
@@ -714,7 +730,7 @@ export const app = new Spiceflow()
         return <div>CLI denied. You can close this page.</div>
       }
 
-      // 1. Require sign-in BEFORE deviceVerify so headers carry session cookie
+      // 1. Require sign-in first
       const session = await getSession(request)
       if (!session) {
         throw redirect(router.href('/login', {
@@ -722,41 +738,42 @@ export const app = new Spiceflow()
         }))
       }
 
-      // 2. Validate AND claim the device code for this session
-      const auth = getAuth()
-      const device = await auth.api.deviceVerify({
-        query: { user_code: userCode },
-        headers: request.headers, // REQUIRED: links device code to the authenticated session
-      }).catch(() => null)
+      // 2. Look up device code directly in DB (auth.api.deviceVerify doesn't work
+      //    with drizzle adapter because it depends on incrementOne)
+      const cleanUserCode = userCode.replaceAll('-', '')
+      const db = getDb()
+      const device = await db.query.deviceCode.findFirst({ where: { userCode: cleanUserCode } })
 
-      if (!device) {
+      if (!device || device.expiresAt < Date.now()) {
         return <div>Invalid or expired device code.</div>
       }
 
-      // 3. Server actions for approve/deny
+      // 3. Claim the device code for this user
+      if (!device.userId) {
+        await db.update(schema.deviceCode)
+          .set({ userId: session.userId })
+          .where(orm.and(
+            orm.eq(schema.deviceCode.id, device.id),
+            orm.eq(schema.deviceCode.status, 'pending'),
+          ))
+      }
+
+      // 4. Server actions for approve/deny
       async function approveDevice(formData: FormData) {
         'use server'
         const actionRequest = getActionRequest()
-        await requireSession(actionRequest)
+        const sess = await requireSession(actionRequest)
         const { userCode: code } = parseFormData(deviceUserCodeSchema, formData)
-        const actionAuth = getAuth()
-        await actionAuth.api.deviceApprove({
-          body: { userCode: code },
-          headers: actionRequest.headers,
-        })
+        await updateDeviceAuthorization({ userCode: code, userId: sess.userId, status: 'approved' })
         throw redirect(router.href('/device', { user_code: code, status: 'approved' }))
       }
 
       async function denyDevice(formData: FormData) {
         'use server'
         const actionRequest = getActionRequest()
-        await requireSession(actionRequest)
+        const sess = await requireSession(actionRequest)
         const { userCode: code } = parseFormData(deviceUserCodeSchema, formData)
-        const actionAuth = getAuth()
-        await actionAuth.api.deviceDeny({
-          body: { userCode: code },
-          headers: actionRequest.headers,
-        })
+        await updateDeviceAuthorization({ userCode: code, userId: sess.userId, status: 'denied' })
         throw redirect(router.href('/device', { user_code: code, status: 'denied' }))
       }
 
@@ -775,6 +792,56 @@ export const app = new Spiceflow()
       )
     },
   })
+```
+
+**Custom `/api/auth/device/token` handler:**
+
+The built-in token exchange endpoint calls `adapter.consumeOne()` which the drizzle adapter doesn't have. Intercept it in your auth middleware before better-auth processes it:
+
+```ts
+// In your Spiceflow auth middleware, BEFORE forwarding to auth.handler:
+.use(async ({ request }, next) => {
+  if (request.parsedUrl.pathname === '/api/auth/device/token' && request.method === 'POST') {
+    return handleDeviceToken(request) // custom handler below
+  }
+  if (request.parsedUrl.pathname.startsWith('/api/auth')) {
+    const auth = getAuth()
+    const res = await auth.handler(request)
+    if (res.ok || res.status !== 404) return res
+  }
+  return next()
+})
+
+// Custom device token handler: find approved code → delete → create session
+async function handleDeviceToken(request: Request) {
+  const body = await request.json() as { grant_type?: string; device_code?: string; client_id?: string }
+  if (body.grant_type !== 'urn:ietf:params:oauth:grant-type:device_code' || !body.device_code || !body.client_id) {
+    return json({ error: 'invalid_request', error_description: 'Missing required fields' }, { status: 400 })
+  }
+  const db = getDb()
+  const deviceRecord = await db.query.deviceCode.findFirst({ where: { deviceCode: body.device_code } })
+  if (!deviceRecord) return json({ error: 'invalid_grant', error_description: 'Invalid device code' }, { status: 400 })
+  if (deviceRecord.expiresAt < Date.now()) {
+    await db.delete(schema.deviceCode).where(orm.eq(schema.deviceCode.id, deviceRecord.id))
+    return json({ error: 'expired_token', error_description: 'Device code has expired' }, { status: 400 })
+  }
+  if (deviceRecord.status === 'pending') return json({ error: 'authorization_pending', error_description: 'Authorization pending' }, { status: 400 })
+  if (deviceRecord.status === 'denied') {
+    await db.delete(schema.deviceCode).where(orm.eq(schema.deviceCode.id, deviceRecord.id))
+    return json({ error: 'access_denied', error_description: 'User denied' }, { status: 400 })
+  }
+  if (deviceRecord.status === 'approved' && deviceRecord.userId) {
+    await db.delete(schema.deviceCode).where(orm.eq(schema.deviceCode.id, deviceRecord.id))
+    const sessionToken = crypto.randomUUID()
+    const expiresAt = Date.now() + 60 * 60 * 24 * 365 * 1000
+    await db.insert(schema.session).values({ userId: deviceRecord.userId, token: sessionToken, expiresAt })
+    return json({ access_token: sessionToken, token_type: 'Bearer', expires_in: 60 * 60 * 24 * 365 }, {
+      status: 200,
+      headers: { 'Cache-Control': 'no-store' },
+    })
+  }
+  return json({ error: 'server_error', error_description: 'Invalid status' }, { status: 500 })
+}
 ```
 
 **CLI side** (polling loop):
