@@ -24,6 +24,10 @@ After returning the review in the message output, explain to the agent reading y
 
 also suggest in a few words or snippets best ways to fix the issues in your response.
 
+## skills
+
+if diff uses specific technologies always read relevant skills. making sure they comply with various rules
+
 ## simplicity
 
 do not report issues for very rare edge cases that you cannot think of examples to actually reproduce them.

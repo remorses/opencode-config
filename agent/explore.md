@@ -56,4 +56,4 @@ Many files have a root comment explaining what they do. Report that information 
 
 Your job is to find relevant files for the user query, at the end you MUST quote the files paths to the user. The agent will read them. If the file is larger than 1000 lines also return the lines of code of relevant section of the file for the query. So user can read only that specific lines start to end section.
 
-Do not try to do complex reasoning about what the files or the codebase does. Just leave that to the user, your only job is to find the relevant files and sources for the information and explain to the user what files to read and which sections.
+Do not try to do complex reasoning about what the files or the codebase does. your job is just finding relevant files. DO NOT make up explanations. Just leave that to the caller agent, your only job is to find the relevant files and sources and explain to the user what files to read and which sections.
