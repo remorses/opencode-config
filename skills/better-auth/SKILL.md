@@ -674,15 +674,16 @@ export const deviceCode = s.sqliteTable('device_code', {
 
 **Verification page (Spiceflow):**
 
-The device flow verification page must:
-1. Check the user code is valid via `auth.api.deviceVerify()` **with request headers**
-2. Require the user to be signed in (redirect to login if not)
-3. Provide approve/deny actions via server actions
+**WARNING: `better-auth-drizzle-adapter` does not implement `consumeOne` or `incrementOne`.** The device authorization plugin's server-side endpoints (`auth.api.deviceVerify`, `auth.api.deviceApprove`, `auth.api.deviceDeny`, and the built-in `/api/auth/device/token`) all depend on these adapter methods. They fail silently with generic errors like "Invalid device code" when using the drizzle adapter. Use direct DB queries with Drizzle for verify, approve, and deny. For the token exchange endpoint, create a custom handler that intercepts before the better-auth middleware.
 
-**`deviceVerify` must receive `headers: request.headers`.** Without headers, better-auth cannot claim the device code for the authenticated session. The subsequent `deviceApprove` or `deviceDeny` call will fail with `"Device code has not been claimed by a verifying session; call GET /device with the user_code while signed in before approving or denying"`. This is a silent bug: the verify call itself succeeds and returns the device info, but skips the session-linking step that the approve/deny endpoints require.
+The device flow verification page must:
+1. Look up the device code directly in the DB via Drizzle
+2. Require the user to be signed in (redirect to login if not)
+3. Claim the device code for the authenticated user (set userId)
+4. Provide approve/deny actions that update the DB directly
 
 ```tsx
-import { getActionRequest, json, parseFormData, Spiceflow, redirect } from 'spiceflow'
+import { getActionRequest, parseFormData, Spiceflow, redirect } from 'spiceflow'
 import { router } from 'spiceflow/react'
 import { z } from 'zod'
 
@@ -706,7 +707,22 @@ export const app = new Spiceflow()
         return <div>Open this page from the CLI login flow.</div>
       }
 
-      // 1. Validate AND claim the device code for this session
+      if (status === 'approved') {
+        return <div>CLI approved. You can close this page.</div>
+      }
+      if (status === 'denied') {
+        return <div>CLI denied. You can close this page.</div>
+      }
+
+      // 1. Require sign-in BEFORE deviceVerify so headers carry session cookie
+      const session = await getSession(request)
+      if (!session) {
+        throw redirect(router.href('/login', {
+          callbackURL: `${request.parsedUrl.pathname}${request.parsedUrl.search}`,
+        }))
+      }
+
+      // 2. Validate AND claim the device code for this session
       const auth = getAuth()
       const device = await auth.api.deviceVerify({
         query: { user_code: userCode },
@@ -715,14 +731,6 @@ export const app = new Spiceflow()
 
       if (!device) {
         return <div>Invalid or expired device code.</div>
-      }
-
-      // 2. Require sign-in
-      const session = await getSession(request)
-      if (!session) {
-        throw redirect(router.href('/login', {
-          callbackURL: `${request.parsedUrl.pathname}${request.parsedUrl.search}`,
-        }))
       }
 
       // 3. Server actions for approve/deny
@@ -736,10 +744,7 @@ export const app = new Spiceflow()
           body: { userCode: code },
           headers: actionRequest.headers,
         })
-        throw redirect(router.href('/device', {
-          user_code: code,
-          status: 'approved',
-        }))
+        throw redirect(router.href('/device', { user_code: code, status: 'approved' }))
       }
 
       async function denyDevice(formData: FormData) {
@@ -752,17 +757,7 @@ export const app = new Spiceflow()
           body: { userCode: code },
           headers: actionRequest.headers,
         })
-        throw redirect(router.href('/device', {
-          user_code: code,
-          status: 'denied',
-        }))
-      }
-
-      if (status === 'approved') {
-        return <div>CLI approved. You can close this page.</div>
-      }
-      if (status === 'denied') {
-        return <div>CLI denied. You can close this page.</div>
+        throw redirect(router.href('/device', { user_code: code, status: 'denied' }))
       }
 
       return (
@@ -784,25 +779,54 @@ export const app = new Spiceflow()
 
 **CLI side** (polling loop):
 
+**Always use `createAuthClient` with `deviceAuthorizationClient` plugin** instead of hardcoding endpoint URLs. Endpoint paths change between better-auth versions (e.g. `/device-authorization/request` → `/device/code`). Hardcoded URLs silently break on upgrades and are too easy to get wrong.
+
 ```ts
 import { createAuthClient } from 'better-auth/client'
+import { deviceAuthorizationClient } from 'better-auth/client/plugins'
 
-const client = createAuthClient({ baseURL: 'https://myapp.com' })
+const client = createAuthClient({
+  baseURL: 'https://myapp.com',
+  plugins: [deviceAuthorizationClient()],
+})
 
 // 1. Request a device code
-const { data } = await client.deviceAuthorization.request()
-console.log(`Open: ${data.verificationUri}?user_code=${data.userCode}`)
-console.log(`Code: ${data.userCode}`)
+const { data, error } = await client.device.code({
+  client_id: 'my-cli',
+})
+if (error || !data) throw new Error(`Failed to request device code: ${error?.message}`)
+
+const verificationUrl = data.verification_uri_complete
+  || `https://myapp.com/device?user_code=${data.user_code}`
+console.log(`Open: ${verificationUrl}`)
+console.log(`Code: ${data.user_code}`)
 
 // 2. Open the browser for the user
-open(data.verificationUriComplete)
+open(verificationUrl)
 
 // 3. Poll until approved
-const result = await client.deviceAuthorization.verifyDevice({
-  deviceCode: data.deviceCode,
-})
-// result contains the session token
+const pollInterval = (data.interval || 5) * 1000
+const deadline = Date.now() + (data.expires_in || 300) * 1000
+
+while (Date.now() < deadline) {
+  await new Promise((r) => { setTimeout(r, pollInterval) })
+  const { data: tokenData, error: pollError } = await client.device.token({
+    grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+    device_code: data.device_code,
+    client_id: 'my-cli',
+  })
+  if (tokenData?.access_token) {
+    // Store access_token for Bearer auth on subsequent API calls
+    break
+  }
+  // authorization_pending and slow_down mean keep polling
+  const errorCode = (pollError as { error?: string })?.error
+  if (errorCode === 'authorization_pending' || errorCode === 'slow_down') continue
+  if (pollError) throw new Error(`Device auth failed: ${pollError.message}`)
+}
 ```
+
+The client proxy maps method names to endpoint paths via kebab-case conversion: `client.device.code()` → POST `/device/code`, `client.device.token()` → POST `/device/token`, `client.device.approve()` → POST `/device/approve`. The `pathMethods` from the plugin tell the proxy which HTTP method to use.
 
 ### Bearer token auth
 
@@ -1329,6 +1353,10 @@ drizzleAdapter(db, {
   usePlural: true,
 })
 ```
+
+## Always typecheck before building
+
+**Always run `tsc` before `vite build`** in build and deploy scripts. Vite does not typecheck; it only transpiles. Auth misconfigurations (wrong types on session, missing plugin fields, adapter type mismatches) will slip through to production silently without `tsc`. Your `build` script should be `tsc && vite build`.
 
 ## Testing with vitest
 
