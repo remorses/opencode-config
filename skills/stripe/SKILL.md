@@ -23,25 +23,63 @@ Core rules, in priority order:
 5. **All Stripe-facing HTTP code lives inside spiceflow sub-apps** (`website/src/lib/spiceflow-*.tsx`). Not react-router actions. The webhook route is also a spiceflow route — spiceflow handlers receive a standard `Request` object, so `await request.text()` gives the raw body needed for Stripe's signature verification.
 6. **Return errors as values, never throw.** All Stripe/Drizzle calls are wrapped with `.catch()` into tagged errore errors (`StripeApiError`, `DbError`, `PriceNotFoundError`, etc.). `constructEvent` and other sync-throwing APIs go through `errore.try`. Handlers check `instanceof Error`, early-return, and map errors to HTTP responses via `errore.matchError` at the HTTP boundary only. **Always read the [errore skill](../errore/SKILL.md) before writing or modifying error handling code in Stripe routes** — it covers tagged errors, `.catch()` boundary rules, flat control flow, cause chains, and the `matchError` exhaustive handler.
 
-## CLI auth and multiple accounts
+## CLI auth via sigillo (no global login)
 
-The Stripe CLI stores credentials in `~/.config/stripe/config.toml`. By default, `stripe login` writes to a `[default]` section and all commands use it.
+**Never use `stripe login` for global auth.** Global CLI auth in `~/.config/stripe/config.toml` is dangerous: it silently targets whichever account was logged in last, which can be a completely different project. Instead, always run the Stripe CLI through **sigillo** so the correct API key is injected per-project.
 
-For **multiple Stripe accounts** (e.g. separate stores, test vs prod, client projects), use `--project-name` to namespace each one:
+The Stripe CLI checks the `STRIPE_API_KEY` environment variable automatically. If set, it overrides everything in `config.toml`. This is the mechanism we use with sigillo.
 
-```bash
-stripe login --project-name=myapp-prod
-stripe login --project-name=myapp-sandbox
-```
+### Setup
 
-This creates separate sections in `config.toml`. Then pass `--project-name` on every command to target the right account:
+Store the Stripe secret key as `STRIPE_API_KEY` in sigillo. This single env var is used by both your app code and the Stripe CLI (which picks it up automatically).
 
 ```bash
-stripe products create --name="Pro" --project-name=myapp-prod
-stripe listen --forward-to http://localhost:8040/api/webhook --project-name=myapp-prod
+sigillo secrets set STRIPE_API_KEY sk_test_... -c dev
+sigillo secrets set STRIPE_API_KEY sk_live_... -c prod
 ```
 
-Without `--project-name`, the CLI uses `[default]`. All CLI commands in this skill omit it for brevity; add it when working with multiple accounts.
+If a project already uses `STRIPE_SECRET_KEY`, copy it to `STRIPE_API_KEY` and update the app code to read `STRIPE_API_KEY` instead:
+
+```bash
+sigillo secrets get STRIPE_SECRET_KEY -c dev | sigillo secrets set STRIPE_API_KEY -c dev
+sigillo secrets get STRIPE_SECRET_KEY -c prod | sigillo secrets set STRIPE_API_KEY -c prod
+```
+
+### Running Stripe CLI commands
+
+Wrap every `stripe` command with `sigillo run` so `STRIPE_API_KEY` is injected:
+
+```bash
+# simple commands, no shell expansion needed
+sigillo run -- stripe products list
+sigillo run -- stripe prices list --lookup-keys pro_monthly
+
+# commands that need shell features (&&, pipes, $VARIABLES)
+sigillo run --command 'stripe products create --name="Pro" --description="Pro plan"'
+
+# webhook listener for local dev
+sigillo run -- stripe listen --forward-to http://localhost:8866/api/stripe/webhook
+```
+
+Since `STRIPE_API_KEY` is in the environment, the CLI picks it up automatically. No `--api-key` flag needed on each command.
+
+### Per-environment targeting
+
+Use sigillo's `-c` flag to target a specific environment's Stripe account:
+
+```bash
+# list products on production Stripe account
+sigillo run -c prod -- stripe products list
+
+# create a webhook endpoint on preview
+sigillo run -c preview -- stripe webhook_endpoints create \
+  --url="https://preview.your-site.example/api/stripe/webhook" \
+  -d "enabled_events[]=customer.subscription.created"
+```
+
+### Why not --project-name?
+
+The `--project-name` flag creates separate sections in `config.toml`, but still relies on global state files and `stripe login`. With sigillo, the API key is scoped to the project directory and environment. No global config to get stale or point at the wrong account. Multiple projects with different Stripe accounts just work because each has its own sigillo secrets.
 
 ## Env vars
 
@@ -51,7 +89,7 @@ Only three Stripe env vars should exist. The publishable key is the only one tha
 
 ```bash
 # .env.local — committed to neither git nor the client bundle (server-only for the two secrets)
-STRIPE_SECRET_KEY=sk_test_...              # server only, via process.env
+STRIPE_API_KEY=sk_test_...                 # server only, via process.env. Also used by Stripe CLI
 STRIPE_WEBHOOK_SECRET=whsec_...            # server only, via process.env
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...    # client + server, via import.meta.env on the client
 ```
@@ -59,7 +97,7 @@ VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...    # client + server, via import.meta.en
 ```ts
 // website/src/lib/env.ts — server-side accessors
 export const env = {
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_API_KEY: process.env.STRIPE_API_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   // Exposed so server code can also read it without reaching into import.meta.env
   VITE_STRIPE_PUBLISHABLE_KEY: process.env.VITE_STRIPE_PUBLISHABLE_KEY,
@@ -73,7 +111,7 @@ const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
 
 **Never use `process.env.*` in client code.** Vite will either leave it as the literal string `process.env.X` at runtime (which explodes as `ReferenceError: process is not defined`) or silently strip it. Only `import.meta.env.VITE_*` is safe in the browser.
 
-**Never prefix `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` with `VITE_`.** Anything starting with `VITE_` is inlined into the client bundle and visible in devtools. If you accidentally rename the secret key to `VITE_STRIPE_SECRET_KEY`, you leak it to every visitor.
+**Never prefix `STRIPE_API_KEY` or `STRIPE_WEBHOOK_SECRET` with `VITE_`.** Anything starting with `VITE_` is inlined into the client bundle and visible in devtools. If you accidentally rename the secret key to `VITE_STRIPE_API_KEY`, you leak it to every visitor.
 
 **Prefer `lookup_key` over `STRIPE_PRICE_ID_FOO` env vars for each plan.** Env vars bind code to a specific Stripe account at deploy time. With `lookup_key` the code stays identical across accounts.
 
@@ -99,7 +137,7 @@ This gives autocomplete on `import.meta.env.VITE_*` and fails compilation if you
 
 | Var | Where from | Notes |
 |---|---|---|
-| `STRIPE_SECRET_KEY` | `stripe login` → `cat ~/.config/stripe/config.toml` (restricted key `rk_*` works for most dev), or copy `sk_test_`/`sk_live_` from `https://dashboard.stripe.com/apikeys` once | Server only. Store in `doppler` / `.env.local`, never in the repo |
+| `STRIPE_API_KEY` | Copy `sk_test_`/`sk_live_` from `https://dashboard.stripe.com/apikeys` | Server only. Store in sigillo, never in the repo. Also used by Stripe CLI automatically |
 | `STRIPE_WEBHOOK_SECRET` | Dev: `stripe listen --print-secret`. Prod: returned once from `stripe webhook_endpoints create ...` | Server only. Returned only on endpoint creation — capture it |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Copy `pk_test_`/`pk_live_` from `https://dashboard.stripe.com/apikeys` | Safe to ship to the browser. Must be `VITE_`-prefixed so Vite inlines it into the client bundle |
 
@@ -110,10 +148,10 @@ This gives autocomplete on `import.meta.env.VITE_*` and fails compilation if you
 pnpm dev
 
 # Terminal 2 — forward Stripe events to the local webhook route
-stripe listen --forward-to http://localhost:8040/api/stripe/webhooks
+sigillo run -- stripe listen --forward-to http://localhost:8040/api/stripe/webhooks
 ```
 
-Copy the `whsec_...` it prints and set `STRIPE_WEBHOOK_SECRET` in `.env.local`. The secret is stable across restarts for the same machine.
+Copy the `whsec_...` it prints and set `STRIPE_WEBHOOK_SECRET` in sigillo (`sigillo secrets set STRIPE_WEBHOOK_SECRET <value> -c dev`). The secret is stable across restarts for the same machine.
 
 ## Creating products and prices via CLI
 
@@ -765,23 +803,21 @@ async function resolveStripeOrgId({
 
 ```bash
 # Production
-stripe webhook_endpoints create \
-  --api-key "$STRIPE_SECRET_KEY" \
+sigillo run -c prod -- stripe webhook_endpoints create \
   --url="https://your-site.example/api/stripe/webhook" \
   -d "enabled_events[]=customer.subscription.created" \
   -d "enabled_events[]=customer.subscription.updated" \
   -d "enabled_events[]=customer.subscription.deleted"
 
 # Preview (separate endpoint, separate secret)
-stripe webhook_endpoints create \
-  --api-key "$STRIPE_SECRET_KEY" \
+sigillo run -c preview -- stripe webhook_endpoints create \
   --url="https://preview.your-site.example/api/stripe/webhook" \
   -d "enabled_events[]=customer.subscription.created" \
   -d "enabled_events[]=customer.subscription.updated" \
   -d "enabled_events[]=customer.subscription.deleted"
 ```
 
-> **Always pass `--api-key "$STRIPE_SECRET_KEY"` explicitly.** Without it, the CLI falls back to the `[default]` profile in `~/.config/stripe/config.toml` — which may point at a different account (and the interactive `delete` confirmation banner shows that wrong account's name/mode). Passing the key from your secrets manager guarantees every command hits the intended account.
+> **Always run stripe commands through `sigillo run`** so `STRIPE_API_KEY` is injected from the correct project/environment. Without it, the CLI falls back to the `[default]` profile in `~/.config/stripe/config.toml`, which may point at a different account. See [CLI auth via sigillo](#cli-auth-via-sigillo-no-global-login).
 
 For local development, use `stripe listen --forward-to http://localhost:8040/api/stripe/webhook` and use its `whsec_` instead.
 
@@ -792,10 +828,9 @@ The `secret` field (`whsec_...`) is returned **only in the `webhook_endpoints cr
 So capture it in the same command that creates the endpoint, and pipe it **straight into your secrets manager via stdin** so the value never lands in shell history, logs, or an agent's context:
 
 ```bash
-# Create + capture the secret directly into the secrets manager (sigillo example).
+# Create + capture the secret directly into sigillo.
 # The whsec_ value flows create -> stdin -> set, never printed.
-resp=$(stripe webhook_endpoints create \
-  --api-key "$STRIPE_SECRET_KEY" \
+resp=$(sigillo run -c prod -- stripe webhook_endpoints create \
   --url="https://your-site.example/api/stripe/webhook" \
   -d "enabled_events[]=customer.subscription.created" \
   -d "enabled_events[]=customer.subscription.updated" \
@@ -996,7 +1031,7 @@ The composite primary key `(subscriptionId, variantId)` lets a single subscripti
 - **Portal can't switch currency.** Once a sub is USD, it stays USD. If a user wants EUR they have to cancel and re-subscribe. Don't try to build a "change currency" button — Stripe won't let you.
 - **`tax_behavior` must match across prices of the same product.** Set it to `exclusive` on every price in the CLI commands above. If one price is `unspecified` and another is `exclusive`, the portal refuses to let users switch between them.
 - **`customer_email` vs `customer`.** Never pass `customer_email` if you have a `customer` id. Passing both makes Stripe ignore `customer_email`, which creates confusing UX bugs.
-- **Stripe CLI is a live API.** Everything in this skill runs against the active account in `~/.config/stripe/config.toml`. Test against a sandbox before running price-creation commands against production (see [CLI auth](#cli-auth-and-multiple-accounts)).
+- **Stripe CLI is a live API.** Everything in this skill runs against the account whose key is in the environment. Use `sigillo run -c dev` for test mode and `sigillo run -c prod` for production (see [CLI auth via sigillo](#cli-auth-via-sigillo-no-global-login)).
 - **Webhooks must return 2xx quickly** (< 5s). If you need to run heavy work, enqueue it to `waitUntil`
 - **Webhook raw body**: call `await request.text()` exactly once in the webhook handler. Calling `request.json()` first (or letting a Zod `body` schema parse the request) consumes the stream and breaks signature verification. Do not add a `body:` schema on the webhook route.
 - **`Subscription.variantId` is the Stripe price id.** The name is historical from the LemonSqueezy days. Do not confuse it with the lookup key.
@@ -1013,3 +1048,4 @@ The composite primary key `(subscriptionId, variantId)` lets a single subscripti
   ```
 - **`is_default` on a portal config cannot be set via the API/CLI.** The `is_default` field is read-only — you cannot pass it to `billing_portal configurations create/update`. Only the Stripe Dashboard (Settings → Billing → Customer portal) controls which config is default, and `billingPortal.sessions.create` uses that default unless you pass an explicit `configuration` id. So: either set the default in the Dashboard, or pin the `bpc_...` id in the session-create call. Creating a new config via CLI does NOT make it the default.
 - **The dashboard-managed default portal config drops API-set `subscription_update.products`.** Updating the default config (the one with `is_default: true`) via the API to add a `products` array silently does not persist — the field comes back empty/absent. Configure the portal's switchable product/price list in the **Dashboard** for the default config, or create + pin a non-default config that does persist `products`.
+- **`managed_payments` for consumer products.** Pass `managed_payments: { enabled: true }` on checkout session creation to let Stripe act as merchant of record for indirect taxes (VAT, GST, sales tax). This is designed for consumer-facing products (B2C subscriptions, digital goods). Requires Stripe Tax with managed payments enabled in dashboard settings. Do not add `managed_payments` by default; only use it when the user explicitly asks for it.
