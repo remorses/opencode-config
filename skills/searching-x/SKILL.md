@@ -13,10 +13,10 @@ description: >
 The `grok` CLI has 4 native X search tools. You invoke them by running grok in single-turn mode with a precise prompt that names the tool and its parameters.
 
 ```bash
-grok -p '<prompt>' --always-approve
+grok -p '<prompt>' -m grok-build --always-approve
 ```
 
-`-p` runs a single-turn prompt and exits. `--always-approve` skips tool approval prompts (optional; native X tools auto-approve, but add it when combining with other tools).
+`-p` runs a single-turn prompt and exits. `-m grok-build` selects the model with native X tools (other models like `grok-composer-2.5-fast` cannot call them). `--always-approve` skips tool approval prompts (optional; native X tools auto-approve, but add it when combining with other tools).
 
 Ignore stderr noise from strada traces. Only stdout matters.
 
@@ -228,25 +228,25 @@ and whether it is a parent, the target post, or a reply.
 ### Latest news on a topic
 
 ```bash
-grok -p 'Use x_keyword_search to search "<TOPIC> since:2026-06-20 min_faves:10" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, and engagement counts (likes, reposts, views).'
+grok -p 'Use x_keyword_search to search "<TOPIC> since:2026-06-20 min_faves:10" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, and engagement counts (likes, reposts, views).' -m grok-build
 ```
 
 ### What a specific user posted recently
 
 ```bash
-grok -p 'Use x_keyword_search to search "from:<HANDLE> since:2026-06-01" with mode "Latest" and limit 5. For each result show: post ID, author handle, date, full post text quoted verbatim, and engagement counts.'
+grok -p 'Use x_keyword_search to search "from:<HANDLE> since:2026-06-01" with mode "Latest" and limit 5. For each result show: post ID, author handle, date, full post text quoted verbatim, and engagement counts.' -m grok-build
 ```
 
 ### Search + read the best thread
 
 ```bash
-grok -p 'Use x_keyword_search to search "<QUERY>" with mode "Latest" and limit 5. For each result show: post ID, author handle, date, full text verbatim, engagement. Then use x_thread_fetch on the post with the most likes to show its full conversation context.' --always-approve
+grok -p 'Use x_keyword_search to search "<QUERY>" with mode "Latest" and limit 5. For each result show: post ID, author handle, date, full text verbatim, engagement. Then use x_thread_fetch on the post with the most likes to show its full conversation context.' -m grok-build --always-approve
 ```
 
 ### Find a user then read their posts
 
 ```bash
-grok -p 'Use x_user_search to find "<NAME>" with count 3. Show display name, handle, bio, follower count. Then use x_keyword_search to search "from:<BEST_HANDLE>" with mode "Latest" and limit 5, showing post ID, date, full text, and engagement for each.' --always-approve
+grok -p 'Use x_user_search to find "<NAME>" with count 3. Show display name, handle, bio, follower count. Then use x_keyword_search to search "from:<BEST_HANDLE>" with mode "Latest" and limit 5, showing post ID, date, full text, and engagement for each.' -m grok-build --always-approve
 ```
 
 ## Exploring post relationships
@@ -256,7 +256,7 @@ grok -p 'Use x_user_search to find "<NAME>" with count 3. Show display name, han
 Use `quoted_tweet_id:` in `x_keyword_search`. Returns all posts that quote the target.
 
 ```bash
-grok -p 'Use x_keyword_search to search "quoted_tweet_id:<POST_ID>" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement.'
+grok -p 'Use x_keyword_search to search "quoted_tweet_id:<POST_ID>" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement.' -m grok-build
 ```
 
 ### Find all replies in a thread
@@ -264,7 +264,7 @@ grok -p 'Use x_keyword_search to search "quoted_tweet_id:<POST_ID>" with mode "L
 Use `conversation_id:` to get all replies in a conversation. The conversation ID is the root post's ID.
 
 ```bash
-grok -p 'Use x_keyword_search to search "conversation_id:<ROOT_POST_ID> filter:replies" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement.'
+grok -p 'Use x_keyword_search to search "conversation_id:<ROOT_POST_ID> filter:replies" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement.' -m grok-build
 ```
 
 Alternatively, use `x_thread_fetch` on the post ID to get the parent chain + replies in one call.
@@ -272,19 +272,19 @@ Alternatively, use `x_thread_fetch` on the post ID to get the parent chain + rep
 ### Find posts with images/videos from a user
 
 ```bash
-grok -p 'Use x_keyword_search to search "from:<HANDLE> filter:images since:2026-06-01" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement, and direct image URLs from media attachments.'
+grok -p 'Use x_keyword_search to search "from:<HANDLE> filter:images since:2026-06-01" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement, and direct image URLs from media attachments.' -m grok-build
 ```
 
 ### Find posts linking to a specific domain
 
 ```bash
-grok -p 'Use x_keyword_search to search "url:github.com min_faves:50 since:2026-06-20" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement.'
+grok -p 'Use x_keyword_search to search "url:github.com min_faves:50 since:2026-06-20" with mode "Latest" and limit 10. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement.' -m grok-build
 ```
 
 ### Find posts near a location
 
 ```bash
-grok -p 'Use x_keyword_search to search "tennis geocode:51.5074,-0.1278,25km since:2026-06-20" with mode "Latest" and limit 5. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement.'
+grok -p 'Use x_keyword_search to search "tennis geocode:51.5074,-0.1278,25km since:2026-06-20" with mode "Latest" and limit 5. For each result show: post ID, author handle, date, full post text quoted verbatim, engagement.' -m grok-build
 ```
 
 ## Decision rule
