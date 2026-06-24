@@ -171,8 +171,10 @@ Modern editors, terminals, and languages handle Unicode just fine. There's no re
 1. Read the file containing the diagram
 2. Identify all diagram blocks (in markdown fences, comments, or standalone)
 3. Replace ASCII characters with Unicode box-drawing equivalents
-4. Run the verification script on each diagram block
-5. Read the column indexes output, check vertical alignment
-6. Fix any misalignment found
-7. Run the verification script again to confirm the fix
-8. Write the fixed file
+4. Run `npx -y @holocron.so/cli diagrams fix <file>` to auto-fix alignment (handles padding, border widths, junctions, nested and side-by-side boxes)
+5. If the CLI reports max-width violations, shorten the offending lines manually
+6. Run the verification script on each diagram block to double-check
+7. Read the column indexes output, check vertical alignment
+8. Fix any remaining misalignment found
+9. Run the verification script again to confirm the fix
+10. Write the fixed file
