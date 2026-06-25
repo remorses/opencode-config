@@ -963,28 +963,28 @@ sigillo run --command 'stripe billing_portal configurations create \
   -d "features[subscription_cancel][cancellation_reason][options][4]=other" \
   -d "features[subscription_update][enabled]=true" \
   -d "features[subscription_update][default_allowed_updates][0]=price" \
-  -d "features[subscription_update][default_allowed_updates][1]=quantity" \
-  -d "features[subscription_update][default_allowed_updates][2]=promotion_code" \
+  -d "features[subscription_update][default_allowed_updates][1]=promotion_code" \
   -d "features[subscription_update][proration_behavior]=create_prorations" \
   -d "features[subscription_update][products][0][product]=$PRODUCT_ID" \
   -d "features[subscription_update][products][0][prices][0]=$PRO_MONTHLY" \
   -d "features[subscription_update][products][0][prices][1]=$PRO_YEARLY" \
-  -d "features[subscription_update][products][0][adjustable_quantity][enabled]=true" \
-  -d "features[subscription_update][products][0][adjustable_quantity][minimum]=1" \
-  -d "features[subscription_update][products][0][adjustable_quantity][maximum]=100" \
   -d "features[subscription_update][schedule_at_period_end][conditions][0][type]=shortening_interval" \
   -d "features[subscription_update][schedule_at_period_end][conditions][1][type]=decreasing_item_amount"'
 ```
 
-Listing both price ids under the same product enables portal-driven monthly/yearly switching. The `adjustable_quantity` lets customers change seat count (min 1, max 100). The `schedule_at_period_end` conditions make downgrades wait until the billing period ends.
+Listing both price ids under the same product enables portal-driven monthly/yearly switching. The `schedule_at_period_end` conditions make downgrades wait until the billing period ends.
 
-To **update** an existing portal configuration (e.g. to add quantity support later):
+### Enabling quantity changes (seat-based pricing)
+
+If the subscription is seat-based (customers pay per unit), add `quantity` to `default_allowed_updates` and `adjustable_quantity` on the product. This can be done when creating the portal config or by updating an existing one.
+
+To **update** an existing portal configuration:
 
 ```bash
 # list existing configs to find the id
 sigillo run -- stripe billing_portal configurations list
 
-# update the config
+# update the config to enable quantity changes
 sigillo run --command 'stripe billing_portal configurations update bpc_xxx \
   -d "features[subscription_update][enabled]=true" \
   -d "features[subscription_update][default_allowed_updates][0]=quantity" \
@@ -996,6 +996,27 @@ sigillo run --command 'stripe billing_portal configurations update bpc_xxx \
   -d "features[subscription_update][products][0][adjustable_quantity][minimum]=1" \
   -d "features[subscription_update][products][0][adjustable_quantity][maximum]=100"'
 ```
+
+To include quantity alongside price switching in the initial create, add these lines to the create command in Step 2:
+
+```bash
+  -d "features[subscription_update][default_allowed_updates][2]=quantity" \
+  -d "features[subscription_update][products][0][adjustable_quantity][enabled]=true" \
+  -d "features[subscription_update][products][0][adjustable_quantity][minimum]=1" \
+  -d "features[subscription_update][products][0][adjustable_quantity][maximum]=100" \
+```
+
+Also set `adjustable_quantity` on the checkout `line_items` so customers can pick quantity during initial purchase:
+
+```ts
+line_items: [{
+  price: priceId,
+  quantity: defaultQty,
+  adjustable_quantity: { enabled: true, minimum: 1, maximum: 100 },
+}]
+```
+
+The webhook handler should read `firstItem.quantity` from the subscription and store it in the DB so the app can enforce seat limits.
 
 If the command fails because any shell variable is empty or points to a non-existent id, Stripe returns a clean error and creates nothing.
 
