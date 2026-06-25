@@ -130,34 +130,46 @@ Stripe lets you upload evidence **without submitting** by passing `--submit fals
 
 This is critical because submission is **irreversible**. Once submitted, you cannot edit or add evidence.
 
+**File uploads must use curl**, not `stripe files create -d`. The Stripe CLI's `-d` flag does not handle multipart file uploads correctly. Use curl with `-F` flags instead:
+
 ```bash
-# 1. Upload evidence files
-doppler run -c production -- stripe files create \
-  -d "purpose=dispute_evidence" \
-  -d "file=@./evidence.pdf"
-# Returns file_xxx (save this ID)
+# 1. Get your Stripe API key
+STRIPE_KEY=$(doppler run -c production -- printenv STRIPE_API_KEY)
 
-doppler run -c production -- stripe files create \
-  -d "purpose=dispute_evidence" \
-  -d "file=@./email-evidence.png"
-# Returns file_yyy (save this ID)
+# 2. Upload evidence files via curl (stripe CLI -d does NOT work for files)
+curl -s https://files.stripe.com/v1/files \
+  -u "$STRIPE_KEY:" \
+  -F "purpose=dispute_evidence" \
+  -F "file=@./evidence.pdf"
+# Returns JSON with "id": "file_xxx" (save this ID)
 
-# 2. Attach evidence WITHOUT submitting (draft mode)
+curl -s https://files.stripe.com/v1/files \
+  -u "$STRIPE_KEY:" \
+  -F "purpose=dispute_evidence" \
+  -F "file=@./email-evidence.png"
+# Returns JSON with "id": "file_yyy" (save this ID)
+```
+
+**Attaching evidence must use `-d` with bracket syntax**, not `--evidence.xxx` flags. The dot-notation flags don't work for nested evidence params:
+
+```bash
+# 3. Attach evidence WITHOUT submitting (draft mode)
 doppler run -c production -- stripe disputes update dp_xxx \
-  --evidence.access-activity-log "$(cat ./access-activity-log.txt)" \
-  --evidence.customer-email-address "user@example.com" \
-  --evidence.customer-purchase-ip "203.0.113.42" \
-  --evidence.product-description "React Export: SaaS plugin that converts Framer designs to production React components." \
-  --evidence.service-date "2025-12-09" \
-  --evidence.service-documentation file_xxx \
-  --evidence.customer-communication file_yyy \
-  --submit false
+  -d "evidence[access_activity_log]=$(cat ./access-activity-log.txt)" \
+  -d "evidence[customer_email_address]=user@example.com" \
+  -d "evidence[customer_purchase_ip]=203.0.113.42" \
+  -d "evidence[product_description]=Your SaaS product description here." \
+  -d "evidence[service_date]=2025-12-09" \
+  -d "evidence[service_documentation]=file_xxx" \
+  -d "evidence[customer_communication]=file_yyy" \
+  -d "submit=false"
 
-# 3. Review in Dashboard: https://dashboard.stripe.com/disputes/dp_xxx
+# 4. Review in Dashboard: https://dashboard.stripe.com/disputes/dp_xxx
 #    Check that all text fields, PDFs, and images look correct.
 
-# 4. Submit ONLY after reviewing (irreversible)
-doppler run -c production -- stripe disputes update dp_xxx --submit true
+# 5. Submit ONLY after reviewing (irreversible)
+doppler run -c production -- stripe disputes update dp_xxx \
+  -d "submit=true"
 ```
 
 ### Verifying generated evidence before uploading
@@ -173,6 +185,10 @@ doppler run -c production -- stripe disputes update dp_xxx --submit true
 Use `open ./output/evidence-dp_xxx.pdf` on macOS to preview PDFs. For images, use `open ./output/email-xxx.png` or the `read-media` tool if running inside an agent.
 
 When running as an agent, always use the `read-media` tool on generated images and PDFs to verify their content before printing the upload commands. Do not blindly upload files you haven't inspected.
+
+### File reuse across disputes
+
+Stripe does not allow the same uploaded file to be attached to multiple disputes. If you have 3 disputes for the same customer, you must upload the file 3 separate times (getting 3 different `file_xxx` IDs) even if the content is identical. Reusing a file ID that is already attached to another dispute returns: `"That file is already attached to something else."`
 
 ## What wins disputes for SaaS/digital products
 
