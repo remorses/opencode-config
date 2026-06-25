@@ -155,6 +155,8 @@ Copy the `whsec_...` it prints and set `STRIPE_WEBHOOK_SECRET` in sigillo (`sigi
 
 ## Creating products and prices via CLI
 
+All `stripe` CLI commands in this section must be wrapped with `sigillo run` (see [CLI auth via sigillo](#cli-auth-via-sigillo-no-global-login)). Commands shown as bare `stripe ...` below are shorthand; always prefix with `sigillo run --` or use `sigillo run --command '...'` when shell variable expansion is needed.
+
 **Prefer `lookup_key`** so app code references a stable string instead of a generated `price_xxx` id. This makes it safe to rotate prices, migrate accounts, or change numbers without redeploys.
 
 ### Naming convention
@@ -935,15 +937,15 @@ export PRO_YEARLY=price_yourYearlyIdHere
 If you don't have the ids anymore, look them up with:
 
 ```bash
-stripe prices list --lookup-keys pro_monthly --lookup-keys pro_yearly
+sigillo run -- stripe prices list --lookup-keys pro_monthly --lookup-keys pro_yearly
 ```
 
 ### Step 2 — create the portal configuration
 
-Run this as a **single atomic call** — unlike the product/price flow, a portal configuration is created in one Stripe API call, so there is no partial-state risk within the command. But do not chain it after the price creation commands in a script; the shell variables above must already be set and verified before you run it.
+Run this as a **single atomic call**. All `stripe` commands must go through `sigillo run` so the correct API key is injected (see [CLI auth via sigillo](#cli-auth-via-sigillo-no-global-login)). Use `sigillo run --command '...'` when the command uses shell variables like `$PRODUCT_ID`.
 
 ```bash
-stripe billing_portal configurations create \
+sigillo run --command 'stripe billing_portal configurations create \
   -d "business_profile[headline]=Manage your subscription" \
   -d "features[customer_update][enabled]=true" \
   -d "features[customer_update][allowed_updates][0]=email" \
@@ -961,18 +963,41 @@ stripe billing_portal configurations create \
   -d "features[subscription_cancel][cancellation_reason][options][4]=other" \
   -d "features[subscription_update][enabled]=true" \
   -d "features[subscription_update][default_allowed_updates][0]=price" \
-  -d "features[subscription_update][default_allowed_updates][1]=promotion_code" \
+  -d "features[subscription_update][default_allowed_updates][1]=quantity" \
+  -d "features[subscription_update][default_allowed_updates][2]=promotion_code" \
   -d "features[subscription_update][proration_behavior]=create_prorations" \
   -d "features[subscription_update][products][0][product]=$PRODUCT_ID" \
   -d "features[subscription_update][products][0][prices][0]=$PRO_MONTHLY" \
   -d "features[subscription_update][products][0][prices][1]=$PRO_YEARLY" \
+  -d "features[subscription_update][products][0][adjustable_quantity][enabled]=true" \
+  -d "features[subscription_update][products][0][adjustable_quantity][minimum]=1" \
+  -d "features[subscription_update][products][0][adjustable_quantity][maximum]=100" \
   -d "features[subscription_update][schedule_at_period_end][conditions][0][type]=shortening_interval" \
-  -d "features[subscription_update][schedule_at_period_end][conditions][1][type]=decreasing_item_amount"
+  -d "features[subscription_update][schedule_at_period_end][conditions][1][type]=decreasing_item_amount"'
 ```
 
-Listing both price ids under the same product is what enables portal-driven monthly↔yearly switching. The `schedule_at_period_end` conditions make sure downgrades (yearly → monthly, or higher → lower tier) wait until the end of the billing period instead of refunding early.
+Listing both price ids under the same product enables portal-driven monthly/yearly switching. The `adjustable_quantity` lets customers change seat count (min 1, max 100). The `schedule_at_period_end` conditions make downgrades wait until the billing period ends.
 
-If the command fails because any of the `$PRODUCT_ID`, `$PRO_MONTHLY`, or `$PRO_YEARLY` shell variables is empty or points to a non-existent id, Stripe returns a clean error and creates nothing — safe to fix and retry.
+To **update** an existing portal configuration (e.g. to add quantity support later):
+
+```bash
+# list existing configs to find the id
+sigillo run -- stripe billing_portal configurations list
+
+# update the config
+sigillo run --command 'stripe billing_portal configurations update bpc_xxx \
+  -d "features[subscription_update][enabled]=true" \
+  -d "features[subscription_update][default_allowed_updates][0]=quantity" \
+  -d "features[subscription_update][proration_behavior]=create_prorations" \
+  -d "features[subscription_update][products][0][product]=$PRODUCT_ID" \
+  -d "features[subscription_update][products][0][prices][0]=$PRO_MONTHLY" \
+  -d "features[subscription_update][products][0][prices][1]=$PRO_YEARLY" \
+  -d "features[subscription_update][products][0][adjustable_quantity][enabled]=true" \
+  -d "features[subscription_update][products][0][adjustable_quantity][minimum]=1" \
+  -d "features[subscription_update][products][0][adjustable_quantity][maximum]=100"'
+```
+
+If the command fails because any shell variable is empty or points to a non-existent id, Stripe returns a clean error and creates nothing.
 
 > **Adding more tiers**: append a second product under `products[1][product]=$TEAM_PRODUCT` with its own `prices[0]=$TEAM_MONTHLY` / `prices[1]=$TEAM_YEARLY`. The portal will let customers switch between any of the 4 prices (pro monthly, pro yearly, team monthly, team yearly).
 
@@ -1049,3 +1074,4 @@ The composite primary key `(subscriptionId, variantId)` lets a single subscripti
 - **`is_default` on a portal config cannot be set via the API/CLI.** The `is_default` field is read-only — you cannot pass it to `billing_portal configurations create/update`. Only the Stripe Dashboard (Settings → Billing → Customer portal) controls which config is default, and `billingPortal.sessions.create` uses that default unless you pass an explicit `configuration` id. So: either set the default in the Dashboard, or pin the `bpc_...` id in the session-create call. Creating a new config via CLI does NOT make it the default.
 - **The dashboard-managed default portal config drops API-set `subscription_update.products`.** Updating the default config (the one with `is_default: true`) via the API to add a `products` array silently does not persist — the field comes back empty/absent. Configure the portal's switchable product/price list in the **Dashboard** for the default config, or create + pin a non-default config that does persist `products`.
 - **`managed_payments` for consumer products.** Pass `managed_payments: { enabled: true }` on checkout session creation to let Stripe act as merchant of record for indirect taxes (VAT, GST, sales tax). This is designed for consumer-facing products (B2C subscriptions, digital goods). Requires Stripe Tax with managed payments enabled in dashboard settings. Do not add `managed_payments` by default; only use it when the user explicitly asks for it.
+- **Portal configuration belongs in the CLI, not in app code.** Portal configurations are account-level Stripe objects created once and reused forever. Do not write code to create or manage portal configurations at runtime (e.g. `stripe.billingPortal.configurations.create()` in a request handler). Instead, create and update them via the Stripe CLI through sigillo as documented in [Portal configuration](#portal-configuration). The app code only needs `stripe.billingPortal.sessions.create()` to open a portal session.
