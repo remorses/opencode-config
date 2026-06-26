@@ -1096,6 +1096,16 @@ The composite primary key `(subscriptionId, variantId)` lets a single subscripti
 - **The dashboard-managed default portal config drops API-set `subscription_update.products`.** Updating the default config (the one with `is_default: true`) via the API to add a `products` array silently does not persist — the field comes back empty/absent. Configure the portal's switchable product/price list in the **Dashboard** for the default config, or create + pin a non-default config that does persist `products`.
 - **`managed_payments` for consumer products.** Pass `managed_payments: { enabled: true }` on checkout session creation to let Stripe act as merchant of record for indirect taxes (VAT, GST, sales tax). This is designed for consumer-facing products (B2C subscriptions, digital goods). Requires Stripe Tax with managed payments enabled in dashboard settings. Do not add `managed_payments` by default; only use it when the user explicitly asks for it.
 - **Portal configuration belongs in the CLI, not in app code.** Portal configurations are account-level Stripe objects created once and reused forever. Do not write code to create or manage portal configurations at runtime (e.g. `stripe.billingPortal.configurations.create()` in a request handler). Instead, create and update them via the Stripe CLI through sigillo as documented in [Portal configuration](#portal-configuration). The app code only needs `stripe.billingPortal.sessions.create()` to open a portal session.
+- **`cancel_at` vs `cancel_at_period_end` in portal cancellations.** When a customer cancels via the Billing Portal, Stripe may set `cancel_at` (epoch timestamp) to the period end date while leaving `cancel_at_period_end = false`. This happens because the portal uses `cancel_at` internally instead of the `cancel_at_period_end` boolean flag. If your webhook handler only checks `cancel_at_period_end`, cancellations from the portal will appear as still active in your DB/UI. Always normalise both fields into a single `cancelAt` timestamp:
+  ```ts
+  let cancelAt: number | null = null
+  if (latest.cancel_at) {
+    cancelAt = latest.cancel_at * 1000
+  } else if (latest.cancel_at_period_end && currentPeriodEnd) {
+    cancelAt = currentPeriodEnd * 1000
+  }
+  ```
+  Then use `cancelAt` in the UI to show "cancelling on ..." regardless of which Stripe field was set. Do not rely solely on `cancel_at_period_end`.
 
 ## Disputes and chargebacks
 
