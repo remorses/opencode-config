@@ -36,11 +36,13 @@ Replace `+` at intersections with the correct Unicode box-drawing character base
 
 ## Arrows
 
-Replace ASCII arrows with Unicode equivalents:
-- `->` or `-->` at end of horizontal line: `─▶` or `──▶`
-- `<-` or `<--` at start of horizontal line: `◀─` or `◀──`
-- `v` at bottom of vertical line (only when clearly structural, not in text): `▼`
-- `^` at top of vertical line: `▲`
+Keep arrows as plain ASCII. Unicode arrow characters like `▶`, `◀`, `▲`, `▼` have ambiguous width and render as 2 cells on many Windows monospaced fonts, breaking alignment. Use these instead:
+- `->` or `-->` at end of horizontal line: `──>` (keep as ASCII `>`)
+- `<-` or `<--` at start of horizontal line: `<──` (keep as ASCII `<`)
+- `v` at bottom of vertical line (only when clearly structural, not in text): keep as `v`
+- `^` at top of vertical line: keep as `^`
+
+Never use `▶ ◀ ▲ ▼ ► ◄` in diagrams. The `@holocron.so/cli diagrams fix` command auto-replaces these with ASCII equivalents.
 
 # Alignment verification process
 
@@ -140,7 +142,7 @@ You can instantly verify that `│` on L01 col 0 aligns with `┌` on L00 col 0 
 
 - **Off-by-one on box widths**: forgetting that corners take 1 column each, so a box of width W has W-2 horizontal line characters between corners
 - **Text not centered**: when centering text in a box, odd-length text in even-width interior (or vice versa) needs asymmetric padding. Pick a side (left or right) for the extra space
-- **Arrow characters eating a column**: `▶` takes 1 column, so if you replace `->` (2 chars) with `▶` (1 char) you lost a column. Use `─▶` (2 chars) to keep width, or `──▶` for `-->` (3 chars)
+- **Arrow characters**: keep arrows as ASCII `>`, `<`, `v`, `^`. Unicode arrows like `▶` have ambiguous width and break on Windows. Use `──>` (3 chars) for `-->`, `<──` for `<--`
 - **Mixing ASCII and Unicode**: never leave a mix. If you convert one `|` to `│`, convert ALL of them in that diagram
 
 ## Use literal Unicode characters, never escape sequences
