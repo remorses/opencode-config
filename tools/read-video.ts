@@ -16,7 +16,7 @@ const MIME_MAP: Record<string, string> = {
 const MAX_BYTES = 20 * 1024 * 1024
 
 export default tool({
-  description: `Read a video file (mp4, webm, mov) from a local path or URL and return it as an inline attachment for direct model analysis. Only works with Google Gemini models; non-Gemini models will get an error from the provider. If you are not using a Gemini model, use a Gemini subagent or the describe-media tool instead.`,
+  description: `Read a video or audio file (mp4, webm, mov, mp3, wav) from a local path or URL and return it as an inline attachment for direct model analysis. Only works with Google Gemini models; non-Gemini models will get an error from the provider. If you are not using a Gemini model, use a Gemini subagent or the describe-media tool instead.`,
   args: {
     filePath: tool.schema.string().describe("Absolute file path or URL to the video"),
   },
