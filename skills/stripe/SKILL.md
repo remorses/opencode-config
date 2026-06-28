@@ -38,11 +38,17 @@ sigillo secrets set STRIPE_API_KEY sk_test_... -c dev
 sigillo secrets set STRIPE_API_KEY sk_live_... -c prod
 ```
 
-If a project already uses `STRIPE_SECRET_KEY`, copy it to `STRIPE_API_KEY` and update the app code to read `STRIPE_API_KEY` instead:
+If a project already uses `STRIPE_SECRET_KEY` instead of `STRIPE_API_KEY`, use `--command` with shell variable expansion to alias it at runtime:
 
 ```bash
-sigillo secrets get STRIPE_SECRET_KEY -c dev | sigillo secrets set STRIPE_API_KEY -c dev
-sigillo secrets get STRIPE_SECRET_KEY -c prod | sigillo secrets set STRIPE_API_KEY -c prod
+sigillo run -c prod --command 'STRIPE_API_KEY=$STRIPE_SECRET_KEY stripe products list'
+```
+
+Or copy the value permanently so `STRIPE_API_KEY` is always available:
+
+```bash
+sigillo secrets get STRIPE_SECRET_KEY --raw -c dev | sigillo secrets set STRIPE_API_KEY -c dev
+sigillo secrets get STRIPE_SECRET_KEY --raw -c prod | sigillo secrets set STRIPE_API_KEY -c prod
 ```
 
 ### Running Stripe CLI commands
@@ -56,6 +62,9 @@ sigillo run -- stripe prices list --lookup-keys pro_monthly
 
 # commands that need shell features (&&, pipes, $VARIABLES)
 sigillo run --command 'stripe products create --name="Pro" --description="Pro plan"'
+
+# when STRIPE_API_KEY is not set but STRIPE_SECRET_KEY is
+sigillo run -c prod --command 'STRIPE_API_KEY=$STRIPE_SECRET_KEY stripe products list'
 
 # webhook listener for local dev
 sigillo run -- stripe listen --forward-to http://localhost:8866/api/stripe/webhook
