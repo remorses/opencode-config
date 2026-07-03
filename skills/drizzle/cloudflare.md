@@ -672,6 +672,10 @@ async restore(timestamp: number) {
 
 PITR restores the entire SQLite database, both SQL tables and KV data. It is not available in local development.
 
+## Redirect chains re-run every D1 read
+
+Each 302 hop is a fresh worker invocation that repeats auth and D1 reads. Never redirect internally through resolver routes; compute the final URL in one hop. See the `cloudflare-workers` skill ("Redirect chains multiply database latency").
+
 ## Memoizing drizzle queries at the edge
 
 Workers run globally on 300+ datacenters, but D1 lives in one region. Cross-region reads can be 50-200ms. Use the `memoize()` utility bundled with this skill (`./worker-memoize.ts`) to cache drizzle query results at the edge via the Cloudflare Cache API. Reads from cache are ~1-5ms.

@@ -861,6 +861,19 @@ const getOrgIdForProject = memoize({
 | OAuth client id by hostname | Encryption keys (CPU, not I/O) |
 | Environment resolution (id/slug) | Write operations |
 
+## Redirect chains multiply database latency
+
+Every 302 hop is a full worker invocation: middleware, auth, and database reads run again. With D1 at 50-200ms per cross-region read, a two-hop chain doubles or triples time-to-content.
+
+**Resolver routes** (e.g. `/dashboard` that resolves the user's tenant and redirects to `/org/:id/...`) exist only as stable entry points for external links where the final URL can't be known upfront: docs, emails, CLI error messages, OAuth `callbackURL`. Internal code must never redirect to a resolver; compute the final URL and redirect there in one hop.
+
+```
+/login (signed in) ──► /dashboard ──► /org/:id/posts     two hops, queries run twice
+/login (signed in) ──► /org/:id/posts                    one hop
+```
+
+Audit the usual chain sources: "already signed in" bounces on login pages, stale-resource bounces in loaders, logo/home links pointing at the resolver, and signed-out pages linking to authed resolvers (which chain into `/login`).
+
 ## Always typecheck before building
 
 **Always run `tsc` before `vite build`** in build and deploy scripts. Vite does not typecheck; it only transpiles. Without `tsc`, type errors slip through to production silently. The `build` script should be `tsc && vite build`, and deploy scripts should include `tsc &&` before the `vite build` step.

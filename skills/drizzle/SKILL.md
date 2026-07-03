@@ -284,6 +284,24 @@ const usersWithPosts = await db.query.users.findMany({
 - **NEVER use `orm.inArray()`, `orm.eq()`, or other operator functions inside `db.query` `where`** — the query API only accepts object-style filters. `orm.inArray(schema.users.id, ids)` will fail with a type error. Instead, use `{ id: { in: ids } }` or loop with `findFirst` per ID.
 - **Do not use `columns` to select specific fields.** Listing every column you want adds noise, rarely helps performance on small rows, and makes the returned object not conform to drizzle Zod schemas (`createSelectSchema`). The only valid use is **omitting** a large field like a binary blob or long text body, and in that case use the exclusion form: `columns: { blobField: false }`. This keeps the query clean and returns everything except the excluded field.
 
+### Derive, don't re-query
+
+When one result set can answer two questions, don't issue two statements.
+
+**Authorization from the list you're fetching anyway.** A route that needs "is the caller a member" + "list all members" is one query, not a `findFirst` followed by a `findMany`: fetch the list and `find()` the caller's own row. Return null when absent so a non-member never sees the list.
+
+```ts
+const members = await db.query.orgMember.findMany({
+  where: { orgId },
+  with: { user: true, org: true },
+})
+const me = members.find((row) => row.userId === userId)
+if (!me?.org) return null // not a member — leak nothing
+return { role: me.role, org: me.org, members }
+```
+
+**Fallbacks from the batch you already ran.** Design batched reads so they answer both "is the requested resource valid" and "where to fall back". E.g. fetching all memberships to validate one org also yields the personal-org fallback for free — never issue a second query (or bounce through another route) to re-derive what the batch already returned.
+
 **Writes: use `db.insert`, `db.update`, `db.delete`** — no query API for writes.
 
 ```ts
