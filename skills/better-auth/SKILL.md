@@ -1081,6 +1081,69 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 ```
 
+## Auto-join organization by email domain
+
+Pattern for automatically adding users to an org when their verified email matches a domain (e.g. all `@acme.com` users join the Acme org). This is application-level logic built on top of better-auth sessions, not a better-auth plugin.
+
+**Schema:** add a nullable `autoJoinDomain` column on the org table, indexed for lookup. A blocklist of common public domains (gmail.com, outlook.com, etc.) prevents misuse.
+
+```ts
+// Schema (SQLite example)
+const org = s.sqliteTable('org', {
+  id: s.text('id').primaryKey().$defaultFn(() => ulid()),
+  name: s.text('name').notNull(),
+  autoJoinDomain: s.text('auto_join_domain'), // e.g. 'acme.com'
+}, (table) => [
+  s.index('org_auto_join_domain_idx').on(table.autoJoinDomain),
+])
+```
+
+**Auto-join function:** runs on every authenticated page load (e.g. in a Spiceflow `loader`). Checks `emailVerified`, skips public domains, queries matching orgs, inserts memberships with `onConflictDoNothing`. No pre-read of existing memberships needed; the unique index handles duplicates.
+
+```ts
+async function autoJoinOrgsByDomain(session: Session): Promise<void> {
+  if (!session.user.emailVerified) return
+  const domain = getEmailDomain(session.user.email)
+  if (!domain || COMMON_EMAIL_DOMAINS.has(domain)) return
+
+  const db = getDb()
+  const matchingOrgs = await db.query.org.findMany({
+    where: { autoJoinDomain: domain },
+    columns: { id: true },
+  })
+  if (matchingOrgs.length === 0) return
+
+  const queries = matchingOrgs.map((o) =>
+    db.insert(schema.orgMember)
+      .values({ orgId: o.id, userId: session.userId, role: 'member' })
+      .onConflictDoNothing({ target: [schema.orgMember.orgId, schema.orgMember.userId] }),
+  )
+  await db.batch(queries as [any, ...any[]])
+}
+```
+
+**Where to call it:** in the authenticated layout loader, before querying the user's org memberships. The function is idempotent, so calling it on every page load is safe.
+
+```ts
+.loader('/dash/*', async ({ request }) => {
+  const session = await requirePageSession(request)
+  await autoJoinOrgsByDomain(session) // join matching orgs before listing them
+  const members = await db.query.orgMember.findMany({
+    where: { userId: session.userId },
+    with: { org: true },
+  })
+  // ...
+})
+```
+
+**UI for enabling:** add a checkbox in the org creation form (hidden for public email domains like gmail.com) and a toggle in org settings. Both the create action and the update action should require `emailVerified: true` on the admin before allowing auto-join to be enabled.
+
+**Key rules:**
+- The domain blocklist and `getEmailDomain()` helper must live in a **client-safe module** (no server imports). Client components need them to show/hide the checkbox. Server code can re-export them.
+- Require `emailVerified: true` on the admin who enables auto-join and on users who get auto-joined.
+- Use `onConflictDoNothing` on the `(org_id, user_id)` unique index so the function is idempotent.
+- No domain ownership verification (DNS TXT, Google Admin SDK) is needed for self-hosted tools. First user to claim a domain gets it.
+
 ## Drizzle ORM v1 (beta) compatibility
 
 The official `@better-auth/drizzle-adapter` does **not** work with `drizzle-orm@beta` (v1.0.0-beta). It relies on v0 APIs (`db._.fullSchema`, `db.query`) that changed in v1 and crashes with `"model 'user' was not found in the schema object"`.
