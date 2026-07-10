@@ -142,23 +142,42 @@ wrangler.jsonc — `remote: true` makes the binding work in local dev / `wrangle
 ```
 
 The binding has a builder-style `send()` overload — no need to construct raw MIME
-`EmailMessage` objects:
+`EmailMessage` objects. Workers use spiceflow; get `env` and `waitUntil` from
+`cloudflare:workers` and send from inside a route handler:
 
 ```ts
-await env.EMAIL.send({
-  from: { email: 'tommy@yourdomain.com', name: 'Tommy' },
-  to: userEmail,
-  subject,
-  html,
+import { env, waitUntil } from 'cloudflare:workers'
+import { Spiceflow } from 'spiceflow'
+
+const app = new Spiceflow().route({
+  method: 'POST',
+  path: '/api/signup',
+  handler: async ({ request }) => {
+    // ... do the actual work first ...
+    waitUntil(sendWelcomeEmail({ to: userEmail }))
+    return { ok: true }
+  },
 })
+
+async function sendWelcomeEmail({ to, data }: { to: string; data: WelcomeEmailData }): Promise<void> {
+  try {
+    await env.EMAIL.send({
+      from: { email: 'tommy@yourdomain.com', name: 'Tommy' },
+      to,
+      subject: buildWelcomeEmailSubject(data),
+      html: buildWelcomeEmailHtml(data),
+    })
+  } catch (err) {
+    // Email is best-effort; never fail the request because an email failed
+    captureException(err instanceof Error ? err : new Error(String(err)), {
+      tags: { route: 'signup', reason: 'welcome-email-failed' },
+    })
+  }
+}
 ```
 
-Email must be **best-effort**: run it in `waitUntil()`, wrap in try/catch, report failures to
-error tracking. Never fail the request because an email failed:
-
-```ts
-waitUntil(sendWelcomeEmail(...))  // inside: try/catch + captureException
-```
+Email must be **best-effort**: fire it via `waitUntil()`, wrap in try/catch, report failures
+to error tracking. Never await it in the response path and never let it throw.
 
 The `from` domain must have Cloudflare Email Routing enabled with the sender address configured.
 
@@ -191,30 +210,39 @@ Always check both screenshots yourself before telling the user the email is done
 Use a throwaway worker with the remote binding — `wrangler dev` proxies `send_email` to the
 real Cloudflare account, so the email actually sends. No deploy needed.
 
-1. Create a temp dir with two files:
+1. Create the two files inside the project's gitignored `tmp/` dir (NOT `/tmp`) so wrangler's
+   bundler resolves `spiceflow` and the email builder from the project's `node_modules`:
 
 ```jsonc
-// wrangler.jsonc
+// tmp/email-test/wrangler.jsonc
 {
   "name": "email-test",
-  "main": "worker.js",
+  "main": "worker.ts",
   "compatibility_date": "2026-04-14",
   "send_email": [{ "name": "EMAIL", "remote": true }]
 }
 ```
 
-```js
-// worker.js
-export default {
-  async fetch(request, env) {
-    if (request.method !== 'POST') return new Response('POST only', { status: 405 })
+```ts
+// tmp/email-test/worker.ts
+import { env } from 'cloudflare:workers'
+import { Spiceflow } from 'spiceflow'
+import { z } from 'zod'
+
+const app = new Spiceflow().route({
+  method: 'POST',
+  path: '/',
+  request: z.object({ to: z.string(), subject: z.string(), html: z.string() }),
+  handler: async ({ request }) => {
     const { to, subject, html } = await request.json()
-    try {
-      await env.EMAIL.send({ from: { email: 'tommy@yourdomain.com', name: 'Tommy' }, to, subject, html })
-      return new Response('sent')
-    } catch (err) {
-      return new Response('error: ' + err.message, { status: 500 })
-    }
+    await env.EMAIL.send({ from: { email: 'tommy@yourdomain.com', name: 'Tommy' }, to, subject, html })
+    return { sent: true }
+  },
+})
+
+export default {
+  fetch(request: Request) {
+    return app.handle(request)
   },
 }
 ```
@@ -223,7 +251,7 @@ export default {
    tuistory background session:
 
 ```bash
-bunx tuistory launch "pnpm --dir <project> exec wrangler dev --config /tmp/email-test/wrangler.jsonc --port 8799" -s email-test
+bunx tuistory launch "pnpm --dir <project> exec wrangler dev --config <project>/tmp/email-test/wrangler.jsonc --port 8799" -s email-test
 bunx tuistory -s email-test wait "/Ready on/i" --timeout 60000
 ```
 
