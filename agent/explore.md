@@ -6,7 +6,7 @@ description: >
   NEVER use explore agent to read skills. use the skill tool directly instead.
 mode: subagent
 source: https://github.com/anomalyco/opencode/blob/7417c869fcecb3f0e6989f4f349df07a6b8ede8d/packages/opencode/src/agent/agent.ts#L13
-model: openai/gpt-5.6-terra-fast
+model: openai/gpt-5.6-luna-fast
 permission:
   "*": "deny"
   grep: "allow"
