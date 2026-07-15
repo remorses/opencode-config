@@ -9,40 +9,33 @@ description: >
 
 # shift-commits
 
-Rewrites git history so weekday commits made before 5 PM get shifted to 17:00-22:00.
-Weekend and already-after-5PM commits are left untouched.
+Rewrites git history so weekday commits appear after working hours.
 
-Run the CLI from inside any git repository:
+**How it works:** groups commits by day. Finds the earliest commit on each weekday.
+If it's before the target hour (default 17:00), computes `delta = target - earliest`
+and shifts ALL commits on that day by the same delta. This preserves relative ordering
+within each day.
+
+Weekend commits and days where all commits are already after the target hour are untouched.
 
 ```bash
-# Preview what would change (no modifications)
-bun ~/.config/opencode/skills/shift-commits/shift-commits.ts --dry-run
-
-# Shift commits from a specific date onward
+# Preview what would change (default is dry-run)
 bun ~/.config/opencode/skills/shift-commits/shift-commits.ts --after 2026-07-06
 
 # Actually rewrite history
 bun ~/.config/opencode/skills/shift-commits/shift-commits.ts --after 2026-07-06 --run
 
-# Custom hour range (default 17-22)
-bun ~/.config/opencode/skills/shift-commits/shift-commits.ts --after 2026-07-06 --min-hour 18 --max-hour 23 --run
+# Custom target hour (default 17)
+bun ~/.config/opencode/skills/shift-commits/shift-commits.ts --after 2026-07-06 --target-hour 18 --run
 ```
 
 After rewriting, verify with `git log` and force push with `git push --force`.
 
-A backup ref is saved automatically so you can recover with `git reset --hard` to the backup ref if anything goes wrong.
-
-## How it works
-
-- Each commit gets a deterministic new hour based on its SHA hash (first 8 hex chars mod hour range). Same hash always produces the same hour.
-- Original minutes and seconds are preserved for natural variation.
-- Both author and committer dates are shifted by the same delta.
-- Original timezone offsets are preserved.
-- `git filter-branch --env-filter` handles the rewrite.
+A backup ref is saved automatically so you can recover if anything goes wrong.
 
 ## Important
 
 - This rewrites history. Every commit from the start date onward gets a new SHA.
 - You must force push afterward.
 - Open PRs referencing old SHAs will break.
-- Always use `--dry-run` first to preview changes.
+- Always preview first (default behavior without `--run`).
