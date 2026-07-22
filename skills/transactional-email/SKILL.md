@@ -5,8 +5,10 @@ description: >
   from Cloudflare Workers. Covers the preferred personal writing style (no headings,
   Gmail-default look, dark mode), building HTML with plain template strings,
   the send_email wrangler binding, previewing in light/dark mode with Playwriter,
-  and test-sending real emails via a temp worker without deploying. ALWAYS load
-  this skill when adding, editing, or testing transactional emails in a project.
+  test-sending real emails via a temp worker without deploying, and one-off scripts
+  that email specific users via the cloudflare SDK (plan changes, bug notices).
+  ALWAYS load this skill when adding, editing, testing, or sending transactional
+  emails in a project.
 ---
 
 # Transactional email on Cloudflare
@@ -181,6 +183,21 @@ to error tracking. Never await it in the response path and never let it throw.
 
 The `from` domain must have Cloudflare Email Routing enabled with the sender address configured.
 
+## Record the sending domain in the project's AGENTS.md
+
+The sending domain and from address are a **user choice** — never guess them. Ask the user
+which sender to use (e.g. `tommy@tommy.akarso.co`), and once they provide it, save it in the
+project's AGENTS.md so future agents don't have to ask again:
+
+```md
+## Email sending
+
+Transactional emails send via Cloudflare Email Service. The sending domain is
+`tommy.akarso.co`; the from address is `tommy@tommy.akarso.co` (name "Tommy").
+```
+
+If AGENTS.md already documents a sending domain, use it without asking.
+
 ## Previewing an email
 
 Add a small tsx script per email that writes the rendered HTML to `tmp/`:
@@ -267,6 +284,106 @@ console.log(res.status, await res.text())
 ```
 
 4. Clean up: `bunx tuistory -s email-test press ctrl c` then `bunx tuistory -s email-test close`.
+
+## One-off emails to specific users from a script
+
+When the user asks to email **specific customers** — a plan change that affects them, a bug
+they hit, a refund notice — do it with a plain tsx script using the official `cloudflare`
+npm SDK. No worker, no wrangler dev: `client.emailSending.send()` hits the Email Service
+REST API (`POST /accounts/{id}/email/sending/send`) directly from Node.
+
+Auth reuses the local wrangler login. On macOS with current wrangler the OAuth token lives at
+`~/Library/Preferences/.wrangler/config/default.toml`. Tokens expire after ~1h; on a 401 just
+run `wrangler whoami` to refresh.
+
+```ts
+// scripts/send-plan-change-email.ts
+// Run: pnpm tsx scripts/send-plan-change-email.ts
+import fs from 'node:fs'
+import Cloudflare from 'cloudflare'
+import dedent from 'string-dedent'
+
+const ACCOUNT_ID = '<cloudflare account id>' // from `wrangler whoami`
+const FROM = { address: 'tommy@yourdomain.com', name: 'Tommy' } // from AGENTS.md
+
+function getWranglerOAuthToken(): string {
+  const path = `${process.env.HOME}/Library/Preferences/.wrangler/config/default.toml`
+  const token = fs.readFileSync(path, 'utf8').match(/oauth_token\s*=\s*"([^"]+)"/)?.[1]
+  if (!token) {
+    console.error(`no oauth_token in ${path}, run 'wrangler login' first`)
+    process.exit(1)
+  }
+  return token
+}
+
+// Affected users: hardcode the list, or query the production DB (e.g. the
+// db package's node.ts entrypoint for remote D1) to select them.
+const recipients = ['user1@example.com', 'user2@example.com']
+
+// Tiny semaphore: caps in-flight sends at `max` while Promise.all drives the rest.
+function createSemaphore(max: number) {
+  let active = 0
+  const waiters: Array<() => void> = []
+  return async function run<T>(fn: () => Promise<T>): Promise<T> {
+    if (active >= max) await new Promise<void>((resolve) => waiters.push(resolve))
+    active++
+    try {
+      return await fn()
+    } finally {
+      active--
+      waiters.shift()?.()
+    }
+  }
+}
+
+async function main() {
+  const client = new Cloudflare({ apiToken: getWranglerOAuthToken() })
+  const limit = createSemaphore(10)
+  const results = await Promise.all(
+    recipients.map((to) =>
+      limit(async () => {
+        console.log(`sending to ${to}...`)
+        const result = await client.emailSending.send({
+          account_id: ACCOUNT_ID,
+          from: FROM,
+          to,
+          subject: 'A change to your plan',
+          html: buildEmailHtml(), // same plain-string builder pattern as above
+          text: dedent`
+            Hey,
+
+            ... plain text fallback ...
+
+            Tommy
+          `,
+        })
+        console.log(`sent to ${to}: ${result.message_id}`)
+        return { to, messageId: result.message_id }
+      }),
+    ),
+  )
+  console.log(`done, ${results.length} emails sent`)
+}
+
+main().catch((err) => {
+  console.error('send failed:', err)
+  process.exit(1)
+})
+```
+
+Rules for these scripts:
+
+- **Log progress per recipient** (email + returned `message_id`) so a crash mid-run shows
+  exactly who already got the email; the response also has `delivered` / `queued` /
+  `permanent_bounces` arrays worth logging on failure.
+- **SDK gotcha:** `from` / `reply_to` objects are `{ address, name }`, NOT `{ email, name }`.
+  Getting it wrong returns a vague 400 `email.sending.error.invalid_request_schema`.
+- Send with **Promise.all capped by a semaphore at 10 concurrent** — fast, but bounded so a
+  big list doesn't blast the API. If any send rejects, the logged per-recipient lines tell
+  you who already got the email before resuming.
+- Preview the HTML (light + dark screenshots) and **send to the user's own address first** for
+  approval before emailing customers.
+- Same writing style rules as every other email: personal, short, no headings, reply-friendly.
 
 ## Gotchas
 
