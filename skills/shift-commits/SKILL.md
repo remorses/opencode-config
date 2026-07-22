@@ -16,6 +16,10 @@ If it's before the target hour (default 17:00), computes `delta = target - earli
 and shifts ALL commits on that day by the same delta. This preserves relative ordering
 within each day.
 
+Commits before the day boundary (default 6 AM) are treated as belonging to the
+previous calendar day. A 00:56 commit is a late-night session, not an early morning
+one, so it gets grouped with yesterday and doesn't inflate today's delta.
+
 Weekend commits and days where all commits are already after the target hour are untouched.
 
 ```bash
@@ -27,6 +31,9 @@ bun ~/.config/opencode/skills/shift-commits/shift-commits.ts --after 2026-07-06 
 
 # Custom target hour (default 17)
 bun ~/.config/opencode/skills/shift-commits/shift-commits.ts --after 2026-07-06 --target-hour 18 --run
+
+# Custom day boundary (commits before this hour count as previous day, default 6)
+bun ~/.config/opencode/skills/shift-commits/shift-commits.ts --after 2026-07-06 --day-boundary 5 --run
 ```
 
 After rewriting, verify with `git log` and force push with `git push --force`.

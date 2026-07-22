@@ -46,10 +46,12 @@ cli
       ),
   )
   .option('--target-hour [hour]', 'Hour to shift the earliest commit to (default: 17)')
+  .option('--day-boundary [hour]', 'Commits before this hour count as previous day (default: 6)')
   .option('--run', 'Actually rewrite commits (default is dry-run)')
   .action((options) => {
     const afterDate = options.after as string
     const targetHour = options.targetHour ? Number(options.targetHour) : 17
+    const dayBoundary = options.dayBoundary ? Number(options.dayBoundary) : 6
     const isDryRun = !options.run
 
     const dateMatch = afterDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -86,13 +88,23 @@ cli
     }
 
     // Parse commits
+    // effectiveDate: commits before dayBoundary (e.g. 6 AM) are grouped with
+    // the previous calendar day. A 00:56 commit is a late-night session, not an
+    // early morning one, so its delta should come from yesterday's group.
     interface Commit {
       hash: string
-      date: string // YYYY-MM-DD
+      date: string // YYYY-MM-DD (calendar date from git)
+      effectiveDate: string // YYYY-MM-DD (shifted back 1 day if hour < dayBoundary)
       time: string // HH:MM:SS
       offset: string // e.g. -0700
       hour: number
-      dayOfWeek: number // 1=Mon, 7=Sun
+      dayOfWeek: number // 1=Mon, 7=Sun (from effectiveDate)
+    }
+
+    function prevDay(dateStr: string): string {
+      const d = new Date(dateStr + 'T12:00:00Z')
+      d.setUTCDate(d.getUTCDate() - 1)
+      return d.toISOString().split('T')[0]
     }
 
     const commits: Commit[] = []
@@ -102,12 +114,14 @@ cli
       if (dateNum < rangeStartDate) continue
 
       const hour = parseInt(time.split(':')[0], 10)
-      const isoStr = `${date}T${time}${offset.slice(0, 3)}:${offset.slice(3)}`
-      const dow = new Date(isoStr).getDay()
+      const effectiveDate = hour < dayBoundary ? prevDay(date) : date
+      const effIso = `${effectiveDate}T12:00:00Z`
+      const dow = new Date(effIso).getUTCDay()
 
       commits.push({
         hash,
         date,
+        effectiveDate,
         time,
         offset,
         hour,
@@ -120,34 +134,39 @@ cli
       process.exit(0)
     }
 
-    // Group by date, find earliest hour per weekday, compute per-day delta
-    // delta = hours to add so earliest commit lands at targetHour
-    const dayDeltas = new Map<string, number>() // date -> delta in hours
+    // Group by effectiveDate, find earliest hour per weekday, compute per-day delta.
+    // Commits before dayBoundary are grouped with the previous day, so a 00:56
+    // commit doesn't inflate the delta for that calendar day's daytime commits.
+    // The delta map is keyed by effectiveDate (for grouping/display) but the
+    // filter-branch case statement maps each commit's CALENDAR date+hour to the
+    // right delta via per-commit lookup (see caseEntries below).
+    const dayDeltas = new Map<string, number>() // effectiveDate -> delta in hours
 
-    // Group commits by date
+    // Group commits by effectiveDate
     const byDate = new Map<string, Commit[]>()
     for (const c of commits) {
-      const group = byDate.get(c.date) ?? []
+      const group = byDate.get(c.effectiveDate) ?? []
       group.push(c)
-      byDate.set(c.date, group)
+      byDate.set(c.effectiveDate, group)
     }
 
-    for (const [date, dayCommits] of byDate) {
+    for (const [effDate, dayCommits] of byDate) {
       const first = dayCommits[0]
       const isWeekday = first.dayOfWeek >= 1 && first.dayOfWeek <= 5
 
       if (!isWeekday) {
-        dayDeltas.set(date, 0)
+        dayDeltas.set(effDate, 0)
         continue
       }
 
-      // Find earliest hour on this day
+      // Find earliest hour on this day (excluding pre-boundary commits which
+      // logically belong here but have very low hours like 0-5)
       const earliestHour = Math.min(...dayCommits.map((c) => c.hour))
 
       if (earliestHour >= targetHour) {
-        dayDeltas.set(date, 0)
+        dayDeltas.set(effDate, 0)
       } else {
-        dayDeltas.set(date, targetHour - earliestHour)
+        dayDeltas.set(effDate, targetHour - earliestHour)
       }
     }
 
@@ -171,19 +190,20 @@ cli
     let skipCount = 0
 
     for (const c of commits) {
-      const delta = dayDeltas.get(c.date)!
+      const delta = dayDeltas.get(c.effectiveDate)!
+      const effLabel = c.effectiveDate !== c.date ? ` ${colors.dim(`(grouped with ${c.effectiveDate})`)}` : ''
       if (delta > 0) {
         const [hh, mins, secs] = c.time.split(':')
         const newHour = parseInt(hh, 10) + delta
         const newTime = `${String(newHour).padStart(2, '0')}:${mins}:${secs}`
         console.log(
-          `${colors.green('SHIFT')} ${c.hash.slice(0, 8)} ${dayNames[c.dayOfWeek]} ${c.date} ${c.time} ${colors.dim('->')} ${colors.green(newTime)} ${c.offset}  ${colors.dim(`(+${delta}h)`)}`,
+          `${colors.green('SHIFT')} ${c.hash.slice(0, 8)} ${dayNames[c.dayOfWeek]} ${c.date} ${c.time} ${colors.dim('->')} ${colors.green(newTime)} ${c.offset}  ${colors.dim(`(+${delta}h)`)}${effLabel}`,
         )
         shiftCount++
       } else {
         const reason = c.dayOfWeek > 5 ? `weekend` : `already >=${targetHour}:00`
         console.log(
-          `${colors.dim('SKIP')}  ${c.hash.slice(0, 8)} ${dayNames[c.dayOfWeek]} ${c.date} ${c.time} ${colors.dim(`(${reason})`)}`,
+          `${colors.dim('SKIP')}  ${c.hash.slice(0, 8)} ${dayNames[c.dayOfWeek]} ${c.date} ${c.time} ${colors.dim(`(${reason})`)}${effLabel}`,
         )
         skipCount++
       }
@@ -206,12 +226,13 @@ cli
 
     console.log('\nRewriting commits with git filter-branch...')
 
-    // Build a lookup table of date -> delta for the env-filter.
-    // We embed it as a shell case statement for O(1) lookup per commit.
+    // Build a lookup table of effectiveDate -> delta for the env-filter.
+    // The shell script computes effectiveDate the same way we do in JS:
+    // if local hour < dayBoundary, subtract 1 day. Then look up the delta.
     let caseEntries = ''
-    for (const [date, delta] of dayDeltas) {
+    for (const [effDate, delta] of dayDeltas) {
       if (delta > 0) {
-        const dateNum = date.replace(/-/g, '')
+        const dateNum = effDate.replace(/-/g, '')
         caseEntries += `  ${dateNum}) DELTA_HOURS=${delta} ;;\n`
       }
     }
@@ -231,10 +252,18 @@ if [ "$OFFSET_SIGN" = "-" ]; then
 fi
 
 LOCAL_EPOCH=$(( AUTHOR_EPOCH + OFFSET_SECS ))
-LOCAL_DATE=$(TZ=UTC date -r "$LOCAL_EPOCH" "+%Y%m%d")
+LOCAL_HOUR=$(TZ=UTC date -r "$LOCAL_EPOCH" "+%H")
+LOCAL_HOUR_NUM=$((10#$LOCAL_HOUR))
+
+# Commits before dayBoundary belong to the previous day's group
+EFF_EPOCH=$LOCAL_EPOCH
+if [ "$LOCAL_HOUR_NUM" -lt ${dayBoundary} ]; then
+  EFF_EPOCH=$(( LOCAL_EPOCH - 86400 ))
+fi
+EFF_DATE=$(TZ=UTC date -r "$EFF_EPOCH" "+%Y%m%d")
 
 DELTA_HOURS=0
-case "$LOCAL_DATE" in
+case "$EFF_DATE" in
 ${caseEntries}  *) DELTA_HOURS=0 ;;
 esac
 
