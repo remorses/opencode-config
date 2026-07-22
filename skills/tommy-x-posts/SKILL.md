@@ -48,8 +48,12 @@ description: >
 
 ## Structure (long post)
 
-- first line is the hook, short and plain: "why <project>" beats a clever
-  thesis sentence
+- **open with an attention-catching phrase that explains what the post is
+  about.** it works when it answers a question the reader might already have:
+  "how do I get agents to write good animations", "how do I get good design
+  with AI", tips and tricks, valuable tools or how to use them. the reader
+  should immediately see there is value in reading on. keep it plain, not
+  clickbait
 - **empty line between every paragraph**, no exceptions
 - each paragraph = one reason/feature, 1-3 sentences, plain
 - agent-related angles come first — agents as users of tools is his recurring
@@ -66,6 +70,24 @@ description: >
 - no hidden framework magic or implicit caching; you own your code
 - deploy anywhere, no platform lock-in
 - self-service software, anti enterprise bloat
+
+## Inspiration accounts
+
+Before drafting, read recent posts from these accounts with the `searching-x`
+skill and borrow what fits:
+
+- **@emilkowalski** (`from:emilkowalski -filter:replies`, no trailing
+  underscore) — long posts about design, animations, and frontend engineering.
+  Study him for: openings that promise value ("New skill: /apple-design",
+  "The people getting great UI results with AI aren't using a secret model"),
+  posts built around a concrete useful artifact (a skill, a fix, a technique),
+  explaining one idea plainly across short paragraphs, and following up a
+  launch post with example prompts / usage posts that extend its life.
+- **@thdxr** — opinion pieces and formatting. He is a low-effort poster on
+  purpose: humor, controversial takes stated flat with zero hedging ("the
+  agent you're building into your product is most likely not going to work"),
+  fake-dialogue formatting for jokes, real numbers as flexes. Study him for
+  how short an opinion post can be while still landing.
 
 ## What kills a draft
 
