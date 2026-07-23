@@ -497,7 +497,9 @@ if the file is tiny (< 100 bytes) or `file` reports "ASCII text", the URL was li
 
 To edit skills search for the skill path in current project cwd first or the appropriate repo. NEVER inside `/Users/morse/Documents/GitHub/kimakivoice/cli/skills` if the skill in system prompt references it. that folder contains skills synced from other repos, those files are generated. NEVER edit or try to read that folder.
 
-some global skills can be inside ~/.config/opencode/skills, `~/.config/opencode/` is a git repo. you can commit skills and other files there, also run the critique command inside it to show diffs.
+personal skills (machine-specific, not for distribution) live in `~/.config/opencode/skills`. `~/.config/opencode/` is a git repo. you can commit skills and other files there, also run the critique command inside it to show diffs.
+
+skills planned for distribution to others go in `~/.config/opencode/skills-repo/` which is a git submodule of https://github.com/remorses/skills. users install them with `npx -y skills add remorses/skills`. when adding a distributable skill, add `repo: remorses/skills` in its frontmatter.
 
 other skills are inside /Users/morse/Documents/GitHub/kimakivoice/skills
 
