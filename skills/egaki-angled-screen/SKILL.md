@@ -11,101 +11,57 @@ description: >
 
 # egaki angled screen
 
-One-shot: scaffold a tiny egaki project under `./tmp/`, wrap a flat image or
-video in `<AngledScreen>`, run the player, capture with
-`window.egakiSDK.screenshot` (or `.export` for video).
+One-shot: write one MDX file, run `egaki dev`, capture with
+`window.egakiSDK.screenshot`.
 
-Works on **any machine**. Do not assume a monorepo or preinstalled examples.
+No `package.json`, no `vite.config`, no `npm install`. The CLI boots Vite
+with all deps from its own install (`egaki dev`).
+
+Requires a recent egaki CLI that includes `egaki dev` and the remotion
+dedupe + safe-mdx prebundle fixes.
 
 ## Before anything
 
 1. **Load the playwriter skill** and run `playwriter skill` (full output, never truncate).
-2. Fetch the egaki README in full for API details:
+2. Confirm the CLI:
+
+```bash
+egaki dev --help
+```
+
+3. For full `<AngledScreen>` API docs (optional):
 
 ```bash
 curl -s https://raw.githubusercontent.com/remorses/egaki/main/README.md
 ```
 
-Never pipe docs through `head`/`tail`. Canonical `<AngledScreen>` docs are under
-`## <AngledScreen>` in that README.
+Never pipe docs through `head`/`tail`.
 
-## Work in `./tmp` (never pollute the user repo)
+## Work under `./tmp`
+
+Keep one-off jobs out of the user's git tree:
 
 ```bash
 mkdir -p tmp/angled-screen-job/public/inputs tmp/angled-exports
 grep -qE '^tmp/?$' .gitignore 2>/dev/null || echo 'tmp/' >> .gitignore
-cd tmp/angled-screen-job
 ```
 
-Never edit the user's tracked source for one-off jobs. Never commit `tmp/`.
+Never edit tracked example projects for agent jobs. Never commit `tmp/`.
 
-## Scaffold — write these files
+## Drop the asset
 
-### `package.json`
-
-```json
-{
-  "name": "angled-screen-job",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite"
-  },
-  "dependencies": {
-    "egaki": "^0.9.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
-  },
-  "devDependencies": {
-    "typescript": "^5.8.0",
-    "vite": "^8.0.0"
-  }
-}
+```bash
+cp /path/to/flat-screenshot.png tmp/angled-screen-job/public/inputs/shot.png
+# Discord CDN: always single-quote the full URL
+curl -sL -o tmp/angled-screen-job/public/inputs/shot.png 'https://cdn.discordapp.com/attachments/...'
+file tmp/angled-screen-job/public/inputs/shot.png   # must be image data, not ASCII/HTML
 ```
 
-**Do not** add `remotion` / `@remotion/*` as direct deps unless you need them
-for your own imports. egaki already depends on them. Listing a second copy
-(especially with `egaki: "file:…"` into a monorepo) creates two Remotion
-React contexts → `No video config found` from `useVideoConfig()`.
+**Only flat inputs.** Already-angled photos are style refs, not sources.
 
-Bump `egaki` with `npm view egaki version` when this skill drifts. egaki needs
-**vite >= 8**.
+## Write one MDX file
 
-### `vite.config.ts`
-
-```ts
-import { defineConfig } from 'vite'
-import { video } from 'egaki/vite'
-
-export default defineConfig({
-  plugins: [video({ entry: './video.mdx' })],
-})
-```
-
-### `egaki-env.d.ts`
-
-```ts
-import 'egaki/mdx-components'
-```
-
-### `tsconfig.json`
-
-```json
-{
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "strict": true,
-    "skipLibCheck": true,
-    "noEmit": true
-  },
-  "include": ["**/*.ts", "**/*.tsx", "**/*.d.ts", "**/*.mdx"]
-}
-```
-
-### `video.mdx` (dark UI)
+`tmp/angled-screen-job/video.mdx` (dark UI):
 
 ```mdx
 ---
@@ -159,25 +115,20 @@ and use a real duration (e.g. `duration=5s`).
 
 `<AngledScreen>` and `<Video>` are MDX builtins — no imports.
 
-## Install and run
+## Start the player
 
 ```bash
-cd tmp/angled-screen-job
-pnpm install   # or: npm install
-pnpm dev
-# note the Local URL — port may not be 5173
+egaki dev tmp/angled-screen-job/video.mdx
+# prints a Local URL on a free port, e.g. http://localhost:5199/
 ```
 
-## Drop the asset
+Or from inside the folder:
 
 ```bash
-cp /path/to/flat-screenshot.png public/inputs/shot.png
-# Discord CDN: always single-quote the full URL
-curl -sL -o public/inputs/shot.png 'https://cdn.discordapp.com/attachments/...'
-file public/inputs/shot.png   # must be image data, not ASCII/HTML
+cd tmp/angled-screen-job && egaki dev
 ```
 
-**Only flat inputs.** Already-angled photos are style refs, not sources.
+Note the URL. Wait until it is serving before capturing.
 
 ## Capture with playwriter + egakiSDK
 
@@ -188,13 +139,13 @@ playwriter session new
 ```
 
 ```bash
-playwriter -s 1 --timeout 120000 -e 'await page.goto("http://localhost:5173/", { waitUntil: "domcontentloaded", timeout: 60000 })'
+playwriter -s 1 --timeout 120000 -e 'await page.goto("http://localhost:5199/", { waitUntil: "domcontentloaded", timeout: 60000 })'
 playwriter -s 1 --timeout 120000 -e 'await page.waitForFunction(() => window.egakiSDK && typeof window.egakiSDK.getInfo === "function", { timeout: 90000 })'
 playwriter -s 1 -e 'console.log(JSON.stringify(await page.evaluate(() => window.egakiSDK.getInfo()), null, 2))'
 ```
 
-Replace the port with whatever `pnpm dev` printed. Wait ~1s after load so the
-shader paints.
+Replace the port with whatever `egaki dev` printed. Wait ~1s after load so
+the shader paints.
 
 ### Screenshot 1x (mid-frame of a 1s section @ 30fps = frame 15)
 
@@ -269,7 +220,7 @@ EOF
 | Softer DOF | lower `aperture` / `maxBlur`, set explicit `focus` (0–1 × perspective) |
 | Film look | `chromaticAberration={0.5–0.7}` `grainIntensity={0.03–0.2}` |
 
-Tweakpane is live in the player. Bake final values into `video.mdx`.
+Tweakpane is live in the player. Bake final values into the MDX.
 
 ## After MDX edits
 
