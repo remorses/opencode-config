@@ -28,17 +28,33 @@ Never pipe docs through `head`/`tail`. Read the full output.
 
 Canonical component docs live under `## <AngledScreen>` in that README.
 
-## Prefer the example project
+## Work in `./tmp` (never pollute the user repo)
 
-In the egaki monorepo:
+Always create a **throwaway project under `./tmp/`** so outputs and deps stay
+out of the user's git diff.
 
 ```bash
-cd example-angled-screen
+# from the current workspace root
+mkdir -p tmp
+# ensure tmp is ignored (add once if missing)
+grep -qxF 'tmp/' .gitignore 2>/dev/null || echo 'tmp/' >> .gitignore
+
+# copy the official example as a clean base (monorepo)
+cp -R example-angled-screen tmp/angled-screen-job
+# or outside monorepo: scaffold a tiny egaki project per the README into tmp/angled-screen-job
+
+cd tmp/angled-screen-job
+# drop inputs into public/inputs/, edit video.mdx, then:
+pnpm install   # only if node_modules was not copied / missing
 pnpm dev
 ```
 
-Elsewhere, scaffold a tiny egaki video project the same way as the README, or
-copy `example-angled-screen` and point it at your assets.
+Rules:
+
+- **Never** edit tracked example projects (`example-angled-screen/`, etc.) for one-off jobs
+- **Never** commit `tmp/` assets, `node_modules`, or exports
+- Put screenshots/exports under `tmp/angled-screen-job/out/` or `tmp/angled-exports/`
+- If the workspace has no egaki example, scaffold into `tmp/angled-screen-job` using the README setup, still under `tmp/`
 
 ## Rules
 
