@@ -17,6 +17,38 @@ Emails must look like they were **manually written by a person**, not designed b
 team. Build them as plain HTML template strings, send them through the Cloudflare `send_email`
 binding, and always preview them in light + dark mode before shipping.
 
+## Every email MUST set a reply_to
+
+Sending subdomains (like `tommy.akarso.co`) usually have **no MX or A records**, so replies
+to the from address silently bounce — while the email copy actively invites replies
+("just reply to this email"). Every send, whether via the `send_email` binding or the
+`cloudflare` SDK, MUST include a `reply_to`.
+
+Rules:
+
+- The reply-to address is a **user choice** — never guess it. Ask the user which email to
+  use, then save it in the project's AGENTS.md (see the "Record the sending domain" section)
+  as the preferred reply-to so future agents don't have to ask again.
+- Prefer an address connected to a **real inbox the user reads (usually Gmail)**, NOT an
+  address behind Cloudflare Email Routing or other forwarding — a chain of routing hops adds
+  failure points and hurts deliverability of the reply.
+- Verify the from domain's DNS when in doubt: `dig +short MX <sending-domain>`. No MX and no
+  A record means replies to that address bounce.
+
+```ts
+const FROM = { address: 'tommy@tommy.akarso.co', name: 'Tommy' }
+const REPLY_TO = { address: 'tommy@holocron.so', name: 'Tommy' } // from AGENTS.md
+
+await client.emailSending.send({
+  account_id: ACCOUNT_ID,
+  from: FROM,
+  reply_to: REPLY_TO, // single { address, name } object, NOT an array
+  to,
+  subject,
+  html,
+})
+```
+
 ## Writing style rules
 
 - **NO headings** (`h1`/`h2`), no logo header, no URL cards/boxes, no `<hr>` dividers, no branded footer.
@@ -165,6 +197,7 @@ async function sendWelcomeEmail({ to, data }: { to: string; data: WelcomeEmailDa
   try {
     await env.EMAIL.send({
       from: { email: 'tommy@yourdomain.com', name: 'Tommy' },
+      replyTo: { email: 'tommy@real-inbox.com', name: 'Tommy' }, // preferred reply-to from AGENTS.md
       to,
       subject: buildWelcomeEmailSubject(data),
       html: buildWelcomeEmailHtml(data),
@@ -185,18 +218,20 @@ The `from` domain must have Cloudflare Email Routing enabled with the sender add
 
 ## Record the sending domain in the project's AGENTS.md
 
-The sending domain and from address are a **user choice** — never guess them. Ask the user
-which sender to use (e.g. `tommy@tommy.akarso.co`), and once they provide it, save it in the
-project's AGENTS.md so future agents don't have to ask again:
+The sending domain, from address, and **preferred reply-to address** are a **user choice** —
+never guess them. Ask the user which sender and reply-to to use, and once they provide them,
+save both in the project's AGENTS.md so future agents don't have to ask again:
 
 ```md
 ## Email sending
 
 Transactional emails send via Cloudflare Email Service. The sending domain is
 `tommy.akarso.co`; the from address is `tommy@tommy.akarso.co` (name "Tommy").
+Every email MUST set `reply_to` to the preferred reply-to address
+`tommy@holocron.so` — the sending subdomain has no MX records, replies to it bounce.
 ```
 
-If AGENTS.md already documents a sending domain, use it without asking.
+If AGENTS.md already documents a sending domain and reply-to, use them without asking.
 
 ## Previewing an email
 
@@ -305,6 +340,7 @@ import dedent from 'string-dedent'
 
 const ACCOUNT_ID = '<cloudflare account id>' // from `wrangler whoami`
 const FROM = { address: 'tommy@yourdomain.com', name: 'Tommy' } // from AGENTS.md
+const REPLY_TO = { address: 'tommy@real-inbox.com', name: 'Tommy' } // preferred reply-to from AGENTS.md
 
 function getWranglerOAuthToken(): string {
   const path = `${process.env.HOME}/Library/Preferences/.wrangler/config/default.toml`
@@ -346,6 +382,7 @@ async function main() {
         const result = await client.emailSending.send({
           account_id: ACCOUNT_ID,
           from: FROM,
+          reply_to: REPLY_TO,
           to,
           subject: 'A change to your plan',
           html: buildEmailHtml(), // same plain-string builder pattern as above
