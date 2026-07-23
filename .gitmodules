@@ -1,0 +1,3 @@
+[submodule "skills-repo"]
+	path = skills-repo
+	url = https://github.com/remorses/skills.git
