@@ -17,15 +17,16 @@ One-shot: write one MDX file, run `egaki dev`, capture with
 No `package.json`, no `vite.config`, no `npm install`. The CLI boots Vite
 with all deps from its own install (`egaki dev`).
 
-Requires a recent egaki CLI that includes `egaki dev` and the remotion
-dedupe + safe-mdx prebundle fixes.
+Requires **egaki ≥ 0.10.0** (`egaki dev`, remotion dedupe, safe-mdx prebundle).
 
 ## Before anything
 
 1. **Load the playwriter skill** and run `playwriter skill` (full output, never truncate).
-2. Confirm the CLI:
+2. Use a recent CLI (global or project-local):
 
 ```bash
+npm install -g egaki@latest   # or: npx egaki@latest dev …
+egaki --version               # expect >= 0.10.0
 egaki dev --help
 ```
 
@@ -140,12 +141,14 @@ playwriter session new
 
 ```bash
 playwriter -s 1 --timeout 120000 -e 'await page.goto("http://localhost:5199/", { waitUntil: "domcontentloaded", timeout: 60000 })'
-playwriter -s 1 --timeout 120000 -e 'await page.waitForFunction(() => window.egakiSDK && typeof window.egakiSDK.getInfo === "function", { timeout: 90000 })'
+# wait until PlayerPage has registered the composition (SDK exists earlier)
+playwriter -s 1 --timeout 120000 -e 'await page.waitForFunction(() => { try { return window.egakiSDK.getInfo().sectionCount > 0 } catch { return false } }, { timeout: 90000 })'
 playwriter -s 1 -e 'console.log(JSON.stringify(await page.evaluate(() => window.egakiSDK.getInfo()), null, 2))'
 ```
 
 Replace the port with whatever `egaki dev` printed. Wait ~1s after load so
-the shader paints.
+the shader paints. A `Mediabunny was loaded twice` console warning is harmless
+for still screenshots.
 
 ### Screenshot 1x (mid-frame of a 1s section @ 30fps = frame 15)
 
