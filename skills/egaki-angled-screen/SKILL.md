@@ -34,27 +34,33 @@ Always create a **throwaway project under `./tmp/`** so outputs and deps stay
 out of the user's git diff.
 
 ```bash
-# from the current workspace root
-mkdir -p tmp
-# ensure tmp is ignored (add once if missing)
-grep -qxF 'tmp/' .gitignore 2>/dev/null || echo 'tmp/' >> .gitignore
+# from the egaki monorepo root
+mkdir -p tmp/angled-exports
 
-# copy the official example as a clean base (monorepo)
-cp -R example-angled-screen tmp/angled-screen-job
-# or outside monorepo: scaffold a tiny egaki project per the README into tmp/angled-screen-job
+# copy sources only (do NOT copy node_modules — monorepo symlinks break)
+rsync -a --exclude node_modules --exclude dist --exclude .git \
+  example-angled-screen/ tmp/angled-screen-job/
+
+# reuse the example's resolved deps via symlink (workspace packages stay valid)
+ln -sfn "$(pwd)/example-angled-screen/node_modules" tmp/angled-screen-job/node_modules
 
 cd tmp/angled-screen-job
-# drop inputs into public/inputs/, edit video.mdx, then:
-pnpm install   # only if node_modules was not copied / missing
+# drop inputs into public/inputs/, simplify video.mdx to one section, then:
 pnpm dev
+# note the Local URL — port may not be 5173 if others are busy
 ```
+
+Outside the monorepo: scaffold a tiny egaki project per the README **into**
+`tmp/angled-screen-job`, run `pnpm install` there, then `pnpm dev`.
 
 Rules:
 
 - **Never** edit tracked example projects (`example-angled-screen/`, etc.) for one-off jobs
 - **Never** commit `tmp/` assets, `node_modules`, or exports
-- Put screenshots/exports under `tmp/angled-screen-job/out/` or `tmp/angled-exports/`
-- If the workspace has no egaki example, scaffold into `tmp/angled-screen-job` using the README setup, still under `tmp/`
+- Put screenshots under **`tmp/angled-exports/`** (workspace-relative, gitignored)
+- If `tmp` / `tmp/` is missing from `.gitignore`, add `tmp` once — do not append duplicates
+- Do **not** `cp -R` including `node_modules` in a pnpm monorepo (broken symlinks)
+- Do **not** `pnpm install` inside the copied job while it still points at `workspace:^` unless you know what you are doing — symlink `node_modules` instead
 
 ## Rules
 
@@ -161,12 +167,14 @@ pnpm dev
 playwriter session new
 # if multiple browsers are listed, re-run with --browser <key>
 # use the session id printed by session new (examples below use -s 1)
-playwriter -s 1 -e 'await page.goto("http://localhost:5174/", { waitUntil: "domcontentloaded", timeout: 60000 })'
-playwriter -s 1 -e 'await page.waitForFunction(() => window.egakiSDK && typeof window.egakiSDK.getInfo === "function", { timeout: 90000 })'
+# raise playwriter timeout — default 10s is too low for goto + first paint
+playwriter -s 1 --timeout 120000 -e 'await page.goto("http://localhost:5177/", { waitUntil: "domcontentloaded", timeout: 60000 })'
+playwriter -s 1 --timeout 120000 -e 'await page.waitForFunction(() => window.egakiSDK && typeof window.egakiSDK.getInfo === "function", { timeout: 90000 })'
 playwriter -s 1 -e 'console.log(JSON.stringify(await page.evaluate(() => window.egakiSDK.getInfo()), null, 2))'
 ```
 
-Wait ~1s after load so the shader paints before the first capture.
+Replace the port with whatever `pnpm dev` printed. Wait ~1s after load so the
+shader paints before the first capture.
 
 ### 4. Screenshot (1x)
 
@@ -177,11 +185,14 @@ const dataUrl = await page.evaluate(async () => {
   return await window.egakiSDK.screenshot({ frame: 15 })
 })
 const buf = Buffer.from(await (await fetch(dataUrl)).arrayBuffer())
-fs.writeFileSync('/tmp/angled.png', buf)
+fs.writeFileSync('tmp/angled-exports/angled.png', buf)
 console.log('wrote', buf.length)
 EOF
 )"
 ```
+
+Run playwriter from the **workspace root** so relative `tmp/` paths resolve.
+Or use an absolute path under the workspace.
 
 `frame` is composition-global. Mid-frame of section `i` =
 
@@ -202,13 +213,15 @@ const dataUrl = await page.evaluate(async () => {
   return await window.egakiSDK.screenshot({ frame: 15, scale: 2 })
 })
 const buf = Buffer.from(await (await fetch(dataUrl)).arrayBuffer())
-fs.writeFileSync('/tmp/angled-2x.png', buf)
+fs.writeFileSync('tmp/angled-exports/angled-2x.png', buf)
 const w = buf.readUInt32BE(16)
 const h = buf.readUInt32BE(20)
 console.log('png', w, 'x', h, 'bytes', buf.length)
 EOF
 )"
 ```
+
+Always pass `--timeout 120000` (or higher) on screenshot calls — 2x renders are slow.
 
 ### 6. Export video (optional)
 
@@ -221,13 +234,13 @@ const dataUrl = await page.evaluate(async () => {
   return await window.egakiSDK.export({ frameRange: [0, 149], scale: 1 })
 })
 const buf = Buffer.from(await (await fetch(dataUrl)).arrayBuffer())
-fs.writeFileSync('/tmp/angled.mp4', buf)
+fs.writeFileSync('tmp/angled-exports/angled.mp4', buf)
 console.log('wrote', buf.length)
 EOF
 )"
 ```
 
-Use `scale: 1` for video unless you need a heavy render. `path` only triggers a browser download; always write the data URL to disk for agents.
+Use `scale: 1` for video unless you need a heavy render. `path` only triggers a browser download; always write the data URL to disk for agents. Pass `--timeout 600000` for multi-second clips.
 
 ### 7. Validate and deliver
 
@@ -240,7 +253,7 @@ Use `scale: 1` for video unless you need a heavy render. `path` only triggers a 
 ```bash
 playwriter -s 1 -e "$(cat <<'EOF'
 const fs = require('node:fs')
-const outDir = '/tmp/angled-exports'
+const outDir = 'tmp/angled-exports'
 fs.mkdirSync(outDir, { recursive: true })
 const info = await page.evaluate(() => window.egakiSDK.getInfo())
 for (const s of info.sections) {
