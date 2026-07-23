@@ -52,12 +52,9 @@ Never edit the user's tracked source for one-off jobs. Never commit `tmp/`.
     "dev": "vite"
   },
   "dependencies": {
-    "@remotion/media": "4.0.494",
-    "@remotion/player": "4.0.494",
     "egaki": "^0.9.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "remotion": "4.0.494"
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
@@ -66,9 +63,13 @@ Never edit the user's tracked source for one-off jobs. Never commit `tmp/`.
 }
 ```
 
-Pin **remotion / @remotion/** to the same line egaki ships
-(`npm view egaki dependencies`). Bump `egaki` with `npm view egaki version`
-when this skill drifts. egaki needs **vite >= 8**.
+**Do not** add `remotion` / `@remotion/*` as direct deps unless you need them
+for your own imports. egaki already depends on them. Listing a second copy
+(especially with `egaki: "file:…"` into a monorepo) creates two Remotion
+React contexts → `No video config found` from `useVideoConfig()`.
+
+Bump `egaki` with `npm view egaki version` when this skill drifts. egaki needs
+**vite >= 8**.
 
 ### `vite.config.ts`
 
