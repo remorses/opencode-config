@@ -19,8 +19,14 @@ import superjson from 'superjson'
 import { waitUntil } from 'cloudflare:workers'
 import { getDeploymentId } from 'spiceflow'
 
-// Use 0.0.0.0 to avoid DNS lookups on cache key URLs (non-routable IP)
-const CACHE_BASE = 'https://0.0.0.0/'
+// LESSON: never use an IP-literal host for cache keys. The Cache API
+// silently DROPS keys like https://0.0.0.0/... — cache.put() resolves
+// without error but stores nothing, and match() always misses, so every
+// memoized call is a permanent cache miss (verified on workerd 2026-07
+// via a debug route: 0.0.0.0 never persisted, real hostnames did). Cache
+// keys never trigger DNS, so any syntactic hostname is safe; prefer a
+// subdomain of your own zone that serves nothing.
+const CACHE_BASE = 'https://memoize-cache.internal.example.com/'
 
 interface CacheEnvelope<T> {
   value: T
