@@ -1,7 +1,7 @@
 ---
 description: Build agent using Opus
 mode: primary
-model: anthropic/claude-opus-4-6
+model: anthropic/claude-opus-5
 variant: medium
 permission:
   question: allow
