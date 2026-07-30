@@ -455,7 +455,10 @@ Only add `routes` when you are intentionally binding a real hostname to the work
 
 Use `routes` (non-custom_domain) only when you need path-based routing (`example.com/api/*`) on a domain that already has another worker or Pages project on the root.
 
-If you are using the default `*.workers.dev` hostname, or you have not decided on a custom domain yet, leave `routes` out entirely.
+If a Worker has no named environments and uses only `*.workers.dev`, leave
+`routes` out entirely. A named preview environment is different: `routes` is
+an inherited Wrangler property. If production defines routes and preview
+should use workers.dev, preview must override them with `"routes": []`.
 
 ## Environments: preview and production
 
@@ -465,7 +468,30 @@ Every project has two environments. Preview is the default for development and t
 
 **Critical: bindings are NOT inherited by environments.** Wrangler environments do not inherit `durable_objects`, `kv_namespaces`, `secrets`, `r2_buckets`, etc. from the top level. You MUST duplicate all bindings in both top-level (production) and `env.preview`. If you don't, `wrangler types` generates optional (`?`) types for bindings that only exist in one environment, causing `possibly undefined` errors everywhere.
 
-Only `vars` values need to differ between environments. Everything else (bindings, secrets, migrations) should be identical.
+Keep binding names, Durable Object classes, secret names, and migration shapes
+consistent so generated `Env` types stay stable. Environment values, routes,
+and physical resource identifiers should differ where isolation requires it.
+
+**Routes behave in the opposite way: they ARE inherited.** If top-level
+production owns `app.example.com` and `env.preview` omits `routes`, then
+`wrangler deploy --env preview` attempts to reassign that production domain to
+the preview Worker. Wrangler prints a warning before doing this. Treat that
+warning as a deployment blocker, never as informational output.
+
+Use one of these explicit preview configurations:
+
+```jsonc
+// workers.dev preview — disable inherited production routes
+"routes": []
+
+// dedicated preview hostname
+"routes": [
+  { "pattern": "app.preview.example.com", "custom_domain": true }
+]
+```
+
+If preview accidentally takes a production domain, add the correct preview
+`routes`, redeploy preview, then redeploy production so it reclaims its domain.
 
 ```jsonc
 {
@@ -509,14 +535,17 @@ Only `vars` values need to differ between environments. Everything else (binding
       "secrets": {
         "required": ["API_KEY", "AUTH_SECRET"]
       },
-      // Optional: only add this when you want a custom hostname.
-      "routes": [
-        { "pattern": "app.preview.example.com", "custom_domain": true, "zone_name": "example.com" }
-      ]
+      // Use [] for workers.dev, or list a distinct preview hostname.
+      "routes": []
     }
   }
 }
 ```
+
+Preview bindings must also point at **isolated resources**. Create separate KV
+namespaces, R2 buckets, and D1 databases instead of copying production IDs or
+bucket names into `env.preview`. Matching binding names keep `Env` types stable;
+different resource identifiers keep preview tests away from production data.
 
 ### Deploy scripts
 
@@ -557,8 +586,11 @@ For projects without D1 (no migrations needed):
 }
 ```
 
-- `pnpm deploy` → migrates + builds for preview env, deploys to **preview** (safe default)
-- `pnpm deploy:prod` → migrates + builds for production, deploys to **production**
+- `pnpm run deploy` → migrates + builds for preview env, deploys to **preview** (safe default)
+- `pnpm run deploy:prod` → migrates + builds for production, deploys to **production**
+
+Always include `run` for package scripts. `pnpm deploy` is pnpm's own built-in
+deployment command and does not reliably invoke a `"deploy"` script.
 
 **Preview is the default deploy target.** This prevents accidental production deploys. Production deploys should be deliberate.
 
@@ -566,12 +598,12 @@ Deployment sequence for D1 projects:
 
 ```bash
 # 1. Deploy preview (migration + build + deploy)
-pnpm deploy
+pnpm run deploy
 
 # 2. Verify preview works (load the page, hit health endpoint, check logs)
 
 # 3. Deploy production
-pnpm deploy:prod
+pnpm run deploy:prod
 ```
 
 ### Secrets per environment
@@ -617,7 +649,7 @@ describe('integration', () => {
 Deploy to preview first, then run tests against it:
 
 ```bash
-pnpm deploy && pnpm vitest --run test/integration.test.ts
+pnpm run deploy && pnpm vitest --run test/integration.test.ts
 ```
 
 ## Testing with Vitest inside workerd
