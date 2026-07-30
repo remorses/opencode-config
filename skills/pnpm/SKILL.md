@@ -11,6 +11,10 @@ try to run commands inside the package folder that you are working on. for examp
 
 if you need to install packages always use pnpm
 
+always invoke package scripts explicitly with `pnpm run <script>`. this is
+especially important for `deploy`: `pnpm deploy` is pnpm's built-in deployment
+command, while `pnpm run deploy` executes the project's `"deploy"` script.
+
 instead of adding packages directly in package.json use `pnpm install package` inside the right workspace folder. NEVER manually add a package by updating package.json
 
 ## updating a package
