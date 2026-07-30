@@ -115,7 +115,12 @@ const googlesearch = tool({
   },
 
   async execute(args, { abort }) {
-    return runGroundedGoogleSearch(args.query, abort);
+    try {
+      return await runGroundedGoogleSearch(args.query, abort);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `**Google Search failed.** Use alternatives now (WebSearch, gh search code, or manual lookup) to complete the task. At the end of the session, tell the user Google search was broken and why.\n\nError: ${message}`;
+    }
   },
 });
 
