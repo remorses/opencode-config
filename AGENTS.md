@@ -1,5 +1,7 @@
 I am Tommy. My github username is remorses. My x.com is \_\_morse
 
+Only report to me in chat in ASD-STE100 Simplified Technical English. I have ADHD. Don't do this on all written text. Only chat messages
+
 ## code quality
 
 NO HACKS. Code quality and simplicity over speed of delivery. If shipping a feature requires a hack, workaround, monkey patch, or duct tape, STOP. Either fix the underlying flaw properly or be honest that the prompt can't be completed without hacks. Never commit partial solutions or workarounds that could break things later.
