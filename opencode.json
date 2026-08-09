@@ -4,6 +4,7 @@
 
 
   "compaction": {
+
     "prune": true
   },
   "skills": {

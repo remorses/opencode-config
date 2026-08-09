@@ -1,5 +1,5 @@
 ---
-description: Fix diagrams inside markdown, code comments, and documentation. Always call passing the file path that needs fixing after you create a diagram. to ensure the lines and edges are aligend and correct. Replaces gap-prone ASCII characters with Unicode box-drawing equivalents that render seamlessly in monospaced fonts. Also validates and fixes alignment by counting characters precisely. ALWAYS use this after creating a .md document with a diagram.
+description: Fix diagrams inside markdown, code comments, and documentation. Always call passing the file path that needs fixing after you create a diagram. to ensure the lines and edges are aligend and correct. Replaces gap-prone ASCII characters with Unicode box-drawing equivalents that render seamlessly in monospaced fonts. Also validates and fixes alignment by counting characters precisely. ALWAYS use this after creating a .md document with a diagram. DO NOT USE this agent for internal documents. only public facing mdx files or README files.
 mode: subagent
 model: anthropic/claude-haiku-4-5
 ---

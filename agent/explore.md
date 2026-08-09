@@ -21,13 +21,6 @@ permission:
   webfetch: "allow"
   websearch: "allow"
   codesearch: "allow"
-  external_directory:
-    "/tmp/*": "allow"
-    "~/.opensrc*": "allow"
-    "~/.cache/*": "allow"
-    "~/.cache": "allow"
-    "/tmp": "allow"
-    "*": "ask"
 ---
 
 You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
