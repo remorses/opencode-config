@@ -422,6 +422,29 @@ Rules for these scripts:
   approval before emailing customers.
 - Same writing style rules as every other email: personal, short, no headings, reply-friendly.
 
+## Attachments (ICS, PDF, etc.)
+
+The `send_email` binding's builder `send()` supports attachments natively. No hand-rolled MIME or `mimetext` needed:
+
+```ts
+await env.EMAIL.send({
+  from: { email: 'notifications@example.com', name: 'App' },
+  to,
+  subject,
+  html,
+  attachments: [
+    {
+      disposition: 'attachment',
+      filename: 'invite.ics',
+      type: 'text/calendar',
+      content: icsString,
+    },
+  ],
+})
+```
+
+Only use the raw `new EmailMessage(from, to, rawMime)` overload from `cloudflare:email` when you need full MIME control (e.g. inline images with Content-ID references).
+
 ## Gotchas
 
 - **spiceflow/federation `renderToStaticMarkup` throws outside Vite RSC** — this is why emails
@@ -430,3 +453,4 @@ Rules for these scripts:
   the zone setup; if a test send errors on the destination, verify the address in Email Routing.
 - `tmp/` preview output should be gitignored; check with `git check-ignore` before committing.
 - Real-world reference implementation: `website/src/deploy-email.ts` in the holocron repo.
+- **`remote: true` can crash the vite dev worker.** With `send_email` set to `remote: true`, the dev worker sometimes dies with `Error: internal error; reference = ...` and stops accepting connections. Restart the dev server session; nothing is wrong with the code.
