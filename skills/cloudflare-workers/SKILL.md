@@ -906,6 +906,20 @@ Every 302 hop is a full worker invocation: middleware, auth, and database reads 
 
 Audit the usual chain sources: "already signed in" bounces on login pages, stale-resource bounces in loaders, logo/home links pointing at the resolver, and signed-out pages linking to authed resolvers (which chain into `/login`).
 
+## Remote bindings can crash the vite dev worker
+
+With bindings like `send_email` set to `remote: true`, the dev worker sometimes dies with `Error: internal error; reference = ...` and the port stops accepting connections. This is a known flaky behavior. Restart the tuistory dev session; nothing is wrong with the code.
+
+## Firing the cron handler locally
+
+`@cloudflare/vite-plugin` exposes the `scheduled()` handler at a special path. Invoke it with:
+
+```bash
+curl -X POST "http://localhost:<port>/cdn-cgi/handler/scheduled?cron=*/5+*+*+*+*"
+```
+
+Replace `<port>` with your dev server port and the cron expression with the one you want to test.
+
 ## Always typecheck before building
 
 **Always run `tsc` before `vite build`** in build and deploy scripts. Vite does not typecheck; it only transpiles. Without `tsc`, type errors slip through to production silently. The `build` script should be `tsc && vite build`, and deploy scripts should include `tsc &&` before the `vite build` step.
