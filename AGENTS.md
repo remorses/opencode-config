@@ -12,6 +12,8 @@ Core values: correctness over convenience, clarity over cleverness, simplicity o
 
 After every change, honestly report any part you are not confident about or that could be fragile.
 
+keep code comments as concise as possible. one line if you can. never write essay-length block comments above functions. if the code is self-descriptive, skip the comment entirely. when a comment is needed, make it short and direct. avoid restating what the code already says.
+
 never commit anything unless asked by the user precisely
 
 NEVER run rm -rf on ANY folder outside of project directory! NEVER even run things like rm -rf ~/.bun/install/cache

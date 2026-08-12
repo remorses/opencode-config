@@ -1,6 +1,6 @@
 ---
 name: pnpm
-description: usefule to debug why there are duplicate dependency in a pnpm project for a specific package in node_modules. this can cause issues for typechecking, bundler resolution and duplicate signleton instances for example React context
+description: Use to debug why a specific package has duplicate dependencies in a pnpm project's node_modules, which can cause type-checking and bundler errors or duplicate singleton instances such as React contexts. Also use for pnpm workspace dependency updates. NEVER use package.json overrides to update or align versions; use `pnpm update -r <package>` instead.
 ---
 
 # package manager: pnpm with workspace
@@ -22,6 +22,8 @@ instead of adding packages directly in package.json use `pnpm install package` i
 when i ask you to update a package always run `pnpm update -r packagename`. to update to latest also add --latest
 
 Do not do `pnpm add packagename` to update a package. only to add a missing one. otherwise other packages versions will get out of sync.
+
+NEVER add `pnpm.overrides` or any other package.json override to update, pin, or align a dependency version. update every workspace consumer together with `pnpm update -r packagename` instead. use `pnpm update -r --latest packagename` when the latest release is required.
 
 ## fixing duplicate pnpm dependencies
 

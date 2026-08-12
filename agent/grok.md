@@ -1,7 +1,7 @@
 ---
 description: grok
 mode: primary
-model: xai/grok-4.5
+model: xai/grok-4.6
 variant: medium
 permission:
   question: allow
