@@ -511,6 +511,10 @@ most other skills are inside their own repo, you can find them with the kimaki c
 
 if after following a SKILL.md instructions you get errors and find the skill to be wrong always tell about it to the user, proposing to update the skill content and fix it. skills should never contain incorrect instructions and rules.
 
+after every session if the user prompt was a correction related to content or tech covered by skills always suggest to the user "should we incorporate x preference into y skill?" where x is the user specific correction and y is the tech specific prompt.
+
+this way our skills will always contain all my (the user) preferences and all content necessary to not repeat the same mistakes. this is very important, otherwise we will always repeat the same mistakes forever in every new project.
+
 ## state management (non-React)
 
 For non-React code (servers, CLIs, extensions). React already encapsulates state in components; only use a central store when state is shared across many components.
