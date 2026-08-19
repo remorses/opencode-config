@@ -223,6 +223,27 @@ in the conversation show the author handle, date, full text quoted verbatim,
 and whether it is a parent, the target post, or a reply.
 ```
 
+## Session minimization
+
+xAI bills by **session**, not by tool call. Every `grok -p` invocation is one session. **Combine as many tool calls as possible into a single prompt.** Grok can chain multiple X tools in one turn: search, then fetch threads, then search again. Never split work across multiple `grok -p` calls when one call can do it all.
+
+When you need multiple searches (e.g. keyword search + semantic search + user lookup + thread fetch), write **one prompt** that lists all the operations sequentially. Grok executes them in order and returns all results in one response.
+
+```bash
+# BAD: 3 sessions, 3x the cost
+grok -p 'Use x_keyword_search to search "chiavari" ...'
+grok -p 'Use x_semantic_search with query "chiavari news" ...'
+grok -p 'Use x_thread_fetch with post_id "123" ...'
+
+# GOOD: 1 session, all 3 operations
+grok -p 'Do all of the following and show full results for each:
+1. Use x_keyword_search to search "chiavari since:2026-06-20 min_faves:10" with mode "Latest" and limit 10. Show post ID, author handle, date, full text verbatim, engagement.
+2. Use x_semantic_search with query "chiavari local news", from_date "2026-06-20", limit 5. Show post ID, author handle, date, full text verbatim.
+3. Use x_thread_fetch with post_id "123". Show the full thread with author, date, full text verbatim for each post.' --always-approve
+```
+
+The only reason to use a second `grok -p` call is when the output of the first is needed to construct the second query (e.g. you don't know the post ID yet). Even then, prefer asking grok to chain: "search for X, then fetch the thread of the top result."
+
 ## Common workflows
 
 ### Latest news on a topic
@@ -247,6 +268,17 @@ grok -p 'Use x_keyword_search to search "<QUERY>" with mode "Latest" and limit 5
 
 ```bash
 grok -p 'Use x_user_search to find "<NAME>" with count 3. Show display name, handle, bio, follower count. Then use x_keyword_search to search "from:<BEST_HANDLE>" with mode "Latest" and limit 5, showing post ID, date, full text, and engagement for each.' --always-approve
+```
+
+### Multi-topic search in one session
+
+When you need data on multiple topics, combine them into one prompt:
+
+```bash
+grok -p 'Do all of the following and show full results for each:
+1. Use x_keyword_search to search "<TOPIC_1> since:2026-06-20" with mode "Latest" and limit 5. Show post ID, author handle, date, full text verbatim, engagement.
+2. Use x_keyword_search to search "<TOPIC_2> since:2026-06-20" with mode "Latest" and limit 5. Show post ID, author handle, date, full text verbatim, engagement.
+3. Use x_semantic_search with query "<BROAD_QUESTION>", from_date "2026-06-20", limit 5. Show post ID, author handle, date, full text verbatim.' --always-approve
 ```
 
 ## Exploring post relationships
@@ -297,10 +329,11 @@ grok -p 'Use x_keyword_search to search "tennis geocode:51.5074,-0.1278,25km sin
 
 ## Tips
 
+- **Minimize sessions.** xAI bills per session. Combine all searches, lookups, and thread fetches into one `grok -p` call. Never run separate `grok -p` calls for things that can be chained in one prompt.
 - Always ask grok to **quote the full post text verbatim**. Without this instruction it tends to summarize.
-- Always ask for **post IDs** in search results so you can follow up with `x_thread_fetch`.
+- Always ask for **post IDs** in search results so you can follow up with `x_thread_fetch` (in the same session).
 - Always ask for **engagement counts** (likes, reposts, views) to gauge post quality.
-- `x_keyword_search` limit max is 10. For broader searches, run multiple queries with different `since:/until:` windows.
+- `x_keyword_search` limit max is 10. For broader searches, combine multiple queries with different `since:/until:` windows **in the same prompt**.
 - `x_semantic_search` can return spam or low-quality results. Add `min_score_threshold` (e.g. 0.3) to filter.
 - The `from:` operator in keyword search does not need the `@` prefix. Use `from:elonmusk` not `from:@elonmusk`.
 - These are the **only 4 native X tools**. There is no direct "get post by ID", "get user timeline", "get followers", "get trends", or "get lists" tool. Use keyword search operators to approximate these (e.g. `from:user` for timeline).
