@@ -56,15 +56,6 @@
             "cache_read": 0.20
           }
         },
-        "grok-4.6": {
-          "name": "xai/grok-4.6",
-          "attachment": true,
-          "tool_call": true,
-          "limit": {
-            "context": 500000,
-            "output": 500000
-          },
-        }
       }
     },
 
