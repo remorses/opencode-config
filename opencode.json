@@ -8,9 +8,10 @@
     "prune": true
   },
   "skills": {
+
     "paths": [
       "/Users/morse/Documents/GitHub/kimakivoice/cli/skills",
-      "/Users/morse/.config/opencode/skills-repo"
+      "/Users/morse/.config/opencode/skills-repo/skills"
     ]
   },
 
@@ -237,6 +238,7 @@
     // "openTelemetry": true
   },
   "agent": {
+
     // "plan": {
     //   "mode": "primary",
     //   "prompt": "{file:./prompts/PLAN.md}",
