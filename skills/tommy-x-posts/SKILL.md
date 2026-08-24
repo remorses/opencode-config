@@ -35,9 +35,13 @@ description: >
 
 - lowercase everywhere, except **"I" stays capitalized** and proper nouns keep
   their casing; product names he mocks or compares against can stay lowercase
-- short plain declarative sentences. flat statements, not punchlines
-- **no mic drops.** every paragraph having a clever closer reads as AI. one
-  plain fact per paragraph is enough
+- write the way he talks: full sentences that carry a thought, often with a
+  clause after the comma. look at his real posts, not telegram fragments.
+  "the benefit of gpuix is that you can compile the bindings in release mode
+  when developing the app" is the length. "no node. no npm. no fetch." is not
+- **no mic drops.** every paragraph having a clever closer reads as AI
+- do not chop a list into one-word sentences. if three things belong together,
+  keep them in one sentence
 - no "→" arrow chains, no em dashes, no rhetorical questions, no "here's the
   thing", no listicles with bold labels
 - no hashtags, no emojis
@@ -55,7 +59,8 @@ description: >
   should immediately see there is value in reading on. keep it plain, not
   clickbait
 - **empty line between every paragraph**, no exceptions
-- each paragraph = one reason/feature, 1-3 sentences, plain
+- each paragraph is one idea, written in normal sentences that connect. 1-3
+  sentences is fine if they are real sentences, not three fragments
 - agent-related angles come first — agents as users of tools is his recurring
   thesis
 - end with the install command in monospace unicode, then the github/site link
@@ -92,5 +97,8 @@ skill and borrow what fits:
 ## What kills a draft
 
 If he says "sounds like AI bs", the fix is always the same: remove punchlines,
-remove parallel rhetorical structure, remove manufactured hooks, flatten every
-sentence into someone plainly explaining what they built.
+remove parallel rhetorical structure, remove manufactured hooks, and write like
+someone explaining the thing to a friend.
+
+If he says the sentences are too short, join the fragments. the voice is
+casual and complete, not staccato.
