@@ -263,7 +263,7 @@ Now **every page, layout, and client component** can access the session type-saf
 })
 
 .page('/dashboard', async ({ loaderData }) => {
-  if (!loaderData.session) return redirect('/login')
+  if (!loaderData.session) throw redirect('/login')
   return <Dashboard user={loaderData.session.user} />
 })
 ```
@@ -366,12 +366,12 @@ export const app = new Spiceflow()
   })
   // Pages
   .page('/login', async ({ loaderData }) => {
-    if (loaderData.session) return redirect('/')
+    if (loaderData.session) throw redirect('/')
     const { LoginButton } = await import('./components/login-button')
     return <LoginButton />
   })
   .page('/dashboard', async ({ loaderData }) => {
-    if (!loaderData.session) return redirect('/login')
+    if (!loaderData.session) throw redirect('/login')
     return <div>Hello, {loaderData.session.user.name}</div>
   })
   // API routes use state.session directly
@@ -902,6 +902,8 @@ If using the `strataBetterAuth()` plugin from `@strada.sh/sdk/better-auth`, erro
 
 ### Login page
 
+**Always create a `/login` page.** Users, agents, OAuth callbacks, and redirects throughout the app expect `/login` to exist. Without it, unauthenticated users hit a 404 instead of a sign-in form. Every better-auth project must have a `/login` route from day one.
+
 A standalone login page that redirects to the dashboard if already authenticated. Uses `loaderData.session` from the `/*` loader — no need to call `getSession` again:
 
 ```tsx
@@ -909,7 +911,7 @@ A standalone login page that redirects to the dashboard if already authenticated
 // Assumes auth middleware + session state + /* loader are registered (see above)
 
   .page('/login', async ({ loaderData }) => {
-    if (loaderData.session) return redirect('/')
+    if (loaderData.session) throw redirect('/')
     const { LoginButton } = await import('./components/login-button')
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -951,6 +953,19 @@ export function LoginButton({ callbackURL = '/' }: { callbackURL?: string }) {
 }
 ```
 
+### Signup route
+
+**Always create a `/signup` route that redirects to `/login`.** Users, agents, and external links expect `/signup` to exist. Without it, visitors hit a 404. Since better-auth handles registration through the same sign-in flow (social OAuth creates accounts automatically, `signUp.email` uses `/api/auth/sign-up`), a dedicated signup page is unnecessary. A redirect keeps the URL alive:
+
+```ts
+.get('/signup', ({ request }) => {
+  const callbackURL = request.parsedUrl.searchParams.get('callbackURL')
+  throw redirect(router.href('/login', { callbackURL: callbackURL || undefined }))
+})
+```
+
+If the app later needs a separate signup page with different UI (e.g. an onboarding form), replace the redirect with a full `.page()`.
+
 ### Dashboard redirect for authenticated users
 
 **Never redirect `/` to a dashboard automatically.** The landing page should always render for all users (authenticated or not). Instead, add a `/dash` or `/dashboard` link in your navbar that resolves the user's default destination.
@@ -960,22 +975,22 @@ The `/dash` route should resolve the full target path in a single query and issu
 ```ts
 // Resolve org → project → env in one hop, redirect to the final URL
 .get('/dash', async ({ state, request }) => {
-  if (!state.session) return redirect('/login?redirect=/dash')
+  if (!state.session) throw redirect('/login?redirect=/dash')
   const db = getDb()
   const org = await db.query.orgMember.findFirst({
     where: { userId: state.session.user.id },
     with: { org: true },
     orderBy: { createdAt: 'desc' },
   })
-  if (!org) return redirect('/dash/new-org')
+  if (!org) throw redirect('/dash/new-org')
   const project = await db.query.project.findFirst({
     where: { orgId: org.orgId },
     with: { environments: true },
     orderBy: { createdAt: 'desc' },
   })
-  if (!project) return redirect(`/dash/orgs/${org.orgId}`)
+  if (!project) throw redirect(`/dash/orgs/${org.orgId}`)
   const envSlug = project.environments?.[0]?.slug ?? '_'
-  return redirect(`/dash/projects/${project.id}/envs/${envSlug}`)
+  throw redirect(`/dash/projects/${project.id}/envs/${envSlug}`)
 })
 ```
 
@@ -985,7 +1000,7 @@ Use a layout to enforce auth for a group of pages. The session is available from
 
 ```tsx
 .layout('/app/*', async ({ loaderData, children }) => {
-  if (!loaderData.session) return redirect('/login')
+  if (!loaderData.session) throw redirect('/login')
   const { user } = loaderData.session
 
   return (
