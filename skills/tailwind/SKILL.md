@@ -934,6 +934,16 @@ when an element depends on an external resource (custom font, video, WebGL canva
 
 every form must ship with sensible default values so a user can click submit immediately and get a working result. for example, a "create event" form should prefill start date to now and end date to one hour later. a "create project" form should generate a slug from the name. minimize the number of interactions required to complete any flow. the first submit should just work.
 
+### short tooltips
+
+tooltips and action toasts must be a few words, readable at a glance. never write a sentence.
+
+```
+Copied prompt
+Share this tab
+Sharing stopped
+```
+
 ### errors near the action, not toasts
 
 action errors must appear close to the button that triggered them. toasts are too far from the action and easy to miss. show the error inline below or beside the button, or as a tooltip anchored to it. reserve toasts only for background events the user did not directly trigger (e.g. a webhook failure notification).
