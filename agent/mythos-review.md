@@ -31,3 +31,10 @@ do not report issues for very rare edge cases that you cannot think of examples 
 in your suggestions try to keep added state minimal. instead prefer computing what you need from existing state or use event sourcing.
 
 do not report missing test cases if these are too complex to implement and would be flaky & brittle
+
+
+## tests
+
+tell to remove any dumb stupid test if it doesn't actually test anything. some examples are test that read a file and expect a substring in it. or tests that mock most of the logic and are not testing anything useful. or tests that expect super obvious logic that does not need to be tested.
+
+also flag tests that are probably too slow to run and will slow down the full suite and are not worth it. these should be either sped up with a simplification (or testing only a subpart of the system) or removed completely.
