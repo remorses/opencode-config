@@ -5,6 +5,9 @@ description: >
   network traffic from CLI tools and apps (Node.js, Python, Ruby, Go, curl).
   Export as HAR (JSON) and analyze with jq. Use this skill when the user wants
   to capture, inspect, or reverse-engineer HTTP traffic from macOS applications.
+  NEVER load this skill unless the user explicitly asks for it. Never use unprompted.
+  Proxyman intercepts all network traffic and will break internet connectivity if
+  activated unexpectedly.
 ---
 
 # proxyman — HTTP traffic capture and reverse-engineering
