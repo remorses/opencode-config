@@ -928,6 +928,94 @@ chart colors, status badges (yellow/emerald/purple), and one-off decorative colo
 
 when an element depends on an external resource (custom font, video, WebGL canvas), it should stay invisible until the resource loads, then fade in with a CSS transition. this prevents jarring flashes where text reflows on font swap or a canvas pops in mid-render. see [resource-aware-fade-in.md](resource-aware-fade-in.md) for the full pattern with font and video examples.
 
+## frontend best practices
+
+### forms must have good defaults
+
+every form must ship with sensible default values so a user can click submit immediately and get a working result. for example, a "create event" form should prefill start date to now and end date to one hour later. a "create project" form should generate a slug from the name. minimize the number of interactions required to complete any flow. the first submit should just work.
+
+### errors near the action, not toasts
+
+action errors must appear close to the button that triggered them. toasts are too far from the action and easy to miss. show the error inline below or beside the button, or as a tooltip anchored to it. reserve toasts only for background events the user did not directly trigger (e.g. a webhook failure notification).
+
+### all actions must surface errors
+
+every server action and client action can fail. never suppress errors silently. the user must always see what went wrong, close to where they triggered the action.
+
+**form actions** — wrap the form in spiceflow's `ErrorBoundary` with `below` so the error appears under the form without hiding the inputs. the user can fix their input and resubmit without clicking reset first:
+
+```tsx
+'use client'
+
+import { ErrorBoundary } from 'spiceflow/react'
+import { createProject, projectSchema } from '../actions'
+
+const fields = projectSchema.keyof().enum
+
+export function CreateProjectForm() {
+  return (
+    <ErrorBoundary
+      below
+      fallback={
+        <div className="flex items-center gap-2 text-sm text-destructive mt-2">
+          <ErrorBoundary.ErrorMessage />
+          <ErrorBoundary.ResetButton className="underline">
+            Dismiss
+          </ErrorBoundary.ResetButton>
+        </div>
+      }
+    >
+      <form action={createProject}>
+        <input name={fields.name} required />
+        <Button type="submit">Create</Button>
+      </form>
+    </ErrorBoundary>
+  )
+}
+```
+
+**client actions (onClick)** — use `startTransition` + try/catch and store the error in local state. render it inline next to the button:
+
+```tsx
+'use client'
+
+import { useState, useTransition } from 'react'
+import { deleteProject } from '../actions'
+
+export function DeleteButton({ id }: { id: string }) {
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  return (
+    <div className="inline-flex items-center gap-2">
+      <Button
+        variant="destructive"
+        disabled={isPending}
+        onClick={() => {
+          setError(null)
+          startTransition(async () => {
+            try {
+              await deleteProject({ id })
+            } catch (e: any) {
+              setError(e.message)
+            }
+          })
+        }}
+      >
+        {isPending ? 'Deleting...' : 'Delete'}
+      </Button>
+      {error && (
+        <span className="text-sm text-destructive">{error}</span>
+      )}
+    </div>
+  )
+}
+```
+
+### onboarding before the full UI
+
+the first screen a new user sees must be a guided onboarding, not the full app with a sidebar full of links. show few interactive elements at a time so the user is not overwhelmed. each onboarding step is one of: a choice (if/else), a data input, or information the user must read before clicking next. only reveal the full navigation (sidebar, tabs, settings) after the user understands all entities in the system. this is the same pattern open-world games use: you start with a tutorial that introduces inventory, shop, weapons, and battle mechanics one at a time, then the full world opens up once the player knows what everything does.
+
 ## scrollbars
 
 always set all scrollbars styles to transparent and thin.
