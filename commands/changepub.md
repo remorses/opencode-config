@@ -188,6 +188,23 @@ Exclude anything users don't directly experience:
 - bad: "fixed race condition in retry logic"
 - good: "fixed intermittent upload failures under high concurrency"
 
+### Group related changesets into single items
+
+Multiple changesets that touch the same area or feature should be merged into one changelog item. Do not give each changeset its own numbered entry if they are closely related. Read all changesets first, identify clusters, then write one item per cluster.
+
+Examples of what to merge:
+- 3 changesets about Prism grammar loading, highlighting extras, and nested fence support → one item about improved code highlighting
+- a changeset that adds a feature + another that fixes a bug in that same feature → one item describing the feature (skip the bug fix)
+- a changeset for a UI fix + another for the same UI area → one item
+
+Examples of what stays separate:
+- a sidebar change and an OpenAPI change → two items (different areas)
+- a new CSS variable and a chat animation fix → two items
+
+### Omit bug fixes for unreleased features
+
+If a feature was added in this release cycle and a later changeset fixes a bug in that feature, the fix is invisible to users. Just describe the feature working correctly. Never list "fixed X" when X was never released broken.
+
 ### Merging unreleased versions
 
 If multiple versions accumulated since last publish, merge them into one changelog entry. Only describe the final state:
@@ -317,6 +334,10 @@ Thanks @contributor for #42!
 EOF
 )" --latest
 ```
+
+### Group and omit in release notes too
+
+Apply the same grouping and omission rules from the changelog section. Related changes become one item. Bug fixes for features added in this release are omitted. The release notes and the changelog should have the same items; do not expand changesets 1:1 into release note entries.
 
 ### Release notes decision flow
 
