@@ -3,8 +3,9 @@ name: changesets
 description: >
   Changeset-based versioning workflow. Manually add .changeset/*.md files to
   describe changes instead of editing CHANGELOG.md directly. Changesets are
-  consumed at publish time to bump versions and generate changelogs. Use this
-  skill when adding changesets or when a repo has a .changeset/ folder. if a repo has a .changeset folder ALWAYS read this skill and write a changeset .md file when creating a commit for new feature or fix.
+  consumed at publish time to bump versions and generate changelogs. ALWAYS
+  load this skill when a repo has a .changeset/ folder. In such a repo, ALWAYS
+  add a changeset file for every commit before creating the commit.
 ---
 
 # Changesets
@@ -50,8 +51,8 @@ template now includes a federation example.
 ## Rules
 
 1. **Never use `major`.** Use `patch` for fixes and `minor` for new features. Releases are frequent enough that breaking changes don't warrant a major bump.
-2. **Only public packages.** Never add changesets for packages marked `"private": true` or without a `version` field in `package.json`.
-3. **Don't edit CHANGELOG.md.** New changes must be added as changesets instead
+2. **Include private websites and apps.** `"private": true` is not a reason to skip a changeset. User-facing private packages (websites, dashboard apps, hosted workers) still get a `CHANGELOG.md`. Add them in the frontmatter next to any public package that changed. Configure `.changeset/config.json` with `"privatePackages": { "version": true, "tag": false }` so `changeset version` writes their changelog without publishing them to npm. Skip only internal packages with no user-facing surface, or packages with no `version` field.
+3. **Don't edit CHANGELOG.md.** New changes must be added as changesets instead. That includes private-package changelogs.
 4. **Never run the changeset CLI.** Always write the `.md` file manually.
 5. **Present tense.** Write "add support for X", "fix bug with Y", not "added" or "fixed".
 6. **One changeset per logical change.** If a PR has two unrelated changes, create two changeset files.
@@ -145,18 +146,20 @@ Example `.changeset/readme.md`:
 ```md
 # Changesets
 
-This folder contains **pending release notes** for public packages. Each `.md` file describes one user-facing fix or feature that should appear in the next generated changelog.
+This folder contains **pending release notes**. Each `.md` file describes one user-facing fix or feature that should appear in the next generated changelog, including private websites and apps.
 
 ## What to put here
 
 - Add one descriptive kebab-case `.md` file per logical change, for example `fix-auth-token-refresh.md`.
 - Use `patch` for fixes and `minor` for new features.
+- Include private user-facing packages in the frontmatter so they keep a CHANGELOG.
 - Write in present tense, focused on what users see.
 - Check GitHub issues first. If the change fixes one, include `Fixes #123` on its own line.
 
 ## What not to put here
 
-- Do not add changesets for private packages or packages without a `version` field.
+- Do not skip a website or app just because it is `"private": true`.
+- Do not add changesets for packages without a `version` field.
 - Do not edit `CHANGELOG.md` directly.
 - Do not run the interactive changeset CLI.
 - Do not add vague entries like "misc improvements" or "update internals".
