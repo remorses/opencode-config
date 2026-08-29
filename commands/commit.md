@@ -26,4 +26,20 @@ example principles to choose commit splits:
 
 if possible split the changes in smaller commits. if a commit diff includes 1000 of lines changes that's definitely too big.
 
+each commit must use the original session that edited those files. do not put this session id on files another session changed.
+
+find that session with:
+
+```bash
+kimaki session editors path/to/file.ts
+```
+
+the command prints session id, discord title, and time ago, newest first. use the title to understand what that session was doing. put that session id as the last line of the commit message:
+
+```
+Session: ses_xxx
+```
+
+if this session edited the files, use the current session id. if files come from different sessions, split into one commit per session.
+
 NEVER ask for confirmation before committing. The user invoking this command IS the confirmation. Just do the commits directly without asking "should I proceed?" or showing a plan and waiting. Execute immediately.
