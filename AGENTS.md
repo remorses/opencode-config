@@ -419,6 +419,8 @@ for multiline inline snapshots always prefix them with \n with `.toMatchInlineSn
 
 NEVER use mocks in tests. NEVER mock modules. tests should try to test as much of the code as possible, and not mock parts of the code. for example if we are testing a NAPI js package you must not mock the native side with fake functions. instead you must test the end to end flow of the code.
 
+NEVER write a test file for a stupid UI change. Truncate, default-open, spacing, colors, overflow, and similar visual tweaks are not unit-tested. Open the page with playwriter and check it there.
+
 ## linting
 
 always run `lintcn lint` at the end of an editing session to catch errors or warnings introduced by the changes. run it inside edited package, not at root of monorepo.
