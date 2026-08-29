@@ -6,7 +6,9 @@ description: >
   for forwarding auth requests, client setup, session middleware, social and email/password
   auth, server-side session checks, and React client hooks (useSession, signIn, signOut,
   signUp). Also covers device authorization (CLI device flow), bearer token auth,
-  and server actions with auth. ALWAYS load this skill when a project uses better-auth.
+  server actions with auth, and SQLite Durable Objects (betterAuth inside the DO,
+  getCookieCache in the Worker). ALWAYS load this skill when a project uses better-auth.
+  Load durable-objects.md when auth tables live in a Durable Object.
 ---
 
 # better-auth
@@ -1355,6 +1357,12 @@ import { betterAuth } from 'better-auth/minimal'
 ```
 
 The API is identical. Plugins are imported from `better-auth/plugins` as usual. Saves ~400 KB from the bundle.
+
+### Durable Objects
+
+When auth tables live in a SQLite Durable Object, follow **[durable-objects.md](./durable-objects.md)**.
+
+`betterAuth()` runs inside the DO. The Worker verifies `session_data` with `getCookieCache` and RPCs the DO only on a miss or for `/api/auth/*`. Do not put better-auth behind the drizzle sqlite-proxy pattern. Do not call the DO on every page load.
 
 ## Social providers
 
