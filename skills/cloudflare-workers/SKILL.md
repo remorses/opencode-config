@@ -5,10 +5,11 @@ description: >
   Covers wrangler.jsonc configuration, type-safe env via `wrangler types` and
   `import { env } from 'cloudflare:workers'`, secrets.required for typed secrets,
   custom_domain for routing, preview/production environments, deploy scripts,
-  Durable Objects with SQLite, and Spiceflow as the web framework with Vite.
+  Durable Objects with SQLite, Spiceflow as the web framework with Vite,
+  and WebSocket close codes on Durable Objects (1006 isolate kill, always reconnect).
   ALWAYS load this skill when a project uses wrangler, Cloudflare Workers,
   Durable Objects, or deploys to Cloudflare. Load it before writing any
-  wrangler config, worker code, or deploy scripts.
+  wrangler config, worker code, deploy scripts, or Durable Object WebSocket clients.
 ---
 
 # Cloudflare Workers
@@ -780,6 +781,12 @@ pnpm test
 | `waitOnExecutionContext(ctx)` | Wait for all `ctx.waitUntil()` promises to settle |
 
 For the full reference including Queues, Workflows, and Scheduled handlers, see [Cloudflare Workers Vitest test APIs](https://developers.cloudflare.com/workers/testing/vitest-integration/test-apis/).
+
+## WebSocket close codes on Durable Objects
+
+See ./websocket-close-codes.md
+
+**1006** means the isolate died with no Close frame (OOM, CPU, throw, deploy). Always reopen the WebSocket. Hibernation does not drop sockets; shutdown does.
 
 ## Durable Objects with SQLite
 
