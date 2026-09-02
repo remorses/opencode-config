@@ -78,7 +78,7 @@ Ping every **30s**. Cloudflare can idle-drop around **100s** on Free/Pro. Protoc
 | **1009** | Message too large (received **32 MiB**) | Reopen the socket. Do **not** resend the same payload |
 | **4409** and similar "already in use" | Your app rejected a second upstream | Slow retry if the old socket may be stale. Then give up |
 
-Application codes **4000–4999** are yours. Example: no upstream yet. Retry, but **wait** for the peer. Immediate retry races the reconnect.
+Codes **4000–4999** are application-specific, not Cloudflare. You define their meaning. Example: no upstream yet. Retry, but **wait** for the peer. Immediate retry races the reconnect.
 
 ### Isolate kill vs hibernation
 
