@@ -507,6 +507,8 @@ personal skills (machine-specific, not for distribution) live in `~/.config/open
 
 skills planned for distribution to others go in `~/.config/opencode/skills-repo/` which is a git submodule of https://github.com/remorses/skills. users install them with `npx -y skills add remorses/skills`. when adding a distributable skill, add `repo: remorses/skills` in its frontmatter.
 
+private skills (directory submissions, product kits, anything that must not be public) go in `~/.config/opencode/private-skills/` which is a git submodule of https://github.com/remorses/private-skills. that repo is private. add `repo: remorses/private-skills` in frontmatter. do not publish these with `npx skills add`.
+
 other skills are inside /Users/morse/Documents/GitHub/kimakivoice/skills
 
 most other skills are inside their own repo, you can find them with the kimaki cli.

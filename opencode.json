@@ -11,7 +11,8 @@
 
     "paths": [
       "/Users/morse/Documents/GitHub/kimakivoice/cli/skills",
-      "/Users/morse/.config/opencode/skills-repo/skills"
+      "/Users/morse/.config/opencode/skills-repo/skills",
+      "/Users/morse/.config/opencode/private-skills/skills"
     ]
   },
 
