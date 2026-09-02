@@ -382,7 +382,37 @@ Include external contributors: "Thanks @username for #42!"
 
 **Submodule packages:** Run `gh release` from inside the submodule directory.
 
-## Step 8: Handle Publish Failures
+## Step 8: Deploy Holocron website docs if present
+
+After the npm publish and GitHub release, keep docs in sync with the new package version.
+
+Do this only when **all** of these are true:
+
+1. A `website/` folder exists in the repo (also check `docs/` only if that is clearly the Holocron site, not a random markdown folder)
+2. That folder uses **Holocron**. Confirm from its `package.json` (`@holocron.so/vite`, `@holocron.so/cli`, or `holocron`) or from `docs.json` / `docs.jsonc` / `holocron.jsonc`
+3. You just published npm packages from this repo
+
+**Only run a script from that folder's `package.json`.** Never run raw `wrangler deploy`, `vite build`, `npx holocron deploy`, or any other deploy command you invent.
+
+Pick **one** production script, in this order if several exist:
+
+1. `deployment:production`
+2. `deploy:production`
+3. `deployment`
+4. `deploy`
+
+Skip preview-only scripts (`deployment:preview`, `deploy:preview`, `preview`).
+
+Run it with the repo package manager **from inside the website folder**:
+
+```bash
+# example when website/package.json has "deployment:production"
+cd website && pnpm deployment:production
+```
+
+Skip this step if there is no website folder, no Holocron dependency, or no `deploy` / `deployment` script.
+
+## Step 9: Handle Publish Failures
 
 If publish fails due to TypeScript errors or other issues, fix them and retry.
 
@@ -391,6 +421,7 @@ If publish fails due to TypeScript errors or other issues, fix them and retry.
 After publishing, report what you did and include:
 - the GitHub release link
 - links to any GitHub issues that were closed by the release (full URLs like `https://github.com/owner/repo/issues/123`)
+- the website deploy result, if Step 8 ran (script name and live URL)
 
 The GitHub release notes should also mention closed issues at the bottom, linking to each one. For example:
 
