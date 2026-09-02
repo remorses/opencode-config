@@ -1,5 +1,5 @@
 ---
-description: Gemini agent. only useful when needed to do some action based on audio or video data. the only model that can natively work on video and audio direclty into context. the task for the agent should be clear and well ocnstrained. having steps of the task passed as input prompt. for exsample extract specific frames from the video, describe scens and time, describe animations. or clone as React code a specific scene from the video. Use this agent for example to find pixel coordinates in a image or video for a specific object.
+description: Gemini agent. Only useful when the task needs native audio or video in context. Keep the task constrained. Pass the steps in the prompt. Examples: extract frames, describe scenes and times, describe animations, clone a scene as React, find pixel coordinates of an object in an image or video.
 mode: subagent
 model: google/gemini-3.5-flash
 permission:
