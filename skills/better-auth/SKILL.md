@@ -968,6 +968,42 @@ export function LoginButton({ callbackURL = '/' }: { callbackURL?: string }) {
 
 If the app later needs a separate signup page with different UI (e.g. an onboarding form), replace the redirect with a full `.page()`.
 
+### Pricing route
+
+**Always create a `/pricing` route.** Users, agents, and external links try `/pricing` first. Without it they hit a 404. If the real pricing page lives elsewhere (for example `/docs/pricing`), keep `/pricing` alive with a redirect:
+
+```ts
+.get('/pricing', ({ redirect }) => {
+  throw redirect('/docs/pricing', { status: 301 })
+})
+```
+
+Do not leave `/pricing` undefined just because a docs site already has a pricing page under another path.
+
+### 404 page
+
+**Always render a 404 page** that explains the page was not found. Spiceflow's default is unstyled. When no page matches, the root `/*` layout receives `children === null`. If that layout returns `{children}` unchanged, the page is **blank white**.
+
+Handle it in the root layout. Do **not** add `.page('/*')` if the app also has API routes: a wildcard page steals GET `/api/*` and aliases like `/signup`.
+
+```tsx
+function NotFoundPage({ path }: { path?: string }) {
+  return (
+    <main>
+      <h1>Page not found</h1>
+      <p>{path ? `The page ${path} was not found.` : 'This page was not found.'}</p>
+    </main>
+  )
+}
+
+.layout('/*', ({ children, response, request }) => {
+  if (children == null) response.status = 404
+  return <>{children ?? <NotFoundPage path={request.parsedUrl.pathname} />}</>
+})
+```
+
+See the spiceflow README "Redirects and Not Found" section.
+
 ### Dashboard redirect for authenticated users
 
 **Never redirect `/` to a dashboard automatically.** The landing page should always render for all users (authenticated or not). Instead, add a `/dash` or `/dashboard` link in your navbar that resolves the user's default destination.
