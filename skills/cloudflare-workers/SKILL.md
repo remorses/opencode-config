@@ -6,10 +6,14 @@ description: >
   `import { env } from 'cloudflare:workers'`, secrets.required for typed secrets,
   custom_domain for routing, preview/production environments, deploy scripts,
   Durable Objects with SQLite, Spiceflow as the web framework with Vite,
-  and WebSocket close codes on Durable Objects (1006 isolate kill, always reconnect).
+  WebSocket close codes on Durable Objects (1006 isolate kill, always reconnect),
+  and Durable Object OOM detection (exceededMemory vs scriptThrewException,
+  clientDisconnected, responseStreamDisconnected) plus heap profiling.
   ALWAYS load this skill when a project uses wrangler, Cloudflare Workers,
   Durable Objects, or deploys to Cloudflare. Load it before writing any
   wrangler config, worker code, deploy scripts, or Durable Object WebSocket clients.
+  Load durable-object-memory.md when counting OOMs, splitting DO invocation
+  errors, taking heap snapshots, or reducing isolate RSS.
 ---
 
 # Cloudflare Workers
@@ -786,7 +790,13 @@ For the full reference including Queues, Workflows, and Scheduled handlers, see 
 
 See ./websocket-close-codes.md
 
-**1006** means the isolate died with no Close frame (OOM, CPU, throw, deploy). Always reopen the WebSocket. Hibernation does not drop sockets; shutdown does.
+**1006** means the isolate died with no Close frame (OOM, CPU, throw, deploy). Always reopen the WebSocket. Hibernation does not drop sockets; shutdown does. 1006 does not prove an OOM.
+
+## Durable Object memory and OOMs
+
+See ./durable-object-memory.md
+
+The isolate heap limit is **128 MB**. The only production OOM signal is invocation status **`exceededMemory`**. Split other errors by status first: `scriptThrewException`, `clientDisconnected`, `responseStreamDisconnected`. Then group stored exceptions by `$metadata.errorTemplate`. Profano is for CPU profiles, not heap snapshots.
 
 ## Durable Objects with SQLite
 
