@@ -5,7 +5,7 @@ description: Set up and control physical iPhones from a Mac with the agent-devic
 
 # Control physical iPhones with agent-device
 
-**Assume one phone is already connected and configured.** Start every task with this connection check, using the installed CLI or its resolved absolute path:
+**Assume one phone is already connected and configured.** Start every task with this connection check:
 
 ```bash
 agent-device devices --platform ios
@@ -47,7 +47,7 @@ If `passcodeRequired: true`, prompt the user: **“Please wake and unlock the iP
 
 1. **Inspect the current app** with a bounded snapshot when it is already the requested app. Preserve its current video, conversation, or form.
 2. Otherwise **open the requested app** in the selected session without `--relaunch` or `--foreground`, then take a separate depth-10 snapshot.
-3. **Act on a current ref**, then take another bounded snapshot. Repeat only the steps needed for the user's request.
+3. **Act on a current ref**, then take another bounded snapshot. If there is no ref, read the screenshot and tap coordinates as described below. Repeat only the steps needed for the user's request.
 4. **Verify the result** from visible UI state, show progress screenshots as described below, and report completion. Preserve a reused session for ongoing work; close a session when the task is finished and it is no longer needed.
 
 ```bash
@@ -85,21 +85,13 @@ Use `snapshot --depth 10` **without `-i`** to read messages, posts, or comments.
 
 ### Install the CLI and Xcode components
 
-Install Node.js **22.12 or newer**, full Xcode, and agent-device from npm. Check for an existing CLI before installing or upgrading it.
+Install full Xcode and agent-device with **bun**. Always install or upgrade to the **latest** version. Never pin a version.
 
 ```bash
-command -v agent-device
-node --version
-npm install -g agent-device@latest
+bun add -g agent-device@latest
 agent-device --version
 agent-device doctor
 xcode-select -p
-```
-
-**Resolve PATH problems** instead of reinstalling repeatedly. Global npm installs can use a Node-version-specific directory that is absent from the agent's PATH. Run `npm prefix -g`, then use its `bin/agent-device` executable explicitly. On this Mac, the working path during setup was:
-
-```text
-/Users/morse/.local/share/pnpm/nodejs/24.15.0/bin/agent-device
 ```
 
 **Select full Xcode** if `xcode-select -p` points only to CommandLineTools. In Xcode, open **Settings > Components** and install iOS platform support. A visible SDK in `xcodebuild -showsdks` does not prove that all platform components are installed. We encountered `iOS 26.5 is not installed` and resolved it by installing the offered **iOS 26.5.1 + iOS 26.5 Simulator** component. It was about 8.5 GB; use the version offered by the current Xcode, not that historical version.
@@ -186,10 +178,10 @@ For an existing daemon with the wrong environment, close this task's sessions fi
 
 If Xcode says **“Your team has no devices”** or cannot generate provisioning profiles, register the actual connected phone through Xcode's automatic signing. The CLI's generic build destination did not register our phone. A build with the **explicit device destination** and `-allowProvisioningDeviceRegistration` resolved it.
 
-Locate the runner project shipped in the installed package and reuse the **derived-data path from `runner.log`**. The example assumes npm's global installation; adjust the package root for the actual install.
+Locate the runner project shipped in the installed package and reuse the **derived-data path from `runner.log`**. The example assumes bun's global installation; adjust the package root for the actual install.
 
 ```bash
-AGENT_DEVICE_PACKAGE_ROOT="$(npm root -g)/agent-device"
+AGENT_DEVICE_PACKAGE_ROOT="$HOME/.bun/install/global/node_modules/agent-device"
 RUNNER_PROJECT="$AGENT_DEVICE_PACKAGE_ROOT/dist/apple/runner/AgentDeviceRunner/AgentDeviceRunner.xcodeproj"
 RUNNER_DERIVED_PATH='/absolute/derivedDataPath/from/runner.log'
 
@@ -239,6 +231,20 @@ agent-device snapshot -i --depth 10 --session phone-a
 
 **Refs are examples**, not stable IDs. Use only refs from the latest snapshot or settled diff, preserving any suffix such as `@e54~s240212`. Never reuse a ref after a state change without observing the new state. `fill` replaces field contents; `type` appends after focus. Verify the composed text before sending because keyboards may alter input.
 
+### Tap by screenshot coordinates when there is no ref
+
+Prefer snapshot refs. If the latest bounded snapshot has **no usable ref** for the control (composer, Send, mic, and similar Messages chrome often omit them), **do not scan pixels with a script**. Take a screenshot, **read that image into context**, estimate the control from the picture, then tap or fill with **logical points**.
+
+```bash
+agent-device screenshot /absolute/path/screen.png --session phone-a
+# Read the image. Convert screenshot pixels to points, then:
+agent-device press 375 562 --session phone-a
+agent-device fill 180 540 'ciao' --session phone-a
+agent-device longpress 375 793 5000 --session phone-a
+```
+
+iPhone screenshots are often **physical pixels**. Taps use **logical points**. On the XR used here, 828×1792 maps to 414×896, so divide both axes by **2**. Verify the current device scale from `screenshot` output size versus a known point space; do not assume 2× on another phone. Aim at the visible control, then screenshot again to confirm. A miss is a bad estimate, not a reason to write a pixel finder.
+
 On stable screens, `press`, `fill`, `scroll`, and `back` support **`--settle`**, which acts and returns a UI diff. On hang-prone screens prefer a plain action and a separate **depth-10 snapshot**. Do not append `--depth 10` blindly to actions: ref-based `press` and `fill` reject snapshot-depth flags in current source. Automatic settle captures are not guaranteed to share the explicit snapshot's bound.
 
 ```bash
@@ -258,7 +264,7 @@ Use a snapshot **without `-i` but with `--depth 10`** when reading non-interacti
 
 1. **Bound the first read:** `snapshot -i --depth 10`. Use `--scope` when a known label narrows the screen. Do not respond to an empty bounded result by immediately requesting an unlimited tree.
 2. If the CLI returns **`fallbackScreenshotPath`**, inspect that existing image. A one-node snapshot with a backend-failure warning has no usable semantic refs.
-3. Use **screenshot-grounded coordinates** only after semantic access fails. iPhone screenshots may use physical pixels while tap coordinates use logical points. Our XR image was 828×1792 and its tap space was 414×896. Verify the current device's scale; do not assume 2× for another phone.
+3. Use **screenshot-grounded coordinates** when the tree has no usable ref. Read the screenshot into context and tap estimated points. Do not write a pixel-scanning script. iPhone screenshots may use physical pixels while tap coordinates use logical points. Our XR image was 828×1792 and its tap space was 414×896. Verify the current device's scale; do not assume 2× for another phone.
 4. A coordinate tap can still invoke XCTest accessibility internally. If it also hangs or returns **`RUNNER_BUSY`**, wait briefly once, then inspect the named session's `runner.log`. Do not queue more actions behind a wedged command.
 5. Recover this session's runner with `close --shutdown`, then `prepare`, then plain `open` and a bounded snapshot. `close --shutdown` also shuts down simulators/emulators; on our physical iPhone it stopped the runner without powering off the phone. Check current help before using it on another target type.
 6. If the app itself remains unresponsive, one intentional **`open ... --relaunch`** can clear stale app state. After a repeated failure with the same cause, report the specific blocker or request the necessary on-device action. Do not keep rebuilding a correctly signed runner for an app-specific tree failure.
@@ -313,7 +319,7 @@ agent-device screenshot /absolute/path/phone-b.png --session phone-b
 
 ## Local setup record and sources
 
-**Observed on 2026-09-05:** CLI 0.20.10, Xcode 26.6, iPhone XR on iOS 18.7.6. The working hardware UDID was `00008020-000405C214BB002E`, team `92MF9DG2LR`, and runner base `com.remorses.agentdevice.runner`. These are local recovery hints, not defaults for a new phone or another user's account. Re-discover before use.
+**Observed on 2026-09-05:** Xcode 26.6, iPhone XR on iOS 18.7.6. The working hardware UDID was `00008020-000405C214BB002E`, team `92MF9DG2LR`, and runner base `com.remorses.agentdevice.runner`. These are local recovery hints, not defaults for a new phone or another user's account. Re-discover before use. Always use the latest `agent-device` CLI.
 
 **Verified references:** consult installed help first when upstream differs. Multi-device support was checked in official guidance and the source test named `router allows pre-open requests for different devices to proceed concurrently` in `src/daemon/__tests__/request-router-open.test.ts`. Two physical phones were not available for a live concurrency test. Depth 10 is the user's chosen operating precaution; this session did not prove it eliminates every hang.
 
