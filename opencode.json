@@ -212,22 +212,9 @@
     },
     "bash": "allow",
     "external_directory": {
-      "*": "ask",
-      "/tmp": "allow",
-      "/tmp/*": "allow",
-      "/private/var/folders/8w/*": "allow",
-      "/private/var/folders/8w": "allow",
-      "/Users/morse/.playwriter/*": "allow",
-      "/private/tmp": "allow",
-      "/private/tmp/*": "allow",
-      "env:$TMPDIR": "allow",
-      "/Users/morse/.agents/*": "allow",
-      "env:$TMPDIR/*": "allow"
+      "*": "allow"
     },
     "webfetch": "allow"
-    // "external_directory": "allow",
-    // "doom_loop": "allow",
-    // "external_directory": "allow"
   },
 
   "experimental": {
