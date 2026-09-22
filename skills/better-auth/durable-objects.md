@@ -119,7 +119,7 @@ export type Auth = ReturnType<typeof createAuth>
 export type AuthSession = Auth['$Infer']['Session'] | null
 ```
 
-Generate tables with `pnpm dlx auth@latest generate`. Use `epochMs` on every timestamp column. See the drizzle skill.
+Generate tables with `pnpm dlx auth@latest generate`. Date columns use `integer({ mode: 'timestamp_ms' })`. See the drizzle skill Timestamps section.
 
 ## Auth DO class
 

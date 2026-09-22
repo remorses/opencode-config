@@ -828,14 +828,21 @@ Exception: truly unstructured/opaque data (raw API responses for debugging) can 
 
 Postgres: `p.timestamp('created_at').defaultNow().notNull()`.
 
-SQLite with D1: use a `customType` called `epochMs` instead of `integer({ mode: 'number' })`. This is required because BetterAuth passes `Date` objects as bind parameters, but D1 only accepts `string | number | null | ArrayBuffer`. The `epochMs` type converts `Date → date.getTime()` via drizzle's `toDriver` hook while keeping the TypeScript type as `number`.
+SQLite / D1: use Drizzle's built-in integer date. SQL is `INTEGER` milliseconds. TypeScript is `Date`. D1 binds a number. Better Auth cookie cache expects a `Date`.
 
 ```ts
-import * as s from 'drizzle-orm/sqlite-core'
+createdAt: s.integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
+```
 
-// Integer column that stores epoch milliseconds as a plain number.
-// Unlike integer({ mode: 'number' }), this accepts Date objects in toDriver
-// so BetterAuth's internal Date params don't crash D1's .bind().
+Writes accept `Date` or `number` (`Date.now()` still works). Reads return `Date`. Do not wrap D1 in a `Proxy`. Do not set Better Auth `supportsDates: false` (that stores ISO strings in INTEGER columns). Do not use `mode: 'timestamp'` (unix seconds).
+
+#### Legacy: `epochMs` customType
+
+Older remorses apps used `epochMs` so TypeScript stayed `number` and JSON stayed epoch ms. That was for app APIs, not because D1 cannot bind `timestamp_ms`. `timestamp_ms` already converts `Date → getTime()` on write.
+
+If a CLI or JSON API still returns epoch numbers, keep `epochMs` on **those app columns only**. Never use it on Better Auth tables (`user`, `session`, `account`, `verification`, `jwks`, `deviceCode`, OAuth). Cookie cache is `z.date()` and fails on numbers.
+
+```ts
 export const epochMs = s.customType<{ data: number; driverParam: number }>({
   dataType() { return 'integer' },
   toDriver(value: unknown): number {
@@ -844,22 +851,7 @@ export const epochMs = s.customType<{ data: number; driverParam: number }>({
   },
   fromDriver(value: unknown): number { return value as number },
 })
-
-// Usage:
-const user = s.sqliteTable('user', {
-  id: s.text('id').primaryKey(),
-  createdAt: epochMs('created_at').notNull().$defaultFn(() => Date.now()),
-  updatedAt: epochMs('updated_at').notNull().$defaultFn(() => Date.now()),
-})
 ```
-
-Why not `integer({ mode: 'timestamp_ms' })`? That changes the TypeScript type from `number` to `Date`, breaking all code that does arithmetic on timestamps, and JSON serialization changes from epoch numbers to ISO strings (breaking CLI/API clients).
-
-Why not the `supportsDates: false` adapter flag? BetterAuth converts `Date → toISOString()` (a string), which would store text in integer columns, corrupting data.
-
-The `epochMs` approach generates the same `integer` SQL type, so no migration is needed when switching from `integer({ mode: 'number' })`.
-
-SQLite without D1 (e.g. better-sqlite3, libsql): plain `integer({ mode: 'number' })` works if BetterAuth is not in the picture. Use `epochMs` whenever BetterAuth + SQLite are combined.
 
 ### Column naming
 
