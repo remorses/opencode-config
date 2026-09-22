@@ -41,6 +41,16 @@ instead prefer minimal layouts with good positioning of the elements. few choice
 
 if there are already components for what you need inside components/ui folder use them. do not re declare components again.
 
+## focus rings are keyboard only
+
+always use `focus-visible`. never use `focus`.
+
+a mouse click focuses the control. `focus:` paints a ring on that click. `focus-visible:` paints the ring only when the user reached the control with the keyboard.
+
+the same rule applies to parents. use `has-focus-visible:`, never `focus-within:` or `has-[:focus]`. an open menu trigger should not keep a ring either. use the open state, like `data-popup-open:ring-0`.
+
+never add a global `:focus:not(:focus-visible) { box-shadow: none }`. that beats `shadow-sm` and wipes elevation on click. the utility choice is enough.
+
 ## Centered multiline text
 
 Always add `text-balance` to centered headings, descriptions, and empty-state copy that can wrap across multiple lines. Centered ragged text looks uneven without balancing, especially in hero sections, onboarding cards, dialogs, and dashboard empty states.
@@ -303,6 +313,12 @@ bunx shadcn@latest apply a2r6bw
 ```
 
 **always run `bunx shadcn@latest docs <component>` and fetch the URLs before using a component.** this ensures correct API usage rather than guessing from memory.
+
+**start from the official component, then tweak.** never hand-roll a switch, combobox, avatar, or button when shadcn has one. install it with `bunx shadcn@latest add`, fix the import paths, then change only the classes that the design needs.
+
+copy the matching docs example, including the props that example sets. a popup combobox of objects needs `itemToStringValue` so search can match, and `autoHighlight` so Enter selects the first match. skipping those makes search look wired and do nothing.
+
+do not invent a second component next to the official one. add a prop or a slot to the official file when the design needs a footer, a custom trigger, or a smaller size.
 
 **component selection guide:**
 

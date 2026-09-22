@@ -168,7 +168,7 @@
   },
   "plugin": [
     "/Users/morse/Documents/GitHub/kimakivoice/subrouter/opencode/src/index.ts",
-    "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
+    // "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
     "/Users/morse/Documents/GitHub/kimakivoice/cli/src/anthropic-auth-plugin.ts",
     "/Users/morse/Documents/GitHub/kimakivoice/cli/src/openai-auth-plugin.ts",
     "/Users/morse/.config/opencode/plugins/systemprompt-debug.ts"
