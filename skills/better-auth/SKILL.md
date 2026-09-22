@@ -9,6 +9,7 @@ description: >
   server actions with auth, and SQLite Durable Objects (betterAuth inside the DO,
   getCookieCache in the Worker). ALWAYS load this skill when a project uses better-auth.
   Load durable-objects.md when auth tables live in a Durable Object.
+  Load mcp.md when adding remote HTTP MCP OAuth (Cursor, Claude, hosted /mcp).
 ---
 
 # better-auth
@@ -662,13 +663,13 @@ export const deviceCode = s.sqliteTable('device_code', {
   id: s.text('id').primaryKey().notNull().$defaultFn(() => ulid()),
   deviceCode: s.text('device_code').notNull().unique(),
   userCode: s.text('user_code').notNull().unique(),
-  userId: s.text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-  expiresAt: epochMs('expires_at').notNull(),
-  status: s.text('status', {
-    enum: ['pending', 'approved', 'denied', 'expired'],
-  }).notNull().default('pending'),
-  lastPolledAt: epochMs('last_polled_at'),
-  pollingInterval: s.integer('polling_interval', { mode: 'number' }),
+    userId: s.text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+    expiresAt: s.integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    status: s.text('status', {
+      enum: ['pending', 'approved', 'denied', 'expired'],
+    }).notNull().default('pending'),
+    lastPolledAt: s.integer('last_polled_at', { mode: 'timestamp_ms' }),
+    pollingInterval: s.integer('polling_interval', { mode: 'number' }),
   clientId: s.text('client_id'),
   scope: s.text('scope'),
 })
@@ -1345,31 +1346,21 @@ When a server-side layout or route needs to redirect an unauthenticated user to 
 
 `returnHeaders: true` is required to capture the CSRF state cookie that better-auth sets. Without forwarding those cookies, the OAuth callback fails with `state_mismatch`.
 
-## SQLite/D1 date binding issue
+## SQLite/D1 dates
 
-BetterAuth passes `Date` objects for timestamp columns (`createdAt`, `updatedAt`, `expiresAt`). This crashes on Cloudflare D1 because D1's `.bind()` only accepts `string | number | null | ArrayBuffer`.
-
-**Do not use `new Proxy` to wrap D1.** Instead, use a drizzle `customType` called `epochMs` for all timestamp columns. It stores epoch milliseconds as integers (same SQL type, no migration needed) but converts `Date → date.getTime()` in drizzle's `toDriver` hook before values reach D1. See the `drizzle` skill's "Timestamps" section for the full implementation.
+Better Auth fields are `type: "date"`. Use the official SQLite column:
 
 ```ts
-// import * as s from 'drizzle-orm/sqlite-core'
-// Use epochMs instead of integer({ mode: 'number' }) for timestamps
-const user = s.sqliteTable('user', {
-  createdAt: epochMs('created_at').notNull().$defaultFn(() => Date.now()),
-  updatedAt: epochMs('updated_at').notNull().$defaultFn(() => Date.now()),
-})
-
-// Then pass env.DB directly to drizzle, no wrapper needed
-export function getDb() {
-  return drizzle(env.DB, { schema, relations: schema.relations })
-}
+createdAt: s.integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
 ```
 
-**Why not `supportsDates: false`?** When this flag is set, BetterAuth converts `Date → toISOString()` (a string). If your columns are `integer` (storing epoch ms), this stores ISO strings in integer columns, corrupting data and breaking sorting/comparisons.
+SQL is `INTEGER` ms. TypeScript is `Date`. D1 binds a number. Cookie cache is `z.date()`. Defaults are `new Date()`, not `Date.now()`.
 
-**Why not `integer({ mode: 'timestamp_ms' })`?** This changes the TypeScript type from `number` to `Date`, requiring changes across the entire codebase. API JSON responses would serialize as ISO strings instead of epoch numbers, breaking CLI clients.
+Do not wrap D1 in a `Proxy`. Do not set `supportsDates: false` (ISO strings in INTEGER columns). Do not use `mode: 'timestamp'` (unix seconds).
 
-This issue is tracked in https://github.com/better-auth/better-auth/issues/8882 (PR #8913 adds `supportsDates: false` for SQLite but converts to ISO strings, not epoch numbers, so it doesn't help for integer timestamp schemas).
+Older remorses apps used an `epochMs` customType so app JSON stayed numbers. That is legacy. Never use it on Better Auth tables. If cookie cache fails with `Cookie cache payload failed schema validation`, the column is returning a number. Switch it to `timestamp_ms`. Do not disable `cookieCache`.
+
+SQLite `string[]` / `json` Better Auth fields must be `text(name, { mode: 'json' })`. Copy OAuth FKs from https://github.com/better-auth/better-auth/blob/main/packages/oauth-provider/src/schema.ts. Missing `onDelete` is NO ACTION. Do not invent CASCADE on `oauthClient.userId` or on token `client_id`. A CIMD client is one shared row. CASCADE there deletes everyone’s tokens or fights NO ACTION child FKs. Full map is in `mcp.md`.
 
 
 ## Cloudflare Workers
@@ -1397,6 +1388,10 @@ The API is identical. Plugins are imported from `better-auth/plugins` as usual. 
 ### Durable Objects
 
 When auth tables live in a SQLite Durable Object, follow **[durable-objects.md](./durable-objects.md)**.
+
+### Remote MCP OAuth
+
+When the app needs a hosted HTTP MCP that Cursor or Claude can add with OAuth, follow **[mcp.md](./mcp.md)**. Use `@better-auth/mcp` plus `cimd()`, not `mcp` from `better-auth/plugins`. Skip this for local stdio CLI MCP.
 
 `betterAuth()` runs inside the DO. The Worker verifies `session_data` with `getCookieCache` and RPCs the DO only on a miss or for `/api/auth/*`. Do not put better-auth behind the drizzle sqlite-proxy pattern. Do not call the DO on every page load.
 
