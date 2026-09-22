@@ -391,8 +391,6 @@ curl -s https://models.dev/api.json | jq '.openai.models | to_entries | map(.val
 
 to swap providers, replace `.openai.models` with another provider key like `.anthropic.models` or `.google.models`.
 
-for Subrouter presets that contain only GPT models, prefix the preset name with `gpt-`. OpenCode v2 detects its GPT prompt and `patch` tool from the public preset id. never use this prefix for mixed-provider fallback presets.
-
 ## docs .md files
 
 if user asks you to create .md files with findings always put them in a docs folder and not at root level or in src
