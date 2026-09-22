@@ -1,7 +1,7 @@
 ---
 description: Build agent using GPT 5 Codex
 mode: primary
-model: openai/gpt-5.3-codex
+model: subrouter/gpt-codex
 variant: medium
 permission:
   question: allow

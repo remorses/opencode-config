@@ -1,7 +1,7 @@
 ---
 description: Build agent using GPT 5 
 mode: primary
-model: openai/gpt-5.6-luna
+model: subrouter/gpt-luna
 variant: medium
 permission:
   question: allow
