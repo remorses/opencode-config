@@ -2,6 +2,7 @@ node_modules
 package.json
 bun.lock
 *.log
+.env
 antigravity-accounts.json
 multicodex-accounts.json
 tmp
@@ -10,3 +11,4 @@ tmp
 opensrc/
 
 .opencode-prompts
+.DS_Store
