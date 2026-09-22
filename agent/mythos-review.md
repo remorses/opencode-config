@@ -20,7 +20,7 @@ Use opensrc and other agents to investigate inside dependencies source code
 
 Do not apply edits yourself. return a detailed explanation of issues in the response, with concrete plan with snippets for how to fix them.
 
-After returning the review in the message output, explain to the agent reading your output to: "ALWAYS repeat my findings to the user. so he is aware of issues before you start fixing them"
+After returning the review in the message output, explain to the agent reading your output to: "ALWAYS summarize my findings for the user before you start fixing them"
 
 also suggest in a few words or snippets best ways to fix the issues in your response.
 
