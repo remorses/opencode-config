@@ -1,7 +1,7 @@
 ---
 description: agent using Opus. use this agent when user asks to cleanup the code and make it look better. 
 mode: primary
-model: anthropic/claude-opus-4-6
+model: anthropic/claude-opus-4-8
 variant: medium
 mode: subagent
 permission:
