@@ -64,6 +64,18 @@ Always add `text-balance` to centered headings, descriptions, and empty-state co
 </div>
 ```
 
+## Left-aligned headings use `text-pretty`
+
+Add `text-pretty` to every left-aligned heading (h1-h6, card titles, section titles). It stops a single word from sitting alone on the last line, and the heading still fills its column. Put the class on the heading component itself. Do not add a global `h1, h2 { text-wrap: pretty }` rule in globals.css.
+
+Use `text-balance` only when the text is centered, or when you want all lines to have the same length and do not mind the block getting narrower than its container. On left-aligned headings, `balance` often makes the first line very short.
+
+```tsx
+<h2 className="text-xl font-semibold text-pretty">Configure your deployment settings</h2>
+```
+
+`text-wrap` is inherited, so the class on the heading also applies to nested `<span>` children. It is safe for performance on short text. Avoid it only on text that re-wraps during an animation.
+
 ## dark mode with @variant dark
 
 always prefer `@variant dark { ... }` over hardcoded `.dark` selectors for dark mode overrides. this is strategy-agnostic: it compiles to whatever selector is configured in `@custom-variant dark` (e.g. `.dark` class, `prefers-color-scheme`, `data-theme`, or a combination). changing the strategy only requires updating one line. never write `.dark { }` or `.dark .selector` in Tailwind-processed CSS files — use `@variant dark` instead.
