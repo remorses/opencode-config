@@ -17,6 +17,8 @@ tokens out of the browser.
 
 Preconditions: Chrome has the playwriter extension, and the user is logged
 into x.com. Read `playwriter skill` in full first if you have not used it.
+If `playwriter session new` fails with `extension_not_connected`, show the
+user the printed install steps and stop. Do not try other workarounds.
 
 ## Get the latest bookmarks
 
