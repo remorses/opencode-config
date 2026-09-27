@@ -1,6 +1,6 @@
 ---
 name: pnpm
-description: Use to debug why a specific package has duplicate dependencies in a pnpm project's node_modules, which can cause type-checking and bundler errors or duplicate singleton instances such as React contexts. Also use for pnpm workspace dependency updates. NEVER use package.json overrides to update or align versions; use `pnpm update -r <package>` instead.
+description: Use to debug why a specific package has duplicate dependencies in a pnpm project's node_modules, which can cause type-checking and bundler errors or duplicate singleton instances such as React contexts. Also use for pnpm workspace dependency updates, and when a just-published package version will not install or update (minimumReleaseAge blocks it). NEVER use package.json overrides to update or align versions; use `pnpm update -r <package>` instead.
 ---
 
 # package manager: pnpm with workspace
@@ -24,6 +24,18 @@ when i ask you to update a package always run `pnpm update -r packagename`. to u
 Do not do `pnpm add packagename` to update a package. only to add a missing one. otherwise other packages versions will get out of sync.
 
 NEVER add `pnpm.overrides` or any other package.json override to update, pin, or align a dependency version. update every workspace consumer together with `pnpm update -r packagename` instead. use `pnpm update -r --latest packagename` when the latest release is required.
+
+## newly published package will not install (minimum release age)
+
+pnpm delays newly published versions by 1 day (`minimumReleaseAge: 1440`), a supply chain security feature. If a package does not update even though a new version was just published, this config is blocking it.
+
+Add the package to the exclude list with the global script:
+
+```bash
+bun ~/.config/pnpm/update-minimum-release-age-exclude.ts package-name @some-scope/pkg
+```
+
+The script fetches all packages maintained by npm user `xmorse`, collapses scoped packages into `@scope/*` globs, and merges the extra packages passed as args. It writes both `~/.config/pnpm/config.yaml` (pnpm 11) and `~/.npmrc` (pnpm 10). `~/.config/pnpm/` is a git repo.
 
 ## fixing duplicate pnpm dependencies
 
