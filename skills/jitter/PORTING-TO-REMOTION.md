@@ -22,7 +22,7 @@ captures `toValue`, but many operations need `fromValue` too:
 - `move` ops can have `fromValue: { moveX: 100 }` (start offset, animate to 0)
 
 ```javascript
-const sceneData = await page.evaluate(() => {
+const sceneData = await state.page.evaluate(() => {
   const conf = window.app.getState().observableImmutableConf.getSnapshot()
   const root = conf.roots[0]
 
@@ -594,8 +594,8 @@ For pixel comparison without the SDK, seek the player and screenshot the
 player element with Playwright instead:
 
 ```javascript
-await page.evaluate((f) => window.egakiSDK.seekTo(f), frame)
-const el = await page.$('.__remotion-player')
+await state.page.evaluate((f) => window.egakiSDK.seekTo(f), frame)
+const el = await state.page.$('.__remotion-player')
 await el.screenshot({ path: `/tmp/dom-${ms}.png` })
 ```
 

@@ -412,7 +412,7 @@ Use Playwriter to capture screenshots of GitHub repos, dashboards, or any authen
 
 ```ts
 // Navigate and screenshot
-playwriter run 'await page.goto("https://github.com/org/repo"); await page.screenshot({ path: "repo.png", fullPage: true })'
+playwriter -s 1 -e 'state.page = await context.newPage(); await state.page.goto("https://github.com/org/repo"); await state.page.screenshot({ path: "/absolute/path/repo.png", fullPage: true })'
 ```
 
 Screenshots are embedded in the evidence PDF as `<Image>` components.

@@ -12,14 +12,15 @@ Control Jitter (jitter.video) for exporting animations, replacing assets, and mo
 Load utils before interacting with Jitter:
 
 ```javascript
-// Load once per page (before navigation or via addInitScript)
-await page.addInitScript({ path: './skills/jitter/dist/jitter-utils.js' })
+// Create your own tab (there is no default page), then load utils once per page
+state.page = await context.newPage()
+await state.page.addInitScript({ path: './skills/jitter/dist/jitter-utils.js' })
 
 // Navigate to project
-await page.goto('https://jitter.video/file/?id=YOUR_FILE_ID')
+await state.page.goto('https://jitter.video/file/?id=YOUR_FILE_ID')
 
 // Wait for app to be ready
-await page.evaluate(() => jitterUtils.waitForApp())
+await state.page.evaluate(() => jitterUtils.waitForApp())
 ```
 
 ## API Reference
@@ -81,10 +82,10 @@ await page.evaluate(() => jitterUtils.waitForApp())
 
 ```javascript
 // Get all media nodes
-const media = await page.evaluate(() => jitterUtils.findAllMediaNodes())
+const media = await state.page.evaluate(() => jitterUtils.findAllMediaNodes())
 
 // Replace specific assets
-await page.evaluate(() => {
+await state.page.evaluate(() => {
   jitterUtils.batchReplace([
     { nodeId: 'abc123', data: { url: 'https://example.com/new-image.svg' } },
     { nodeId: 'def456', data: { url: 'https://example.com/new-photo.jpg' } },
@@ -92,17 +93,17 @@ await page.evaluate(() => {
 })
 
 // Wait for sync then export
-await page.evaluate(() => jitterUtils.waitForSync())
-const exportUrl = await page.evaluate(() =>
+await state.page.evaluate(() => jitterUtils.waitForSync())
+const exportUrl = await state.page.evaluate(() =>
   jitterUtils.generateExportUrlFromCurrentProject({ profile: 'lottie' }),
 )
-await page.goto(exportUrl)
+await state.page.goto(exportUrl)
 ```
 
 ### Export with Temporary Changes
 
 ```javascript
-await page.evaluate(async () => {
+await state.page.evaluate(async () => {
   const nodeIds = ['node1', 'node2']
   const changes = {
     node1: { url: 'https://temp-asset.svg' },
@@ -121,10 +122,10 @@ await page.evaluate(async () => {
 ### Find and Update Text
 
 ```javascript
-const textNodes = await page.evaluate(() => jitterUtils.findAllTextNodes())
+const textNodes = await state.page.evaluate(() => jitterUtils.findAllTextNodes())
 // [{ id, name, text, fontSize, fontFamily }, ...]
 
-await page.evaluate(() => {
+await state.page.evaluate(() => {
   jitterUtils.replaceText('textNodeId', 'New headline')
 })
 ```
@@ -188,8 +189,8 @@ From the editor page URL `https://jitter.video/file/?id=FILE_ID&nodeId=ARTBOARD_
 or programmatically:
 
 ```javascript
-const fileId = await page.evaluate(() => window.app.props.fileMeta.id)
-const artboard = await page.evaluate(() => {
+const fileId = await state.page.evaluate(() => window.app.props.fileMeta.id)
+const artboard = await state.page.evaluate(() => {
   const conf = window.app.getState().observableImmutableConf.getSnapshot()
   const root = conf.roots[0]
   return { id: root.id, width: root.item.width, height: root.item.height, duration: root.item.duration }
@@ -229,7 +230,7 @@ const rendererUrl = [
   `&vfe=off`,
 ].join('')
 
-state.rendererPage = context.pages().find(p => p.url() === 'about:blank') ?? await context.newPage()
+state.rendererPage = await context.newPage()
 await state.rendererPage.goto(rendererUrl, { waitUntil: 'domcontentloaded' })
 ```
 

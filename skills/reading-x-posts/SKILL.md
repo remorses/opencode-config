@@ -39,7 +39,7 @@ playwriter session new
 
 # 2. Navigate to the tweet
 playwriter -s <ID> -e '
-state.page = context.pages().find(p => p.url() === "about:blank") ?? await context.newPage();
+state.page = await context.newPage();
 await state.page.goto("https://x.com/USER/status/STATUSID", { waitUntil: "domcontentloaded" });
 await waitForPageLoad({ page: state.page, timeout: 8000 });
 '

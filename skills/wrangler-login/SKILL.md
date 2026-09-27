@@ -56,7 +56,7 @@ in their browser first, then retry.
    playwriter session and navigate to that URL:
    playwriter session new
    playwriter -s <id> -e '
-   state.page = context.pages().find(p => p.url() === "about:blank") ?? (await context.newPage());
+   state.page = await context.newPage();
    await state.page.goto("<OAUTH_URL>", { waitUntil: "domcontentloaded" });
    await waitForPageLoad({ page: state.page, timeout: 8000 });
    console.log("URL:", state.page.url());
