@@ -2,7 +2,7 @@
 description: Commit, update changelog, npm publish
 # agent: build
 subtask: false
-# model: anthropic/claude-sonnet-5
+# model: subrouter/claude-sonnet
 ---
 
 # Publishing npm Packages
@@ -38,7 +38,7 @@ For monorepos, check each workspace package to identify which ones have unpublis
 ## Step 3: Bump Version and Update Changelog
 
 1. Bump the version in `package.json` (never do major bumps)
-2. Update or create `CHANGELOG.md` with a **numbered list** under the new version heading
+2. Update or create `CHANGELOG.md` with a **numbered list** under the new version heading, using only the final user-facing changes since the last published version. If none remain, do not add an empty version heading.
 
 ### Semver bump rules
 
@@ -190,7 +190,9 @@ Exclude anything users don't directly experience:
 
 ### Group related changesets into single items
 
-Multiple changesets that touch the same area or feature should be merged into one changelog item. Do not give each changeset its own numbered entry if they are closely related. Read all changesets first, identify clusters, then write one item per cluster.
+Read all pending changesets before writing the changelog. Compare them with the code and the last published version. Multiple changesets that describe the same user-facing outcome should become **one** changelog item, even if they were written in different commits. Describe the final behavior, not the sequence of implementation steps. A changeset is a source of context, not a guarantee of its own item.
+
+If a change was added and then undone before publication, omit it entirely. Likewise, omit fixes to a feature that users never received in a broken state. If no user-facing change remains from a group of changesets, produce **no** changelog item for that group. Keep unrelated outcomes as separate items.
 
 Examples of what to merge:
 - 3 changesets about Prism grammar loading, highlighting extras, and nested fence support → one item about improved code highlighting
@@ -203,7 +205,7 @@ Examples of what stays separate:
 
 ### Omit bug fixes for unreleased features
 
-If a feature was added in this release cycle and a later changeset fixes a bug in that feature, the fix is invisible to users. Just describe the feature working correctly. Never list "fixed X" when X was never released broken.
+If a feature was added in this release cycle and a later changeset fixes a bug in that feature, the fix is invisible to users. Just describe the feature working correctly. Never list "fixed X" when X was never released broken. If the feature itself was removed before publication, omit both entries.
 
 ### Merging unreleased versions
 
@@ -248,7 +250,7 @@ Fixes #123
 Closes #456'
 ```
 
-Collect all issue references from the changeset files being consumed and append them as separate lines in the commit body. This ensures issues get closed at publish time without needing a separate PR or GitHub Action.
+Collect issue references from changesets for changes that actually ship and append them as separate lines in the commit body. Do not close an issue for a change that was undone before publication. This ensures issues get closed at publish time without needing a separate PR or GitHub Action.
 
 ## Step 5: Publish to npm
 
@@ -447,9 +449,10 @@ Changelog item entry here. with examples
 For packages that contain these `.md` files we should
 
 - read the .md files inside `.changeset` if any (also check in parent folders if this is a workspace. sometimes `.changeset` is at the repo root)
-- update the CHANGELOG.md for the packages, adding each one of these .md entries content as a list item for the new version. Keep all content, if there are code snippets or examples, add them too, indented into the list item
-- if any entry adds a **new feature or capability**, use a **minor** bump
-- use **patch** only when all entries are fixes or non-feature improvements
+- compare the entries with the final user-facing behavior since the last published version; merge related entries into one numbered changelog item per outcome, and omit entries for changes that were undone or never visible to users. If nothing remains, add no item for those entries
+- keep useful examples and details from related entries in the merged item, but verify that every example still matches the shipped code
+- if the final release adds a **new feature or capability**, use a **minor** bump
+- use **patch** only when the changes that still ship are fixes or non-feature improvements
 - then delete these .md files
 - publish as normal
 
