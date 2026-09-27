@@ -1,6 +1,6 @@
 ---
 description: get branch diff.
-model: anthropic/claude-sonnet-5
+model: subrouter/claude-sonnet
 ---
 
 # Compare Current Branch Against Upstream Default

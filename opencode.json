@@ -16,7 +16,7 @@
     ]
   },
 
-  // "model": "google/gemini-flash-latest",
+  "model": "subrouter/gpt-sol",
 
   // "mode": {
   //   "build": {
@@ -69,14 +69,7 @@
             "output": 65536
           }
         },
-        // gpt-5.6-sol and gpt-5.6-terra limits from models.dev
-        "gpt-5.6-sol": {
-          "limit": {
-            "context": 1050000,
-            "output": 128000
-          }
-        },
-        "gpt-5.6-terra": {
+        "gpt-6-sol": {
           "limit": {
             "context": 1050000,
             "output": 128000

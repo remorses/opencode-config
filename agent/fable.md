@@ -1,7 +1,7 @@
 ---
 description: Build agent using Anthropic Fable (expeinse model)
 mode: primary
-model: anthropic/claude-fable-5-1
+model: subrouter/claude-fable
 variant: medium
 # mode: all
 permission:

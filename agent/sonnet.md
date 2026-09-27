@@ -1,7 +1,7 @@
 ---
 description: Build agent using Sonnet
 mode: primary
-model: anthropic/claude-sonnet-5
+model: subrouter/claude-sonnet
 variant: medium
 permission:
   question: allow

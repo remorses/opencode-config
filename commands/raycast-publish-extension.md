@@ -1,7 +1,6 @@
 ---
-model: anthropic/claude-sonnet-5
+model: subrouter/claude-sonnet
 subtask: true
-model: anthropic/claude-sonnet-5
 ---
 
 # publishing an extension update

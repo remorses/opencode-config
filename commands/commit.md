@@ -2,7 +2,7 @@
 description: Commit in groups
 # agent: build
 subtask: false
-# model: anthropic/claude-sonnet-5
+# model: subrouter/claude-sonnet
 ---
 
 see git diff. if there are submodules also see their diff too.

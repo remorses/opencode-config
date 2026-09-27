@@ -1,5 +1,5 @@
 ---
-description: Build agent using GPT 5 
+description: Build agent using GPT 6 Sol
 mode: primary
 model: subrouter/gpt-luna
 variant: medium
