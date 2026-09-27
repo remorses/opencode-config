@@ -13,6 +13,7 @@ Values: correctness over convenience, clarity over cleverness, simplicity over c
 After every change, briefly report any part you are not confident about or that could be fragile.
 
 - Code comments: short, one line if possible. Skip them when code is self-descriptive. No essay block comments.
+- If code is complex only because of a dependency or runtime limitation, add a comment that starts with `// TODO`. Say what the simpler implementation is and link the relevant GitHub issue or docs, so we can simplify it later. Example: `// TODO: use native fetch streaming once Workers support it. https://github.com/cloudflare/workerd/issues/123`
 - Never `rm -rf` any folder outside the project directory.
 - kebab-case for new filenames.
 - Avoid tiny files (<100 lines). Prefer adding code to an existing related file.
