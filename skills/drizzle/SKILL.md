@@ -344,6 +344,14 @@ await db.update(schema.notifications)
 This is critical when **finding the row is the authorization** (invite ids, reset tokens, share links).
 
 ```ts
+// BAD: invitationId = { gt: '0' } joins the org of any live invite
+export async function acceptInviteAction({ invitationId }: { invitationId: string }) {
+  const invite = await db.query.orgInvitation.findFirst({ where: { id: invitationId } })
+}
+```
+
+```ts
+// GOOD
 'use server'
 
 import { z } from 'zod'
