@@ -3,7 +3,8 @@ name: drizzle
 description: >
   Drizzle ORM conventions and best practices for TypeScript projects.
   Covers namespace imports, Prisma-like query API, object-style where
-  filters, schema design (ULIDs, cascade deletes, indexes, enums over bools),
+  filters, validating untrusted ids before relational lookups (object ids
+  become filter operators and match any row), schema design (ULIDs, cascade deletes, indexes, enums over bools),
   Zod schema generation, type inference, transactions, migrations, and
   driver setup for Cloudflare Durable Objects (via sqlite-proxy),
   libSQL/Turso, Postgres via Hyperdrive, and Cloudflare D1.
@@ -335,6 +336,70 @@ await db.update(schema.notifications)
   .set({ read: true })
   .where(orm.eq(schema.notifications.userId, userId))
 ```
+
+## CRITICAL: Validate ids before a `db.query` lookup
+
+**Any id that comes from outside (server action args, request body, query string, webhook payload) MUST be checked to be a non-empty string before it reaches a `db.query` `where`.** Otherwise `findFirst` can return **any row** in the table.
+
+The relational `where` does not compare the value you pass. It **interprets** it (`drizzle-orm/relations.js`, `relationsFieldFilterToSQL`):
+
+| value passed as `id` | SQL it compiles to | result of `findFirst` |
+|---|---|---|
+| `'01HX...'` | `id = '01HX...'` | the row, or undefined |
+| `undefined` | filter **skipped** | **first row in the table** |
+| `{}` | filter **skipped** | **first row in the table** |
+| `{ isNull: false }` | filter **skipped** | **first row in the table** |
+| `{ gt: '0' }` | `id > '0'` | **first row in the table** |
+| `{ isNotNull: true }` | `id IS NOT NULL` | **first row in the table** |
+| `null` | throws `TypeError` (`Object.entries(null)`) | 500 |
+
+TypeScript does not protect you. The parameter says `string`, but server action args are decoded from the wire (React Flight, like JSON) and can be any object. This was a real exploit in sigillo (GHSA-2vj3-x25h-7f7j): sending `{ "invitationId": { "gt": "0" } }` matched a live invitation of **another org**, and the attacker joined it.
+
+It is worst when **finding the row is the authorization**: invite tokens, password reset tokens, share links, API key lookups, magic links. There is no later "is this yours" check to save you.
+
+**BAD** — trusts the declared type:
+
+```ts
+'use server'
+
+export async function acceptInviteAction({ invitationId }: { invitationId: string }) {
+  if (!invitationId) throw new Error('Invitation ID is required') // { gt: '0' } is truthy
+  const invite = await db.query.orgInvitation.findFirst({
+    where: { id: invitationId }, // { gt: '0' } -> WHERE id > '0' -> any invite
+  })
+  if (!invite) throw new Error('Invitation not found')
+  await joinOrg(invite.orgId, session.userId)
+}
+```
+
+**GOOD** — parse the input with zod before any query:
+
+```ts
+'use server'
+
+import { z } from 'zod'
+
+const acceptInviteInput = z.object({ invitationId: z.string().min(1) })
+
+export async function acceptInviteAction(input: z.input<typeof acceptInviteInput>) {
+  const { invitationId } = acceptInviteInput.parse(input) // throws on objects, null, undefined, ''
+  const invite = await db.query.orgInvitation.findFirst({
+    where: { id: invitationId },
+  })
+  if (!invite) throw new Error('Invitation not found')
+  await joinOrg(invite.orgId, session.userId)
+}
+```
+
+Rules:
+
+- **Every server action parses its whole argument with a zod schema on the first line.** Derive the parameter type from the schema (`z.input<typeof schema>`) so the type and the check can never disagree.
+- Use `z.string().min(1)` for ids. `z.string()` alone lets `''` through; `''` is harmless for equality but usually means a bug upstream.
+- A truthy check (`if (!id)`) is **not** validation. Objects are truthy.
+- HTTP routes with a zod body schema are safe only if the handler reads the **validated** body (in spiceflow, `await request.json()` on a route with `request: z.object(...)`). Reading `request.clone().json()` or raw `formData()` bypasses it.
+- Path params and `URLSearchParams.get()` are always strings or null, but still check for null before passing them in.
+- Nested fields need the same care: `{ id: { in: ids } }` with an unchecked `ids` array can carry objects too. Use `z.array(z.string().min(1))`.
+- Add a regression test that passes `{ gt: '0' }` and `undefined` as the id and asserts the call is refused.
 
 ## CRUD examples
 
