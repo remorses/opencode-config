@@ -5,7 +5,7 @@ model: subrouter/claude-opus
 variant: medium
 mode: subagent
 permission:
-  question: allow
+  question: deny
   taster: deny
   plan_enter: allow
 ---

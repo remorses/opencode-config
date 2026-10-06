@@ -4,6 +4,8 @@ mode: subagent
 # model: google/gemini-3.1-pro-preview
 model: subrouter/gpt-sol
 variant: medium
+permission:
+  question: deny
 ---
 
 ALWAYS read current git diff or commits range diff to see the changes made by parent agent.

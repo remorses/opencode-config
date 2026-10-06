@@ -4,6 +4,8 @@ description: this is a copy of oracle agent using Anthropic mythos instead of or
 mode: subagent
 model: subrouter/claude-opus
 variant: high
+permission:
+  question: deny
 ---
 
 ALWAYS read current git diff or commits range diff to see the changes made by parent agent.

@@ -8,6 +8,8 @@ description: >
   design decisions, debugging, or code review.
 mode: subagent
 model: opencode-go/deepseek-v4.1-flash
+permission:
+  question: deny
 ---
 
 You run cheap mechanical batch work. Follow the steps in the prompt exactly.

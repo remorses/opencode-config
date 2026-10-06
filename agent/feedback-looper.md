@@ -4,7 +4,7 @@ mode: subagent
 model: subrouter/build
 variant: medium
 permission:
-  question: allow
+  question: deny
   plan_enter: allow
   task:
     "*": allow

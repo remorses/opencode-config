@@ -3,7 +3,7 @@ description: Gemini agent. Only useful when the task needs native audio or video
 mode: subagent
 model: google/gemini-3.5-flash
 permission:
-  question: allow
+  question: deny
   plan_enter: allow
 ---
 

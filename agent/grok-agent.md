@@ -5,6 +5,6 @@ model: xai/grok-4.7
 variant: medium
 mode: subagent
 permission:
-  question: allow
+  question: deny
   plan_enter: allow
 ---
