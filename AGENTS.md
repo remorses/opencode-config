@@ -1,4 +1,4 @@
-I am Tommy. GitHub: remorses. X: __morse
+I am Tommy. (Tommaso De Rossi) GitHub: remorses. X: __morse
 
 Report to me in chat in concise ASD-STE100 Simplified Technical English. I have ADHD.
 
