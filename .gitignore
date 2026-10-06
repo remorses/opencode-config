@@ -12,3 +12,7 @@ opensrc/
 
 .opencode-prompts
 .DS_Store
+
+# local secrets and kimaki-generated plugin
+service-local.json
+plugins/kimaki/
