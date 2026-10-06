@@ -23,7 +23,22 @@ Search GitHub for **concrete** code before guessing. Search for exact API names,
 
 ## 1. Search code
 
-Combine several clues from the pattern. More clues means fewer, better hits.
+**Search for one unique term, not a description.** GitHub code search matches literal tokens in files. Natural-language phrases ("iOS HID wheel scroll bluetooth mouse") return nothing, because no file contains those words together. The best queries use one term that only appears in code doing what you want:
+
+- a specific **function or class name** from the API you use: `IOHIDScrollAccelerator`, `registerForL2CAPChannelOpenNotifications`, `IOHIDEventGetTimeStamp`
+- a **magic number or constant**: `SCROLL_CLEAR_THRESHOLD_MS`, `"0x09, 0x38"`, `kHIDUsage_GD_Wheel`
+- an exact **string in quotes** that the code must contain: `'"setClassOfDevice(0x002540"'`
+
+```bash
+# one unique API name found the iOS scroll accelerator source and a decompiled iOS 18 build
+gh search code 'IOHIDScrollAccelerator' --limit 30
+# then add ONE more token to narrow, not a sentence
+gh search code 'IOHIDScrollAccelerator SCROLL_CLEAR_THRESHOLD_MS'
+```
+
+If a query returns nothing, remove terms; do not add more. Start from names you already know (functions, constants, report IDs you use in your own code), then read the hits to learn new unique names and search those.
+
+Combine several clues from the pattern only when each clue is a real code token.
 
 ```bash
 # one concrete API
@@ -41,6 +56,10 @@ gh search code 'ThreadsafeFunction' --repo napi-rs/napi-rs
 Qualifiers work inline too: `language:go`, `path:src`, `filename:package.json`. Quote exact strings with double quotes inside the single-quoted query.
 
 > `gh search code` uses GitHub's legacy code search API. No regex. Results can differ from github.com. If nothing matches, drop a clue and retry.
+
+> `gh search issues` and `gh search repos` wrap one quoted argument as a phrase (`q=( "ios scroll wheel" )`), which almost never matches. Pass words as separate arguments: `gh search issues iPhone scroll --repo owner/repo`.
+
+> HTTP 502/503/504 from search is transient. Wait a few seconds and retry once; do not drop the query.
 
 ## 2. Collect repos from hits
 
