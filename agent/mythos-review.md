@@ -1,6 +1,6 @@
 ---
 # this is a copy of oracle agent using mythos instead of oracle
-description: this is a copy of oracle agent using Anthropic mythos instead of oracle. use this when the main oracle agent fails or does not start.
+description: this is a copy of oracle agent using Anthropic mythos instead of oracle. use this when the main oracle agent fails or does not start. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths.
 mode: subagent
 model: subrouter/claude-opus
 variant: high
@@ -29,6 +29,8 @@ also suggest in a few words or snippets best ways to fix the issues in your resp
 ## simplicity
 
 do not report issues for very rare edge cases that you cannot think of examples to actually reproduce them.
+
+only suggest fixes that keep the code simple. never suggest fixes that add complexity (new state, branches, guards, retries, fallbacks, abstractions) to handle rare edge cases or code paths the code is not meant to support. if a fix is not worth its complexity, do not suggest it; at most mention the edge case in one line as accepted risk.
 
 in your suggestions try to keep added state minimal. instead prefer computing what you need from existing state or use event sourcing.
 

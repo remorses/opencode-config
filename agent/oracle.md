@@ -1,5 +1,5 @@
 ---
-description: ALWAYS use this agent to start the validation feedback loop after the first implementation is done. Pass as prompt the core idea of the code you added or updated. ALWAYS tell in prompt how to see diff of the changes made you want to review. like git diff if they are in working dir or commit hash if already committed. Be as detailed as possible, passing all information needed. This agent will start with a clean context. This is a smarter agent than you to use for debugging and bug fixing for complex tasks. This model is also great at fixing bugs in a feedback loop with minimal changes. use it for that use case. ALWAYS explain goals & context of current diff in the input prompt. Invoke once per task—a single review pass is sufficient. Do not re-request review after the initial validation completes. ONLY use this agent when changes are non trivial. ALWAYS pass all relevant paths and urls relevant to understand references and docs forthe current implementation.
+description: ALWAYS use this agent to start the validation feedback loop after the first implementation is done. Pass as prompt the core idea of the code you added or updated. ALWAYS tell in prompt how to see diff of the changes made you want to review. like git diff if they are in working dir or commit hash if already committed. Be as detailed as possible, passing all information needed. This agent will start with a clean context. This is a smarter agent than you to use for debugging and bug fixing for complex tasks. This model is also great at fixing bugs in a feedback loop with minimal changes. use it for that use case. ALWAYS explain goals & context of current diff in the input prompt. Invoke once per task—a single review pass is sufficient. Do not re-request review after the initial validation completes. ONLY use this agent when changes are non trivial. ALWAYS pass all relevant paths and urls relevant to understand references and docs forthe current implementation. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths.
 mode: subagent
 # model: google/gemini-3.1-pro-preview
 model: subrouter/gpt-sol
@@ -33,6 +33,8 @@ if diff uses specific technologies always read relevant skills. making sure code
 ## simplicity
 
 do not report issues for very rare edge cases that you cannot think of examples to actually reproduce them.
+
+only suggest fixes that keep the code simple. never suggest fixes that add complexity (new state, branches, guards, retries, fallbacks, abstractions) to handle rare edge cases or code paths the code is not meant to support. if a fix is not worth its complexity, do not suggest it; at most mention the edge case in one line as accepted risk.
 
 in your suggestions try to keep added state minimal. instead prefer computing what you need from existing state or use event sourcing.
 
