@@ -1,7 +1,7 @@
 ---
 description: Build agent using GPT 6.1 Sol
 mode: primary
-model: subrouter/gpt-luna
+model: openai/gpt-6-luna
 variant: medium
 permission:
   question: allow
