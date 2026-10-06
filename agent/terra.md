@@ -1,5 +1,5 @@
 ---
-description: Build agent using GPT 6 Sol
+description: Build agent using GPT 6.1 Sol
 mode: primary
 model: subrouter/gpt-terra
 variant: medium

@@ -69,7 +69,7 @@
             "output": 65536
           }
         },
-        "gpt-6-sol": {
+        "gpt-6.1-sol": {
           "limit": {
             "context": 1050000,
             "output": 128000
