@@ -11,7 +11,7 @@ Canonical docs (fetch in full, never truncate):
 - https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
 - https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization
 
-Working example: [Strada](https://github.com/remorses/strada) (`website/src/mcp.ts`, `website/src/db.ts`, `website/src/cimd-fetch.ts`, `db/src/schema.ts`).
+Working examples: [ghosthand](https://github.com/remorses/ghosthand) (`website/src/cimd-fetch.ts`, `website/src/actions.tsx` consent, `website/wrangler.jsonc` flags), tested end to end on a deployed Worker. [Strada](https://github.com/remorses/strada) (`website/src/mcp.ts`, `website/src/db.ts`, `db/src/schema.ts`); its `cimd-fetch.ts` uses `connect()` and fails on Workers, see [CIMD on Workers](#cimd-on-workers).
 
 ```
 MCP client (Cursor, Claude)
@@ -95,7 +95,7 @@ export const auth = betterAuth({
 })
 ```
 
-On Node, pass `fetchClientMetadataResource` from `@better-auth/cimd/node`. On Workers, inject a pinned TLS transport. See [CIMD on Workers](#cimd-on-workers).
+On Node, pass `fetchClientMetadataResource` from `@better-auth/cimd/node`. On Workers, inject a `fetch`-based transport. See [CIMD on Workers](#cimd-on-workers).
 
 `disabledPaths: ['/token']` hides the old JWT plugin token route. MCP uses `/oauth2/token`.
 
@@ -274,35 +274,76 @@ MCP 2026-07-28 deprecates DCR. Always add `cimd()` with `metadataProfile: "mcp-2
 
 Do **not** use `@better-auth/cimd/node` on Workers, Bun, or Deno.
 
-Do **not** DNS-check then `fetch()`. That resolves DNS twice. DNS rebinding can win.
+Do **not** use `connect()` from `cloudflare:sockets` with a pinned IP (Strada's `cimd-fetch.ts`). **Workers TCP sockets cannot reach Cloudflare IP ranges**, and most MCP clients host their metadata behind Cloudflare (claude.ai, trycloudflare tunnels). Authorize then fails with `invalid_client: Failed to fetch metadata document (network error or redirect blocked)`, and nothing is logged. It works in `wrangler dev`, so only a deployed test finds it. https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/
 
-Inject a transport that:
+Use plain `fetch`. On Workers the network boundary already pins: subrequests leave from Cloudflare's edge, which has no private network and refuses special-use addresses. The transport must still:
 
-1. Parses the target as HTTPS before resolving
-2. Resolves the hostname **once** and rejects RFC 6890 special-use addresses on every A and AAAA
-3. Connects to that pinned address while keeping TLS SNI for the original host
-4. Honors abort
-5. Caps the body (64 KiB)
-6. Decodes `Transfer-Encoding: chunked`
-7. Refuses redirects
+1. Accept only HTTPS, and only GET or HEAD
+2. Send `redirect: 'manual'` and throw on any 3xx
+3. Cap the body at 64 KiB while reading the stream
+4. Drop `content-encoding` and `content-length` from the returned headers (the body is decoded)
 
-Same-origin metadata URL: return the known JSON document. No socket.
+```ts
+const MAX_BODY_BYTES = 64 * 1024
 
-Working transport: Strada `website/src/cimd-fetch.ts`.
+export async function fetchCimdOnWorkers(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const request = new Request(input, { ...init, redirect: 'manual' })
+  if (new URL(request.url).protocol !== 'https:') throw new TypeError('CIMD metadata URL must be HTTPS')
+  if (request.method !== 'GET' && request.method !== 'HEAD') throw new TypeError('CIMD transport supports only GET and HEAD')
+  const response = await fetch(request)
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel()
+    throw new TypeError('CIMD metadata redirects are not followed')
+  }
+  if (request.method === 'HEAD' || !response.body) return new Response(null, { status: response.status, headers: response.headers })
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel()
+      throw new TypeError('CIMD response exceeded 64 KiB')
+    }
+    chunks.push(value)
+  }
+  const body = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  const headers = new Headers(response.headers)
+  headers.delete('content-encoding')
+  headers.delete('content-length')
+  return new Response(body, { status: response.status, headers })
+}
+```
+
+Working file: ghosthand `website/src/cimd-fetch.ts` (remorses/ghosthand).
 
 ## Consent page
 
 The user must be signed in first. Redirect to `/login?callbackURL=/consent?...` if not.
 
-Call `auth.api.oauth2Consent` with the request headers. Map `{ url }` to a redirect. Do not call `auth.handler()` from a server action and rewrite `Content-Type`. That can keep stale multipart `Content-Length`.
+Call `auth.api.oauth2Consent` with the request headers **and the request**, plus `asResponse: false`. Map `{ url }` to a redirect. Do not call `auth.handler()` from a server action and rewrite `Content-Type`. That can keep stale multipart `Content-Length`.
 
 ```ts
-const result = await auth.api.oauth2Consent({
+const request = getActionRequest()
+const { url } = await auth.api.oauth2Consent({
   body: { accept, oauth_query: oauthQuery || undefined },
   headers: request.headers,
+  // Accept resumes /oauth2/authorize, which throws 401 "request not found" without it.
+  request,
+  // With `request`, better-call returns a Response unless this is false.
+  asResponse: false,
 })
-if (result.url) throw redirect(result.url)
+throw redirect(url)
 ```
+
+Both traps show only when **Allow** is clicked: headers-only fails with `{"error":"invalid_request","error_description":"request not found"}`, and `request` without `asResponse: false` gives `url === undefined`, so the page silently re-renders. Click Allow in a real browser before shipping.
 
 Show at least:
 
@@ -315,7 +356,9 @@ Generic "Allow access" is not enough. The user must see which CIMD client is ask
 
 ## Protect POST /mcp
 
-`requireMcpAuth` checks the `Authorization` header against JWKS (issuer, audience, expiry, DPoP when bound). Unauthenticated calls get JSON-RPC **401** plus RFC 9728 `WWW-Authenticate`. Missing scopes get **403** `insufficient_scope` so the client can step up.
+`requireMcpAuth` checks the `Authorization` header against JWKS (issuer, audience, expiry, DPoP when bound).
+
+**On Workers, add the `global_fetch_strictly_public` compatibility flag.** `requireMcpAuth` downloads `{baseURL}/jwks` with `fetch`, and a Worker on a custom domain cannot fetch its own hostname without it. Every MCP call then throws `Jwks failed: <none>` (500, error 1101) after a successful token exchange. `wrangler dev` does not show it. The keys are cached in the isolate for 5 minutes, so the extra request is rare. Unauthenticated calls get JSON-RPC **401** plus RFC 9728 `WWW-Authenticate`. Missing scopes get **403** `insufficient_scope` so the client can step up.
 
 If the MCP server is a different origin than Better Auth, use `createMcpProtectedRequestHandler` with explicit `issuer`, `audience`, and `jwksUrl`.
 
@@ -452,13 +495,32 @@ Minimum:
 
 A test that only constructs `Response.json()` does not cover `GET /.well-known/oauth-client`. Call the real route.
 
+### End-to-end with MCP Inspector
+
+Unit tests miss Workers-only failures (CIMD sockets, JWKS self-fetch, consent action). Deploy to preview and run the real flow once with [MCP Inspector](https://github.com/modelcontextprotocol/inspector) v2 and playwriter:
+
+1. `npx -y @modelcontextprotocol/inspector@latest`, add the server as `streamable-http` with the preview `/mcp` URL.
+2. **Turn on CIMD** in Client settings > OAuth Client ID Metadata Document. Without it the Inspector tries DCR, which `mcp()` does not enable, and the server only shows "Failed".
+3. The metadata URL must be public HTTPS and list `http://127.0.0.1:6274/oauth/callback`. Serve it from a small Bun server behind `cloudflared tunnel --url http://localhost:8790`, with `client_id` built from the request's `Host` header and path, and `Content-Type: application/json`.
+4. Sign out of the site first (delete its cookies with CDP `Network.deleteCookies`), so the flow runs Google login, then `/consent`, then the callback.
+5. Consent is remembered per client. To see the consent page again, change the metadata path (`/client2.json`) and click "Clear stored OAuth state" in the server settings.
+6. Test both protocol eras (server settings > Protocol Era: Legacy and Modern).
+7. Watch `wrangler tail --env preview` during the run; library errors (`APIError`, `Jwks failed`) only appear there.
+
+### MCP 2026-07-28 list results
+
+A hand-written stateless server must add `ttlMs` (number) and `cacheScope` (`"public"` or `"private"`) to `tools/list` results (CacheableResult). The Inspector rejects the result without them. Use `"private"` for per-user tools.
+
 ## Do not
 
 - Import `mcp` from `better-auth/plugins`
 - Register `oauthProvider()` next to `mcp()`
 - Enable DCR by default
 - Use `@better-auth/cimd/node` on Workers
-- DNS-check then `fetch()` for CIMD
+- DNS-check then `fetch()` for CIMD on Node
+- Use `connect()` sockets for CIMD on Workers (cannot reach Cloudflare-hosted metadata)
+- Call `oauth2Consent` without `request` and `asResponse: false`
+- Deploy `requireMcpAuth` on Workers without `global_fetch_strictly_public`
 - Put OAuth on a stdio MCP server
 - Skip `jwt()`
 - Skip `/login` or `/consent`

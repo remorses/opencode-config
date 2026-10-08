@@ -136,6 +136,12 @@ This hits libraries that call their own server over HTTP, e.g. better-auth `requ
 
 Add it to every environment that overrides `compatibility_flags`. When the code is yours, call the handler in process instead (`app.handle(request)` or a service binding); use the flag when a dependency does the fetch.
 
+### TCP sockets cannot reach Cloudflare IPs
+
+**`connect()` from `cloudflare:sockets` fails for any host behind Cloudflare** (claude.ai, most SaaS, trycloudflare tunnels). Use `fetch` for HTTP. Do not hand-roll HTTP over a pinned-IP socket for SSRF safety: Worker subrequests already leave from Cloudflare's edge, which cannot reach private networks. `wrangler dev` uses your machine's network, so this also breaks only after deploy. https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/
+
+**Test outbound calls on a deployed preview**, with `wrangler tail --env preview` open: both traps above pass locally.
+
 ## Type-safe environment
 
 ### Generate types with `wrangler types`
