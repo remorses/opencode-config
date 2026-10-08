@@ -645,7 +645,7 @@ export const auth = betterAuth({
 })
 ```
 
-**IMPORTANT: pass `schema: {}` to `deviceAuthorization()`.** In `better-auth@1.6.9+`, the plugin's Zod options schema has `schema: z.custom(() => true)` which is non-optional. Without passing it, the plugin throws a ZodError at init time: `"expected": "nonoptional", "path": ["schema"]`. The `schema` field is only for user-provided table overrides and the plugin merges it with its built-in schema via `mergeSchema()`. Passing an empty object is safe and satisfies the validator. No `as any` cast needed; the published types accept `{}`.
+**IMPORTANT: pass `schema: {}` to `deviceAuthorization()`.** (Optional again in 1.7.x; still safe.) In `better-auth@1.6.9+`, the plugin's Zod options schema has `schema: z.custom(() => true)` which is non-optional. Without passing it, the plugin throws a ZodError at init time: `"expected": "nonoptional", "path": ["schema"]`. The `schema` field is only for user-provided table overrides and the plugin merges it with its built-in schema via `mergeSchema()`. Passing an empty object is safe and satisfies the validator. No `as any` cast needed; the published types accept `{}`.
 
 ```
 // Error without schema field:
@@ -780,6 +780,10 @@ export const app = new Spiceflow()
     },
   })
 ```
+
+**Device flow tips:**
+- Pass `headers: request.headers` to `auth.api.deviceToken()` when you call it from your own route: the new session stores that request's `user-agent` and IP (e.g. `mycli/1.0 (Mac name)`), so a dashboard can list and revoke CLI sessions.
+- In bearer-token API routes the CLI calls, never wrap `getSession` in a catch that returns null. A DB outage then becomes a 401, and a CLI that deletes its token on 401 signs every user out. Let it throw (5xx); catch only for browser pages with stale cookies.
 
 **CLI side** (polling loop):
 

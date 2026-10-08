@@ -945,6 +945,8 @@ Replace `<port>` with your dev server port and the cron expression with the one 
 
 Standard scripts for a Worker package (with D1):
 
+`CI=1` on every `wrangler d1 migrations apply`: without it, apply asks Y/n and blocks `pnpm dev` and deploy scripts.
+
 ```json
 {
   "scripts": {
@@ -952,9 +954,9 @@ Standard scripts for a Worker package (with D1):
     "build": "tsc && vite build",
     "typecheck": "tsc",
     "types": "wrangler types",
-    "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:prod": "echo \"D1 pre-migration timestamp: $(date +%s)\" && wrangler d1 migrations apply DB --remote",
-    "db:migrate:preview": "echo \"D1 pre-migration timestamp: $(date +%s)\" && wrangler d1 migrations apply DB --remote --env preview",
+    "db:migrate:local": "CI=1 wrangler d1 migrations apply DB --local",
+    "db:migrate:prod": "echo \"D1 pre-migration timestamp: $(date +%s)\" && CI=1 wrangler d1 migrations apply DB --remote",
+    "db:migrate:preview": "echo \"D1 pre-migration timestamp: $(date +%s)\" && CI=1 wrangler d1 migrations apply DB --remote --env preview",
     "deploy": "pnpm db:migrate:preview && tsc && CLOUDFLARE_ENV=preview vite build && wrangler deploy --env preview",
     "deploy:prod": "pnpm db:migrate:prod && tsc && vite build && wrangler deploy"
   }

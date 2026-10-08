@@ -147,7 +147,7 @@ This gives autocomplete on `import.meta.env.VITE_*` and fails compilation if you
 | Var | Where from | Notes |
 |---|---|---|
 | `STRIPE_API_KEY` | Copy `sk_test_`/`sk_live_` from `https://dashboard.stripe.com/apikeys` | Server only. Store in sigillo, never in the repo. Also used by Stripe CLI automatically |
-| `STRIPE_WEBHOOK_SECRET` | Dev: `stripe listen --print-secret`. Prod: returned once from `stripe webhook_endpoints create ...` | Server only. Returned only on endpoint creation — capture it |
+| `STRIPE_WEBHOOK_SECRET` | Dev: `stripe listen --print-secret` (fails with `sk_live_` keys: live mode needs `stripe listen --live` after `stripe login`). Prod: returned once from `stripe webhook_endpoints create ...` | Server only. Returned only on endpoint creation — capture it |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Copy `pk_test_`/`pk_live_` from `https://dashboard.stripe.com/apikeys` | Safe to ship to the browser. Must be `VITE_`-prefixed so Vite inlines it into the client bundle |
 
 ### Local dev webhook loop
@@ -1081,6 +1081,10 @@ export const relations = defineRelations({ orgs, subscriptions }, (r) => ({
 The composite primary key `(subscriptionId, variantId)` lets a single subscription carry multiple line items (e.g. base plan + add-on) without the upsert colliding. Use `onConflictDoUpdate({ target: [schema.subscriptions.subscriptionId, schema.subscriptions.variantId], set: record })` for idempotent webhook writes.
 
 ## Common gotchas
+
+- **Shared Stripe account between products.** Webhooks get every product's events. Tag products with `metadata.app`, skip other apps in the handler, and store `stripe_account_id` on customer and subscription rows so a later account switch keeps old subscriptions working.
+- **One customer does not stop two subscriptions.** Two `/subscribe` tabs create two Checkout sessions. Reuse an open one (`checkout.sessions.list({ customer, status: 'open' })`), and turn on "Limit customers to one subscription" in the dashboard.
+- **`current_period_end` moved to `subscription.items.data[n]`** in API version 2025-03-31. Reading it from the subscription gives `undefined`.
 
 
 - **Portal can't switch currency.** Once a sub is USD, it stays USD. If a user wants EUR they have to cancel and re-subscribe. Don't try to build a "change currency" button — Stripe won't let you.
