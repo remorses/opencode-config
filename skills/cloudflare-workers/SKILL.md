@@ -121,6 +121,21 @@ Always use `wrangler.jsonc` (not `wrangler.toml`). Newer features are exclusive 
 }
 ```
 
+### Fetching your own domain: `global_fetch_strictly_public`
+
+**A Worker on a custom domain cannot `fetch()` its own hostname by default.** A same-zone subrequest skips the Worker and goes to the (missing) origin, so it fails. `wrangler dev` hides this: it works locally and breaks only once deployed.
+
+This hits libraries that call their own server over HTTP, e.g. better-auth `requireMcpAuth` fetching `/api/auth/jwks` ("Jwks failed: <none>"). Add the flag so the subrequest goes out to the public internet and back into the Worker:
+
+```jsonc
+{
+  // requireMcpAuth fetches this Worker's own /api/auth/jwks
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"]
+}
+```
+
+Add it to every environment that overrides `compatibility_flags`. When the code is yours, call the handler in process instead (`app.handle(request)` or a service binding); use the flag when a dependency does the fetch.
+
 ## Type-safe environment
 
 ### Generate types with `wrangler types`
