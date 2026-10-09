@@ -5,9 +5,11 @@
     "@ai-sdk/google-vertex": "^4.0.102",
     "@openauthjs/openauth": "^0.4.3",
     "@opencode-ai/plugin": "1.1.51",
+    "@opencode/plugin": "2.0.19",
     "ai": "^6.0.146",
     "kimaki": "^0.4.90",
     "proper-lockfile": "^4.1.2",
+    "string-dedent": "^3.0.2",
     "tree-sitter-bash": "^0.25.0",
     "web-tree-sitter": "^0.26.8"
   },

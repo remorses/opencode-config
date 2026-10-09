@@ -1,10 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@tsconfig/bun/tsconfig.json",
-  "compilerOptions": {},
+  "compilerOptions": { "types": ["bun"] },
   "include": [
     "plugins",
-    "tools",
     "scripts",
     "disabled-plugins/branch-injector.ts",
     // "disabled-plugins/session-lock.ts",
