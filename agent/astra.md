@@ -1,7 +1,7 @@
 ---
 description: Build agent using GPT 6
 mode: primary
-model: subrouter/gpt-astra
+model: openai/gpt-6-astra
 variant: medium
 permission:
   question: allow

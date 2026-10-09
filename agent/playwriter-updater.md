@@ -1,5 +1,5 @@
 ---
-model: subrouter/claude-sonnet
+model: anthropic/claude-sonnet-5-5
 mode: primary
 permission:
   external_directory:

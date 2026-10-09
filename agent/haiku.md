@@ -1,8 +1,8 @@
 ---
 description: Build agent using Haiku
 mode: primary
-model: subrouter/claude-haiku
-variant: medium
+model: anthropic/claude-haiku-5-5
+variant: high
 permission:
   question: allow
   plan_enter: allow

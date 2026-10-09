@@ -2,7 +2,7 @@
 description: Commit, update changelog, npm publish
 # agent: build
 subtask: false
-# model: subrouter/claude-sonnet
+# model: anthropic/claude-sonnet-5-5
 ---
 
 # Publishing npm Packages

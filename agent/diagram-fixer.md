@@ -1,7 +1,7 @@
 ---
 description: Fix ASCII diagrams in markdown, code comments, and docs. Always pass the file path after you create a diagram. Use only for public README/mdx files, never for internal docs.
 mode: subagent
-model: subrouter/explore
+model: opencode-go/glm-5.3-flash
 disable: true
 ---
 

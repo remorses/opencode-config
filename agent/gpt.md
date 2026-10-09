@@ -1,7 +1,7 @@
 ---
 description: Build agent using GPT 6.1 Sol
 mode: primary
-model: subrouter/gpt-terra
+model: openai/gpt-6.1-sol
 variant: medium
 permission:
   question: allow

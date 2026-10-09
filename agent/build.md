@@ -1,7 +1,8 @@
 ---
-description: The default build agent. Routes through subrouter/build so GPT 6.1 Sol, grok, opus 5.5, then GLM flash take over when a subscription dies.
+description: The default build agent using GPT 6.1 Sol.
 mode: primary
-model: subrouter/build
+model: openai/gpt-6.1-sol
+variant: high
 permission:
   question: allow
   doom_loop: allow

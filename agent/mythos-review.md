@@ -1,8 +1,9 @@
 ---
 # this is a copy of oracle agent using mythos instead of oracle
-description: this is a copy of oracle agent using Anthropic mythos instead of oracle. use this when the main oracle agent fails or does not start. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths.
+description: >-
+  this is a copy of oracle agent using Anthropic mythos instead of oracle. use this when the main oracle agent fails or does not start. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths.
 mode: subagent
-model: subrouter/claude-opus
+model: anthropic/claude-opus-5-5
 variant: high
 permission:
   question: deny

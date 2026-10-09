@@ -16,7 +16,7 @@
     ]
   },
 
-  "model": "subrouter/gpt-sol",
+  "model": "anthropic/claude-opus-5-5",
 
   // "mode": {
   //   "build": {
@@ -160,10 +160,10 @@
     }
   },
   "plugin": [
-    "/Users/morse/Documents/GitHub/kimakivoice/subrouter/opencode/src/index.ts",
     // "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
     "/Users/morse/Documents/GitHub/kimakivoice/cli/src/anthropic-auth-plugin.ts",
     "/Users/morse/Documents/GitHub/kimakivoice/cli/src/openai-auth-plugin.ts",
+    "/Users/morse/Documents/GitHub/kimakivoice-cli2/kimaki/src/plugin/anthropic",
     // "kitty-graphics-agent",
     // "opencode-cursor-oauth"
     // "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
@@ -223,5 +223,7 @@
     //     "bash": "allow"
     //   }
     // }
-  }
+  },
+  "websearch": { "provider": "random" }
+
 }

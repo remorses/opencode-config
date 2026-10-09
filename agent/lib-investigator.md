@@ -1,7 +1,8 @@
 ---
 description: Read source code of libraries and dependencies to answer some specific question. always use this agent to efficiently explore and answer questions about dependencies. Can use many at the same time in parallel to answer separate questions
 mode: subagent
-model: subrouter/explore
+model: openai/gpt-6-luna
+variant: high
 permission:
   question: deny
 ---
