@@ -5,23 +5,19 @@ description: >
   When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions. 
   NEVER use explore agent to read skills. use the skill tool directly instead.
 mode: subagent
-source: https://github.com/anomalyco/opencode/blob/7417c869fcecb3f0e6989f4f349df07a6b8ede8d/packages/opencode/src/agent/agent.ts#L13
-model: openai/gpt-6-luna
-variant: high
-permission:
-  "*": "deny"
-  grep: "allow"
-  glob: "allow"
-  list: "allow"
-  bash: "allow"
-  read:
-    "*": "allow"
-    "*.env": "deny"
-    "*.env.*": "deny"
-    "*.env.example": "allow"
-  webfetch: "allow"
-  websearch: "allow"
-  codesearch: "allow"
+# source: https://github.com/anomalyco/opencode/blob/7417c869fcecb3f0e6989f4f349df07a6b8ede8d/packages/opencode/src/agent/agent.ts#L13
+model: openai/gpt-6-luna#high
+permissions:
+  - { action: "*", resource: "*", effect: deny }
+  - { action: "grep", resource: "*", effect: allow }
+  - { action: "glob", resource: "*", effect: allow }
+  - { action: "shell", resource: "*", effect: allow }
+  - { action: "read", resource: "*", effect: allow }
+  - { action: "read", resource: "*.env", effect: deny }
+  - { action: "read", resource: "*.env.*", effect: deny }
+  - { action: "read", resource: "*.env.example", effect: allow }
+  - { action: "webfetch", resource: "*", effect: allow }
+  - { action: "websearch", resource: "*", effect: allow }
 ---
 
 You are a file search specialist. You excel at thoroughly navigating and exploring codebases.

@@ -1,12 +1,7 @@
 ---
 description: Build agent using Composer 2.5
 mode: primary
-model: xai/grok-composer-2.5
-variant: high
-permission:
-  question: allow
-  doom_loop: allow
-  plan_enter: allow
+model: xai/grok-composer-2.5#high
 ---
 
 DO NOT start editing, creating files, running bash commands with side effects unless asked by the user

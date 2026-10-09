@@ -1,15 +1,9 @@
 ---
 description: Build agent using GPT 6.1 Sol
 mode: primary
-model: openai/gpt-6-luna
-variant: medium
-permission:
-  question: allow
-  plan_enter: allow
-  task:
-    "*": allow
-    oracle: deny
-    image-understanding: deny
+model: openai/gpt-6-luna#medium
+permissions:
+  - { action: "subagent", resource: "oracle", effect: deny }
 ---
 
 

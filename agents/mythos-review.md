@@ -3,10 +3,9 @@
 description: >-
   this is a copy of oracle agent using Anthropic mythos instead of oracle. use this when the main oracle agent fails or does not start. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths.
 mode: subagent
-model: anthropic/claude-opus-5-5
-variant: high
-permission:
-  question: deny
+model: anthropic/claude-opus-5-5#high
+permissions:
+  - { action: "question", resource: "*", effect: deny }
 ---
 
 ALWAYS read current git diff or commits range diff to see the changes made by parent agent.

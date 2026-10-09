@@ -2,7 +2,7 @@
 description: Fix ASCII diagrams in markdown, code comments, and docs. Always pass the file path after you create a diagram. Use only for public README/mdx files, never for internal docs.
 mode: subagent
 model: opencode-go/glm-5.3-flash
-disable: true
+disabled: true
 ---
 
 You are a diagram fixer. Your job is to take ASCII diagrams and fix them so they render perfectly in monospaced terminal fonts with no visual gaps or misalignment.

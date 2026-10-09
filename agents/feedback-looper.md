@@ -2,15 +2,10 @@
 description: >-
   Smart agent that accepts an input prompt with a defined feedback loop and a problem, it can run for a long time as a subagent and fix the issue given the feedback loop. Useful to save context when fixing an unkown issue when we have a well defined feedback loop (like a test suite failing, tsc or build script failing). Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths.
 mode: subagent
-model: openai/gpt-6.1-sol
-variant: medium
-permission:
-  question: deny
-  plan_enter: allow
-  task:
-    "*": allow
-    oracle: deny
-    image-understanding: deny
+model: openai/gpt-6.1-sol#medium
+permissions:
+  - { action: "question", resource: "*", effect: deny }
+  - { action: "subagent", resource: "oracle", effect: deny }
 ---
 
 DO NOT over engineer. keep code simple. do not care about backwards compatibility
