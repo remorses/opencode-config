@@ -1,6 +1,6 @@
 ---
 description: grok
-mode: primary
+mode: all
 model: xai/grok-4.7
 variant: medium
 permission:
