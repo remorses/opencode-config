@@ -45,7 +45,7 @@
       }
     }
   },
-  "plugins": ["/Users/morse/Documents/GitHub/kimakivoice-cli2/kimaki/src/plugin/anthropic"],
+  "plugins": ["/Users/morse/Documents/GitHub/kimakivoice/kimaki/dist/plugin/anthropic"],
   "formatter": false,
   "permissions": [
     { "action": "external_directory", "resource": "*", "effect": "allow" },
