@@ -1,9 +1,12 @@
 ---
-$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/opencode-command.schema.json
-description: Commit in groups
-# agent: build
-subagent: false
-# model: anthropic/claude-sonnet-5-5
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
+name: commit
+description: >
+  Commit all uncommitted changes split into focused, detailed commits grouped by
+  goal (including submodules). Covers .gitignore cleanup, splitting by file or
+  hunk, finding the session that edited each file with `kimaki session editors`,
+  and the `Session: ses_xxx` trailer. Load when the user asks to commit, "commit
+  all", or commit in groups.
 ---
 
 see git diff. if there are submodules also see their diff too.
@@ -43,4 +46,4 @@ Session: ses_xxx
 
 if this session edited the files, use the current session id. if files come from different sessions, split into one commit per session.
 
-NEVER ask for confirmation before committing. The user invoking this command IS the confirmation. Just do the commits directly without asking "should I proceed?" or showing a plan and waiting. Execute immediately.
+NEVER ask for confirmation before committing. The user asking to commit IS the confirmation. Just do the commits directly without asking "should I proceed?" or showing a plan and waiting. Execute immediately.

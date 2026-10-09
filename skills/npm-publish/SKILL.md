@@ -1,9 +1,13 @@
 ---
-$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/opencode-command.schema.json
-description: Commit, update changelog, npm publish
-# agent: build
-subagent: false
-# model: anthropic/claude-sonnet-5-5
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
+name: npm-publish
+description: >
+  Release an npm package end to end: commit pending work, pick the semver bump,
+  write the CHANGELOG (or consume .changeset files manually), publish with the
+  lockfile's package manager (never npm publish in pnpm/bun repos, workspace:^
+  leaks), tag, push, create the GitHub release, and deploy the website/ folder via its deploy script.
+  Covers monorepo order and prerelease --tag. ALWAYS load when asked to publish,
+  release, or bump a package version.
 ---
 
 # Publishing npm Packages
@@ -385,15 +389,11 @@ Include external contributors: "Thanks @username for #42!"
 
 **Submodule packages:** Run `gh release` from inside the submodule directory.
 
-## Step 8: Deploy Holocron website docs if present
+## Step 8: Deploy the website if present
 
-After the npm publish and GitHub release, keep docs in sync with the new package version.
+After the npm publish and GitHub release, deploy the website so docs match the new package version.
 
-Do this only when **all** of these are true:
-
-1. A `website/` folder exists in the repo (also check `docs/` only if that is clearly the Holocron site, not a random markdown folder)
-2. That folder uses **Holocron**. Confirm from its `package.json` (`@holocron.so/vite`, `@holocron.so/cli`, or `holocron`) or from `docs.json` / `docs.jsonc` / `holocron.jsonc`
-3. You just published npm packages from this repo
+Do this when a `website/` folder exists in the repo and has a `package.json`. Also check `docs/` only if it is clearly a website package (has its own `package.json`), not a random markdown folder. Any framework counts (Holocron, Vite, Next, Spiceflow, etc).
 
 **Only run a script from that folder's `package.json`.** Never run raw `wrangler deploy`, `vite build`, `npx holocron deploy`, or any other deploy command you invent.
 
@@ -413,7 +413,7 @@ Run it with the repo package manager **from inside the website folder**:
 cd website && pnpm deployment:production
 ```
 
-Skip this step if there is no website folder, no Holocron dependency, or no `deploy` / `deployment` script.
+Skip this step if there is no website folder or no `deploy` / `deployment` script.
 
 ## Step 9: Handle Publish Failures
 

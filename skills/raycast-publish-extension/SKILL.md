@@ -1,7 +1,11 @@
 ---
-$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/opencode-command.schema.json
-model: anthropic/claude-sonnet-5-5
-subagent: true
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
+name: raycast-publish-extension
+description: >
+  Publish a Raycast extension update: build to validate, add a CHANGELOG entry
+  with {PR_MERGE_DATE}, run `npm run publish` (opens or updates a PR in
+  raycast/extensions), pull contributions, then edit the PR title/body and
+  watch checks with gh. Load when asked to publish or update a Raycast extension.
 ---
 
 # publishing an extension update

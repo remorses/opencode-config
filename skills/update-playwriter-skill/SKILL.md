@@ -1,7 +1,12 @@
 ---
-$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/opencode-command.schema.json
-description: learn new things about playwriter and store them to skill.md
-agent: playwriter-updater
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
+name: update-playwriter-skill
+description: >
+  Self-improve the playwriter skill: reflect on past playwriter mistakes and
+  unclear docs from this session, then update
+  /Users/morse/Documents/GitHub/playwriter/playwriter/src/skill.md with minimal
+  diffs, commit it, and return a critique link. Load when the user asks to
+  update, improve, or store learnings into the playwriter skill.
 ---
 
 based on your past interactions with playwriter think deeply:

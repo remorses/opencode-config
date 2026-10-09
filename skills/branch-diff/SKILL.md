@@ -1,7 +1,12 @@
 ---
-$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/opencode-command.schema.json
-description: get branch diff.
-model: anthropic/claude-sonnet-5-5
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
+name: branch-diff
+description: >
+  Show the full diff of the current branch against the upstream default branch
+  (upstream/main if the repo is a fork, else origin/main). Covers finding the
+  base ref with gh, listing commits, --stat overview, excluding lock and
+  generated files with pathspecs, and paginating large diffs with sed. Load
+  when asked to review a branch, PR, or "what changed on this branch".
 ---
 
 # Compare Current Branch Against Upstream Default
