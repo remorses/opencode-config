@@ -1,6 +1,7 @@
 ---
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/opencode-command.schema.json
 model: anthropic/claude-sonnet-5-5
-subtask: true
+subagent: true
 ---
 
 # publishing an extension update
