@@ -1,4 +1,5 @@
 ---
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
 name: pnpm
 description: Use to debug why a specific package has duplicate dependencies in a pnpm project's node_modules, which can cause type-checking and bundler errors or duplicate singleton instances such as React contexts. Also use for pnpm workspace dependency updates, and when a just-published package version will not install or update (minimumReleaseAge blocks it). NEVER use package.json overrides to update or align versions; use `pnpm update -r <package>` instead.
 ---

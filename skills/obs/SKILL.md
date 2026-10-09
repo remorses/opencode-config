@@ -1,4 +1,5 @@
 ---
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
 name: obs
 description: >
   Control OBS Studio via CLI using obs-cmd and obs-websocket v5.

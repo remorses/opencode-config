@@ -1,4 +1,5 @@
 ---
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
 name: changesets
 description: >
   Changeset-based versioning workflow. Manually add .changeset/*.md files to

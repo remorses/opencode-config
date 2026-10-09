@@ -1,4 +1,5 @@
 ---
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
 name: napi
 description: >
   Build native Node.js addons in Rust with napi-rs. Covers the napi config,

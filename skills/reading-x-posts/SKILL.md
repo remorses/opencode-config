@@ -1,4 +1,5 @@
 ---
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
 name: reading-x-posts
 description: >
   Read tweets and threads from X (Twitter). Use when the user shares an

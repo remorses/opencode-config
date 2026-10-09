@@ -1,4 +1,5 @@
 ---
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
 name: react-pdf
 description: >
   Generate professional PDF reports using @react-pdf/renderer in Node.js scripts.

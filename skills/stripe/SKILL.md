@@ -1,4 +1,5 @@
 ---
+$schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
 name: stripe
 description: >
   Stripe billing patterns for spiceflow + Drizzle apps. Covers creating
