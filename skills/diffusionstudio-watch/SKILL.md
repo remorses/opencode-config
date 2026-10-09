@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: diffusionstudio-watch
 description: >-
   Watch and understand footage with Diffusion Studio via the `dapi` CLI: answer 

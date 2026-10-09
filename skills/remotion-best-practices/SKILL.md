@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: remotion-best-practices
 description: Best practices for Remotion - Video creation in React
 metadata:

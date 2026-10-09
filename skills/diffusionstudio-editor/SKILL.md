@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: diffusionstudio-editor
 description: >-
   Understand, generate, and edit footage with Diffusion Studio via the `dapi`
