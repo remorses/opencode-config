@@ -16,3 +16,4 @@ opensrc/
 # local secrets and kimaki-generated plugin
 service-local.json
 plugins/kimaki/
+service.json
