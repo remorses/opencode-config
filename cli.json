@@ -10,6 +10,9 @@
     "speed": 6,
     "acceleration": true
   },
+  "prompt": {
+    "paste": "full"
+  },
   "diffs": {
     "wrap": "word"
   },

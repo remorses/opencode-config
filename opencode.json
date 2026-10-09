@@ -1,66 +1,33 @@
 {
-  "$schema": "https://opencode.ai/config.json",
-  "lsp": false,
-
-
-  "compaction": {
-
-    "prune": true
-  },
-  "skills": {
-
-    "paths": [
-      "/Users/morse/Documents/GitHub/kimakivoice/cli/skills",
-      "/Users/morse/.config/opencode/skills-repo/skills",
-      "/Users/morse/.config/opencode/private-skills/skills"
-    ]
-  },
-
+  "$schema": "https://gist.githubusercontent.com/remorses/776ab3907d24c1fe9749232f0189588a/raw/opencode-v2-config.schema.json",
   "model": "anthropic/claude-opus-5-5",
-
-  // "mode": {
-  //   "build": {
-  //     "prompt": "You are Claude Code, Anthropic's official CLI for Claude."
-  //   },
-  //   "plan": {
-  //     "prompt": "You are Claude Code, Anthropic's official CLI for Claude."
-  //   }
-  // },
-  "provider": {
-    "cursor": {
-      "name": "Cursor"
-    },
-    "opencode": {
-      "models": {
-        "glm-4.6": {
-          "options": {
-            "reasoning": {
-              "enabled": true
-            }
-          }
-        }
-      }
-    },
-
+  "skills": [
+    "/Users/morse/Documents/GitHub/kimakivoice/cli/skills",
+    "/Users/morse/.config/opencode/skills-repo/skills",
+    "/Users/morse/.config/opencode/private-skills/skills"
+  ],
+  "providers": {
     "xai": {
       "models": {
         "grok-composer-2.5": {
           "name": "Grok Composer 2.5",
-          "attachment": true,
-          "tool_call": true,
+          "capabilities": {
+            "tools": true,
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
           "limit": {
             "context": 256000,
             "output": 256000
           },
           "cost": {
-            "input": 0.50,
-            "output": 2.50,
-            "cache_read": 0.20
+            "input": 0.5,
+            "output": 2.5,
+            "cache": { "read": 0.2 }
           }
-        },
+        }
       }
     },
-
     "openai": {
       "models": {
         "gpt-5.3-codex": {
@@ -76,154 +43,13 @@
           }
         }
       }
-    },
-
-    // "claudecode": {
-    //   "npm": "file:///Users/morse/Documents/GitHub/ai-sdk-provider-claude-code/src/claude-code-provider.ts",
-
-    //   "name": "Claude Code SDK",
-    //   "options": {
-
-    //     // "baseURL": "https://api.myprovider.com/v1",
-    //     // "apiKey": "{env:ANTHROPIC_API_KEY}",
-    //     // "headers": {
-    //     //   "Authorization": "Bearer custom-token"
-    //     // }
-    //   },
-    //   "models": {
-    //     "opus": {
-    //       "name": "Claude Code Opus",
-    //       "limit": {
-    //         "context": 200000,
-    //         "output": 65536
-    //       }
-    //     },
-    //     "haiku": {
-    //       "name": "Claude Code Haiku",
-    //       "limit": {
-    //         "context": 200000,
-    //         "output": 65536
-    //       }
-    //     },
-    //   }
-    // },
-
-    "anthropic": {
-      "name": "Anthropic",
-      "models": {
-        "claude-sonnet-5-5": {
-          // "options": {
-          //   "thinking": {
-          //     "type": "enabled",
-          //     "budgetTokens": 16000
-          //   }
-          // }
-        },
-        "claude-opus-4-8": {
-          "limit": {
-            "context": 500000,
-            "output": 128000
-          },
-          "options": {
-            "thinking": {
-              "type": "enabled",
-              "budgetTokens": 30000
-            }
-          }
-        },
-        "claude-opus-4-5": {
-          "options": {
-            "thinking": {
-              "type": "enabled",
-              "budgetTokens": 16000
-            }
-          }
-        },
-        "claude-opus-4-1": {
-          "options": {
-            "thinking": {
-              "type": "enabled",
-              "budgetTokens": 16000
-            }
-          }
-        },
-        "claude-opus-4-0": {
-          "options": {
-            "thinking": {
-              "type": "enabled",
-              "budgetTokens": 16000
-              // "budgetTokens": 16000
-            }
-          }
-        }
-      }
     }
   },
-  "plugin": [
-    // "/Users/morse/kimaki/mappamundi/opencode/src/index.ts",
-    "/Users/morse/Documents/GitHub/kimakivoice/cli/src/anthropic-auth-plugin.ts",
-    "/Users/morse/Documents/GitHub/kimakivoice/cli/src/openai-auth-plugin.ts",
-    "/Users/morse/Documents/GitHub/kimakivoice-cli2/kimaki/src/plugin/anthropic",
-    // "kitty-graphics-agent",
-    // "opencode-cursor-oauth"
-    // "/Users/morse/Documents/GitHub/opencode-anthropic-auth/index.mjs",
-    // "@tarquinen/opencode-dcp", SHIT. breaks claude rules of thinking
-    // "/Users/morse/kimaki/codex-multi-auth/index.ts", SHIT. breaks everything. codex 5.3 does not work.probably uses the API for some reason! spent a lot of money on API for no reason
-    // "oc-chatgpt-multi-auth@latest", SHIT. does not even work
-    // "opencode-google-antigravity-auth" https://github.com/shekohex/opencode-google-antigravity-auth/issues/39
-  ],
-  "mcp": {
-    // "playwriter": {
-    //   "type": "local",
-    //   "command": [
-    //     "tsx",
-    //     "/Users/morse/Documents/GitHub/playwriter/playwriter/src/cli.ts"
-    //   ],
-    //   "environment": {
-    //     "PLAYWRITER_LOG_FILE_PATH": "/Users/morse/.config/opencode/playwriter.log",
-    //     "PLAYWRITER_NODE_ENV": "development",
-    //     "PLAYWRITER_AUTO_ENABLE": "1"
-    //   }
-    // }
-  },
-
+  "plugins": ["/Users/morse/Documents/GitHub/kimakivoice-cli2/kimaki/src/plugin/anthropic"],
   "formatter": false,
-
-  "permission": {
-    "edit": {
-      "*": "allow",
-      "/Users/morse/Documents/GitHub/kimakivoice/cli/skills/*": "deny"
-    },
-    "write": {
-      "*": "allow",
-      "/Users/morse/Documents/GitHub/kimakivoice/cli/skills/*": "deny"
-    },
-    "apply_patch": {
-      "*": "allow",
-      "/Users/morse/Documents/GitHub/kimakivoice/cli/skills/*": "deny"
-    },
-    "bash": "allow",
-    "external_directory": {
-      "*": "allow"
-    },
-    "webfetch": "allow"
-  },
-
-  "experimental": {
-    "disable_paste_summary": true,
-    // "openTelemetry": true
-  },
-  "agent": {
-
-    // "plan": {
-    //   "mode": "primary",
-    //   "prompt": "{file:./prompts/PLAN.md}",
-    //   "permission": {
-    //     "edit": "deny",
-    //     "bash": "allow"
-    //   }
-    // }
-  },
+  "permissions": [
+    { "action": "external_directory", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": "/Users/morse/Documents/GitHub/kimakivoice/cli/skills/*", "effect": "deny" }
+  ],
   "websearch": { "provider": "random" }
-
 }
