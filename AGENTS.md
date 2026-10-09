@@ -98,6 +98,7 @@ Run `lintcn lint` at the end of an editing session, inside the edited package (n
 
 - Ask before creating PRs/issues only if the repo owner is not remorses. Never close a PR or issue without my confirmation.
 - Load the `github-prs` skill before creating or editing PRs, issues, comments, releases, or review replies.
+- PRs, issues, and comments must be super concise: a few short lines. No code refs, no file lists, no long explanations unless I ask.
 - Load the `gh-search` skill before guessing how an API or pattern is used.
 
 ## tools
