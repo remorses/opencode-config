@@ -4,6 +4,10 @@ Report to me in chat in concise ASD-STE100 Simplified Technical English. I have 
 
 ## code quality
 
+Write typescript in the style of Mario Zechner badlogic (creator of pi mono) and Anthony Fu antfu. Simple, explicit, a few but elegant abstractions where they are really worth it. 
+
+Always think of the codebase architecture before starting writing code. it must be clear to you where each system boundary is and what is the best way to implement a feature or fix. For new projects always plan using architecture diagrams. Keep a concise architecture summary in the AGENTS.md, add it if missing. Keeping it updated with new changes.
+
 No hacks, workarounds, monkey patches, or duct tape. Fix the underlying flaw properly, or say honestly that the task can't be done without a hack. Never ship partial solutions.
 
 Backwards compatibility does not matter. If something is poorly designed, fix it even if it breaks APIs.
