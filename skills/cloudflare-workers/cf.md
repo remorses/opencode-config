@@ -416,6 +416,76 @@ export async function getDb() {
 - Hyperdrive caches reads and does not invalidate them on writes. For auth, sessions or permissions reads, add a second Hyperdrive config with caching disabled.
 - Placement next to the DB matters when one request runs many queries.
 
+## PlanetScale preview branch
+
+A preview environment gets its **own branch, role, Hyperdrive config, Sigillo env and Worker**. Nothing is shared with production except the database name.
+
+```
+main branch ──▶ role clamor-app ──▶ Hyperdrive my-app         ──▶ Worker my-app          (sigillo prod)
+preview branch ─▶ role clamor-app ──▶ Hyperdrive my-app-preview ──▶ Worker my-app-preview (sigillo preview)
+```
+
+**Cost:** a new branch starts as a development branch on **PS-DEV** (single node, no replicas), from **$5/month**, billed per millisecond. It is the cheapest size; PS-5 single node is also $5. Cloudflare-billed databases put every branch on the Cloudflare invoice at PlanetScale prices. Each branch includes 10 GB storage.
+
+**Postgres branches are empty.** No schema, no data is copied from the parent (`--from` only sets the parent). Run your migrations on the new branch. Use `--seed-data` or `--restore` only if you want prod data; they default to PS-10 and cost more.
+
+**No blockers on Postgres.** Deploy requests, safe migrations and branch protection are Vitess only. `drizzle-kit migrate` applies DDL to each branch directly. Check with `pscale database show <db> --format json`: `require_approval_for_deploy` must be `false`.
+
+```bash
+PS=pscale   # needs v0.313+; always pass </dev/null in agent shells
+
+# 1. branch, same region as main (region cannot change later)
+$PS branch create my-app preview --org <ORG> --from main --region us-east --wait </dev/null
+
+# 2. role with migration rights (same as main), JSON holds the password: never print it
+$PS role create my-app preview app --org <ORG> --inherited-roles postgres --format json </dev/null > ./tmp/role.json
+
+# 3. DATABASE_URL into sigillo; pscale gives sslmode=verify-full, node-postgres wants require
+jq -r '.database_url | sub("sslmode=verify-full"; "sslmode=require")' ./tmp/role.json | tr -d '\n' \
+  | sigillo secrets set DATABASE_URL -c preview
+
+# 4. Hyperdrive with caching disabled (password goes through $(), never through the chat)
+wrangler hyperdrive create my-app-preview --caching-disabled \
+  --connection-string="$(jq -r '.database_url | sub("\\?.*$"; "")' ./tmp/role.json)"
+rm ./tmp/role.json
+
+# 5. other secrets: copy shared ones, generate new auth secret
+sigillo secrets get GOOGLE_CLIENT_ID -c prod | sigillo secrets set GOOGLE_CLIENT_ID -c preview
+openssl rand -base64 32 | tr -d '\n' | sigillo secrets set BETTER_AUTH_SECRET -c preview
+```
+
+Wrangler config. Bindings are not inherited, routes are: `"routes": []` keeps preview off the production domain.
+
+```jsonc
+"env": {
+  "preview": {
+    "name": "my-app-preview",
+    "placement": { "region": "aws:us-east-1" },
+    "assets": { "binding": "ASSETS", "run_worker_first": true },
+    "observability": { "enabled": true, "traces": { "enabled": true } },
+    "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<PREVIEW_HYPERDRIVE_ID>" }],
+    "secrets": { "required": ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
+    "routes": [],
+    "workers_dev": true
+  }
+}
+```
+
+With `cloudflare.config.ts`, the same thing is a mode branch: `hyperdriveId` and `domains` per mode (see the modes example above, `domains: []` for workers.dev).
+
+```json
+{
+  "db:migrate:preview": "sigillo run -c preview -- drizzle-kit migrate",
+  "secrets:preview": "sigillo secrets download -c preview --format env | wrangler secret bulk --env preview",
+  "deploy:preview": "pnpm db:migrate:preview && tsc && CLOUDFLARE_ENV=preview sigillo run -c preview --command 'CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=$DATABASE_URL vite build' && wrangler deploy --env preview"
+}
+```
+
+- **Spiceflow prerender runs `vite preview`**, which refuses to start a Hyperdrive binding without `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`. Set it from the env's `DATABASE_URL` during `vite build`, as above.
+- **First deploy:** the workers.dev URL is unknown until the Worker exists. Set `BETTER_AUTH_URL` to a placeholder, deploy with `sigillo run -c preview --mount ./tmp/s.env --mount-format env -- wrangler deploy --env preview --secrets-file ./tmp/s.env`, then set the real URL and run `secrets:preview`.
+- Add the preview origin and `/api/auth/callback/google` to the **existing** Google OAuth client. One client per product, not per env.
+- Long-lived preview branch: keep it on PS-DEV, run every migration on preview first, never point local dev at it unless you want shared state.
+
 ## Migrate a wrangler project
 
 ```bash
