@@ -20,16 +20,31 @@ Drizzle ORM conventions for all my TypeScript projects.
 
 If the project is **deployed on Cloudflare** or uses **D1**, **Hyperdrive**, **Durable Objects**, `wrangler`, or `cloudflare:workers`, you MUST also read the companion doc `./cloudflare.md` before writing code. That file contains the Cloudflare-only runtime, driver, and migration rules.
 
-## CRITICAL: Always use drizzle beta, NEVER v0
+## CRITICAL: Always use drizzle 1.0 rc, NEVER v0
 
-Always install `drizzle-orm@beta` and `drizzle-kit@beta` (currently 1.0.0-beta.x). NEVER use `drizzle-orm@latest` which resolves to v0.x — it lacks `defineRelations`, 2-param `DrizzleSqliteDODatabase`, and other v1 features used throughout this skill.
+Always install `drizzle-orm@rc` and `drizzle-kit@rc` (currently 1.0.0-rc.x). NEVER use `drizzle-orm@latest`, which resolves to v0.x: it lacks `defineRelations` and the other v1 features used in this skill. Projects still on `@beta` move with one command, from the workspace root:
 
 ```bash
-pnpm install drizzle-orm@beta
-pnpm install drizzle-kit@beta --save-dev
+pnpm install drizzle-orm@rc
+pnpm install drizzle-kit@rc --save-dev
+# existing projects on beta
+pnpm update -r drizzle-orm@rc drizzle-kit@rc
 ```
 
-**Docs reference:** https://orm.drizzle.team/llms.txt — full docs index for LLMs. Fetch this when you need to look up something not covered here.
+**The rc config takes `relations` only, never `schema`.** Every driver types its config as `Omit<DrizzleConfig, 'schema'>`, and database types have one type parameter:
+
+```ts
+const db = drizzle({ connection: process.env.DATABASE_URL!, relations: schema.relations })
+type Db = DrizzleSqliteDODatabase<typeof schema.relations>
+```
+
+Because the db no longer carries the tables (`db._.fullSchema` is gone), libraries that read them from the db need them passed in. better-auth's drizzle adapter:
+
+```ts
+database: drizzleAdapter(db, { provider: 'pg', schema }),
+```
+
+**drizzle-kit checks the drizzle-orm it resolves.** It imports `drizzle-orm/version` and requires the same `compatibilityVersion` (14 for 1.0 rc). A second drizzle-orm copy hoisted by pnpm (e.g. from another workspace package) makes every kit command fail with "This version of drizzle-kit is outdated" or "Please install latest version of drizzle-orm". Fix it by moving all packages to the same rc line, not by pinning around it.
 
 ## CRITICAL: Duplicate drizzle-orm in pnpm monorepos
 
@@ -102,7 +117,6 @@ export const db = drizzle({
     url: process.env.DATABASE_URL!,
     authToken: process.env.DATABASE_AUTH_TOKEN!,
   },
-  schema,
   relations: schema.relations,
 })
 ```
@@ -632,7 +646,7 @@ Docs: https://orm.drizzle.team/docs/zod
 
 Always prefer generating Zod schemas from your Drizzle tables instead of duplicating the same fields by hand in API code. This keeps validation, OpenAPI output, and DB schema in sync.
 
-If the repo uses Drizzle v1 beta (`drizzle-orm@1.0.0-beta.x`), import from `drizzle-orm/zod` directly. Only use `drizzle-zod` on older Drizzle versions.
+If the repo uses Drizzle v1 (`drizzle-orm@1.0.0-rc.x` or beta), import from `drizzle-orm/zod` directly. Only use `drizzle-zod` on older Drizzle versions.
 
 ```ts
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-orm/zod'
@@ -933,7 +947,6 @@ export const db = drizzle({
     url: process.env.DATABASE_URL!,
     authToken: process.env.DATABASE_AUTH_TOKEN!,
   },
-  schema,
   relations: schema.relations,
 })
 ```
@@ -989,7 +1002,6 @@ export const db = drizzle({
     url: process.env.DATABASE_URL!,
     authToken: process.env.DATABASE_AUTH_TOKEN!,
   },
-  schema,
   relations: schema.relations,
 })
 ```
@@ -1187,7 +1199,13 @@ Drizzle-orm does not read migration files at runtime; they are pure output. The 
 5. For Postgres/libSQL: the generated file can be used directly after review
 6. Apply the migration with the database's native tool
 
-If `drizzle-kit generate` fails (interactive prompts on renames, TTY errors in CI), write the migration SQL directly instead. Read existing migration files and `schema.ts` to understand the current and desired state.
+When `drizzle-kit generate` cannot tell a rename from a create, it asks interactively, or in a non-TTY shell prints `missing_hints` and exits 2. Answer non-interactively with `--hints`, using the JSON it prints:
+
+```bash
+pnpm drizzle-kit generate --hints '[{"type":"create","kind":"index","entity":["public","post","post_slug_unique"]}]'
+```
+
+If generation still fails, write the migration SQL directly instead. Read existing migration files and `schema.ts` to understand the current and desired state.
 
 **Before writing any migration, always read:**
 - All existing `.sql` migration files in the migrations directory (to know the current DB state)

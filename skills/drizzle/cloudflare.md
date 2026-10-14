@@ -56,7 +56,7 @@ export function getDb(d1: D1Database = env.DB) {
         return { rows: rows as any[] }
       })
     },
-    { schema, relations: schema.relations },
+    { relations: schema.relations },
   )
 }
 ```
@@ -67,7 +67,7 @@ When a project uses **D1 inside Workers** and also needs **Node.js/Bun scripts**
 
 This is the canonical runtime example for remote D1 access from Node.js or Bun.
 
-**Important:** in Drizzle beta, `driver: 'd1-http'` exists in **drizzle-kit config**, but there is **no public runtime import** `drizzle-orm/d1-http`. The Drizzle repo itself handles `d1-http` in `drizzle-kit/src/cli/connections.ts` by importing `drizzle-orm/sqlite-proxy` and calling the Cloudflare D1 HTTP API with `fetch()`. So the runtime pattern for Node.js/Bun scripts should be `drizzle-orm/sqlite-proxy`, not `drizzle-orm/d1-http`.
+**Important:** in Drizzle 1.0, `driver: 'd1-http'` exists in **drizzle-kit config**, but there is **no public runtime import** `drizzle-orm/d1-http`. The Drizzle repo itself handles `d1-http` in `drizzle-kit/src/cli/connections.ts` by importing `drizzle-orm/sqlite-proxy` and calling the Cloudflare D1 HTTP API with `fetch()`. So the runtime pattern for Node.js/Bun scripts should be `drizzle-orm/sqlite-proxy`, not `drizzle-orm/d1-http`.
 
 **Rule:** Both Workers and Node entrypoints use `drizzle-orm/sqlite-proxy` as the runtime driver. Import `D1Database` as a **type only** from `drizzle-orm/d1` for typing the binding parameter. The Workers entrypoint calls D1 APIs directly via inline callbacks; the Node entrypoint calls the D1 HTTP API.
 
@@ -122,7 +122,7 @@ export function getDb(d1: D1Database = env.DB) {
         return { rows: rows as any[] }
       })
     },
-    { schema, relations: schema.relations },
+    { relations: schema.relations },
   )
 }
 ```
@@ -174,7 +174,7 @@ export function getDb() {
   return drizzle(
     (sql, params, method) => queryD1(sql, params, method),
     async (queries) => Promise.all(queries.map((q) => queryD1(q.sql, q.params, q.method))),
-    { schema, relations: schema.relations },
+    { relations: schema.relations },
   )
 }
 ```
@@ -235,7 +235,7 @@ export function createDb(env: { HYPERDRIVE: Hyperdrive }) {
   const pool = new pg.Pool({
     connectionString: env.HYPERDRIVE.connectionString,
   })
-  return drizzle(pool, { schema, relations: schema.relations })
+  return drizzle(pool, { relations: schema.relations })
 }
 ```
 
@@ -355,7 +355,7 @@ wrangler d1 time-travel restore DB --timestamp=<unix_timestamp> --env preview
 
 Use the canonical `db/src/node.ts` `sqlite-proxy` example above to talk to remote D1 databases from Node.js/Bun scripts.
 
-Do **not** write `import { drizzle } from 'drizzle-orm/d1-http'` in runtime code. In Drizzle beta, that path is **not** a public `drizzle-orm` export. `d1-http` is a **drizzle-kit driver name**, not a runtime import path.
+Do **not** write `import { drizzle } from 'drizzle-orm/d1-http'` in runtime code. In Drizzle 1.0, that path is **not** a public `drizzle-orm` export. `d1-http` is a **drizzle-kit driver name**, not a runtime import path.
 
 **Required environment variables:**
 
@@ -442,11 +442,11 @@ import migrations from '../drizzle/migrations.js'
 import * as schema from './schema.ts'
 
 export class Store extends DurableObject<Env> {
-  db: durable.DrizzleSqliteDODatabase<typeof schema, typeof schema.relations>
+  db: durable.DrizzleSqliteDODatabase<typeof schema.relations>
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
-    this.db = durable.drizzle(ctx.storage, { schema, relations: schema.relations })
+    this.db = durable.drizzle(ctx.storage, { relations: schema.relations })
     ctx.blockConcurrencyWhile(async () => {
       await migrator.migrate(this.db, migrations)
     })
@@ -501,7 +501,7 @@ export function getDb() {
   return drizzle(
     async (sql, params, method) => stub.executeSql(sql, params, method) as any,
     async (batch) => stub.executeSqlBatch(batch) as any,
-    { schema, relations: schema.relations },
+    { relations: schema.relations },
   )
 }
 ```
@@ -549,7 +549,7 @@ export function createDb(env: { HYPERDRIVE: Hyperdrive }) {
   const pool = new pg.Pool({
     connectionString: env.HYPERDRIVE.connectionString,
   })
-  return drizzle(pool, { schema, relations: schema.relations })
+  return drizzle(pool, { relations: schema.relations })
 }
 ```
 
@@ -650,7 +650,7 @@ import * as durable from 'drizzle-orm/durable-sqlite'
 import * as migrator from 'drizzle-orm/durable-sqlite/migrator'
 import migrations from '../drizzle/migrations.js'
 
-this.db = durable.drizzle(ctx.storage, { schema, relations: schema.relations })
+this.db = durable.drizzle(ctx.storage, { relations: schema.relations })
 ctx.blockConcurrencyWhile(async () => {
   await migrator.migrate(this.db, migrations)
 })
