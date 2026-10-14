@@ -755,13 +755,18 @@ await db.update(schema.projects)
 
 ### Foreign keys with cascade delete
 
-Always set `onDelete: 'cascade'` on child references so deleting a parent cleans up children:
+**Prefer `onDelete: 'cascade'`** on child references so deleting a parent cleans up children:
 
 ```ts
 accountId: s.text('account_id')
   .notNull()
   .references(() => accounts.accountId, { onDelete: 'cascade' }),
 ```
+
+- Use `'set null'` (nullable column) only when the child must outlive the parent, e.g. a token that should survive its session.
+- Leave the default NO ACTION only with a one-line comment saying why, e.g. a shared parent row whose deletion must never wipe other users' data.
+- A column that holds another table's id (`referenceId`, `ownerId`, ...) gets a real `.references()` too. A missing FK leaves orphans: a deleted user's API key keeps authenticating.
+- When you touch a schema, check every FK. If one is NO ACTION with no reason, switch it to cascade. On SQLite this needs a table rebuild; for D1 read the FK rebuild rules in `./cloudflare.md`.
 
 ### `.references()` vs `defineRelations()` — use both
 
@@ -782,7 +787,9 @@ You *can* have `defineRelations` without `.references()` (some databases like Pl
 
 ### Always define relations — both sides
 
-Even if you only query one direction. This enables `db.query` `with` nesting. Define at the bottom of the same schema file:
+Even if you only query one direction. This enables `db.query` `with` nesting. Define at the bottom of the same schema file.
+
+**Add missing relations.** When you read or edit a schema, check that every `.references()` column has an `r.one` on the child and an `r.many` (or `r.one`) on the parent. If any are missing, add them in the same change, even if your task did not ask. Junction tables also get `.through()` many-to-many relations on both ends. Relations are TypeScript only: no migration needed.
 
 ```ts
 // at the bottom of src/schema.ts

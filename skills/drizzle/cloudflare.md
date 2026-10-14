@@ -584,6 +584,45 @@ export default defineConfig({
 })
 ```
 
+## Changing a FOREIGN KEY on D1 (table rebuild)
+
+SQLite cannot alter a foreign key, so `drizzle-kit generate` rebuilds the table: `CREATE __new_x`, copy, `DROP x`, rename. **Never ship that output to D1 unchanged.** Fix it like this:
+
+1. **Replace every `PRAGMA foreign_keys=OFF/ON`** with one `PRAGMA defer_foreign_keys = on;` at the top. D1 runs each migration in a transaction and ignores `foreign_keys`, so FK checks still run.
+2. **Never drop a table that still has child rows pointing at it.** `DROP TABLE` does an implicit `DELETE`. With NO ACTION children this leaves a deferred violation that never clears, so `COMMIT` fails with `FOREIGN KEY constraint failed`. With CASCADE children it **deletes them**, even with deferred FKs.
+3. So **stash and drop the children first**, rebuild the parent, then recreate the children:
+
+```sql
+PRAGMA defer_foreign_keys = on;
+-- child of oauth_refresh_token: move it out of the way first
+CREATE TABLE `__old_oauth_access_token` AS SELECT * FROM `oauth_access_token`;
+DROP TABLE `oauth_access_token`;
+-- rebuild the parent: nothing references it now
+CREATE TABLE `__new_oauth_refresh_token` (...);
+INSERT INTO `__new_oauth_refresh_token` (...) SELECT ... FROM `oauth_refresh_token`;
+DROP TABLE `oauth_refresh_token`;
+ALTER TABLE `__new_oauth_refresh_token` RENAME TO `oauth_refresh_token`;
+-- recreate the child with its final FKs
+CREATE TABLE `oauth_access_token` (...);
+INSERT INTO `oauth_access_token` (...) SELECT ... FROM `__old_oauth_access_token`;
+DROP TABLE `__old_oauth_access_token`;
+-- then CREATE INDEX for every rebuilt table
+```
+
+If a parent has CASCADE children you cannot stash easily, skip changing that parent's FKs and leave a comment.
+
+**Test with real rows before applying.** Run old migrations, insert one row per table, then run the new one on local D1:
+
+```bash
+P=./tmp/d1-test
+wrangler d1 execute DB --local --persist-to $P --file drizzle/0001_x/migration.sql   # each old one
+wrangler d1 execute DB --local --persist-to $P --command "INSERT INTO ..."           # sample rows
+wrangler d1 execute DB --local --persist-to $P --file drizzle/0005_new/migration.sql
+wrangler d1 execute DB --local --persist-to $P --command "SELECT count(*) FROM ..."  # rows survived
+```
+
+An empty database hides both bugs: drops with no child rows never violate anything.
+
 ## SQLite enums are safe to extend
 
 In SQLite, `text('status', { enum: ['a', 'b', 'c'] })` does **not** generate a `CHECK` constraint. The enum is purely a TypeScript type hint. Adding a new value to the array produces no migration at all, or at most a no-op snapshot update. No table recreate, no data copy.
