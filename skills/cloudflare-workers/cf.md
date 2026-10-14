@@ -57,6 +57,23 @@ Requirements:
 - `cf` as a devDependency (`pnpm add -D cf`) so `cf/config` resolves.
 - Vite projects use `@cloudflare/vite-plugin@beta` (2.0, no wrangler dependency).
 
+## Region: always IAD (Ashburn, Virginia)
+
+**Always put every regional resource in IAD.** Each product names it differently:
+
+| Resource | Value | Where |
+| --- | --- | --- |
+| PlanetScale DB (Postgres, Vitess) | `us-east` (AWS us-east-1) | `pscale database create --region us-east` |
+| Worker placement | `aws:us-east-1` | `worker.placement: { region: 'aws:us-east-1' }` |
+| D1 primary | `enam` | `cf d1 create --primary-location-hint enam` |
+| R2 bucket | `enam` | `cf r2 buckets create --location-hint enam` |
+| Durable Object | `enam` | `ns.get(id, { locationHint: 'enam' })` |
+
+- **PlanetScale defaults to `aws-us-east-2` (Ohio)**, not IAD. Always pass `--region us-east`. The region of a branch cannot change later.
+- Without a hint, D1 and R2 are created **near the machine that runs the command** (Europe for us). So create D1 and R2 yourself with `enam`; do not let `cf deploy` auto-provision them.
+- `enam` is the only IAD option for D1, R2 and DOs. It means "Eastern North America", not one exact data center.
+- Worker placement only matters when the Worker talks to a regional backend (PlanetScale, D1 primary, an external API). Use `aws:us-east-1` so the Worker and the PlanetScale DB run in the same AWS region.
+
 ## Discover API commands
 
 ```bash
@@ -205,6 +222,13 @@ Not provisionable: **Hyperdrive** (`id` is required), Vectorize, AI Search insta
 
 Prefer `name` over `id` for D1 and R2 so the config is readable and stable across machines.
 
+**Auto-provisioned D1 and R2 get no location hint**, so they land near the deploying machine. Create them first in IAD, then deploy:
+
+```bash
+cf d1 create --name my-app --primary-location-hint enam
+cf r2 buckets create --name my-app-uploads --location-hint enam
+```
+
 ### Durable Objects: exports instead of migrations
 
 `worker.exports` replaces the ordered `migrations` array. Keep live classes in the map; add tombstones only for pending changes.
@@ -328,7 +352,7 @@ cf hyperdrive integration planetscale signature | \
   pscale database create my-app \
     --org <PLANETSCALE_ORG> \
     --engine postgresql \
-    --region <REGION> \
+    --region us-east \
     --cloudflare-billing @- \
     --format json
 ```
@@ -368,7 +392,7 @@ env: {
   }),
 },
 compatibilityFlags: ['nodejs_compat'],
-placement: { region: 'gcp:us-east4' }, // match the PlanetScale region
+placement: { region: 'aws:us-east-1' }, // IAD, same AWS region as PlanetScale us-east
 ```
 
 `dev.connectionString` replaces wrangler's `localConnectionString`. You can also set `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in the env instead of committing it.
