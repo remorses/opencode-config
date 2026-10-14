@@ -1,0 +1,42 @@
+/* nextjs-style: dark Next.js docs diagram palette. See DESIGN.md. */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Geist+Mono:wght@400..700&display=block');
+@import url('../base.css');
+
+:root {
+  --bg: #0a0a0a;
+  --card: #171717;
+  --sunken: #232323;
+  --ink: #ededed;
+  --ink-soft: #c7c7c7;
+  --muted: #8f8f8f;
+  --line: #878787;
+  --border: #3d3d3d;
+  --divider: #2a2a2a;
+  --grid: #1f1f1f;
+  --accent: #f2b342;
+  --blue: #1d68c5;
+  --blue-fill: #0b1f38;
+  --blue-text: #4a8fe7;
+  --pink: #c14c70;
+  --pink-fill: #371523;
+  --purple: #8955a7;
+  --purple-fill: #251931;
+  --green: #49a45f;
+  --green-fill: #1a2c1e;
+  --amber: #f2b342;
+  --amber-fill: #4c3d20;
+  --bar: #4d4d4d;
+
+  --sans: 'Geist', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, monospace;
+  --stroke: 1.75px;
+}
+
+/* text on colored boxes is bright, like the reference */
+.box.blue,
+.box.pink,
+.box.purple,
+.box.green,
+.box.amber {
+  color: var(--ink);
+}

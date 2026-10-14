@@ -1,0 +1,32 @@
+/* claude-style: Anthropic engineering blog look. See DESIGN.md. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&family=JetBrains+Mono:wght@400..700&display=block');
+@import url('../base.css');
+
+:root {
+  --bg: #fafbf8;
+  --card: #ffffff;
+  --sunken: #efeee5;
+  --ink: #141413;
+  --ink-soft: #3a3a38;
+  --muted: #72736e;
+  --line: #72736e;
+  --border: #72736e;
+  --divider: #d3d4cd;
+  --grid: #e6e7e0;
+  --accent: #d97757;
+  --blue: #5290c8;
+  --blue-fill: #edf5fb;
+  --pink: #c4688a;
+  --pink-fill: #fbeef3;
+  --purple: #8a72c2;
+  --purple-fill: #f3effa;
+  --green: #5f9a6d;
+  --green-fill: #eef6f0;
+  --amber: #c99a3e;
+  --amber-fill: #fbf5e8;
+  --bar: #74726c;
+
+  --sans: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --stroke: 1.75px;
+}

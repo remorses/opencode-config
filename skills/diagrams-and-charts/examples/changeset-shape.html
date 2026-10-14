@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/skill/claude-style/style.css" />
+  </head>
+  <body>
+    <div class="canvas" id="diagram">
+      <div class="section">
+        <div class="section-label">Spanner: metadata</div>
+        <div class="flow" style="grid-template-columns: auto auto 1fr; --row-gap: 56px">
+          <div class="record" id="changeset" style="--key-w: 150px; width: 620px">
+            <div class="record-head"><span>Changeset</span><span class="mono accent">id 9f2c…7ab0</span></div>
+            <div class="record-row"><span class="key">author</span><span>Claude &lt;noreply@anthropic.com&gt;</span></div>
+            <div class="record-row"><span class="key">author_date</span><span>2026-09-15T01:25:09+00:00</span></div>
+            <div class="record-row"><span class="key">committer</span><span>Scion &lt;noreply+scion@anthropic.com&gt;</span><span class="note">Optional</span></div>
+            <div class="record-row"><span class="key">committer_date</span><span>2026-09-15T01:31:40+00:00</span><span class="note">Optional</span></div>
+            <div class="record-row"><span class="key">message</span><span>scion-cache: serve blobs from the memory tier</span></div>
+            <div class="record-row"><span class="key">parents</span><span class="accent">d41c…88e2</span></div>
+            <div class="record-row"><span class="key">signature</span><span>—</span><span class="note">Optional</span></div>
+            <div class="record-row">
+              <span class="key">file_changes</span>
+              <span style="display: grid; grid-template-columns: 140px auto">
+                <span>docs/guide.md</span><span class="accent">3e1f…a2c4</span>
+                <span>src/legacy.rs</span><span class="note" style="text-align: left">Deleted</span>
+                <span>tools/build.sh</span><span class="accent">9b07…5d18</span>
+              </span>
+              <span class="note">Regular file<br />&nbsp;<br />Executable</span>
+            </div>
+          </div>
+          <div class="box row medium" id="parent" style="align-self: center">
+            <span>Changeset</span><span class="mono accent">id d41c…88e2</span>
+          </div>
+          <div class="text" id="more">…</div>
+
+          <div class="box row medium dashed green" id="root" style="justify-self: end">
+            <span>Root tree</span><span class="mono accent">5c0e…d1a9</span>
+          </div>
+          <div class="box row medium dashed green" id="tree">
+            <span>Tree <span class="mono">src/</span></span><span class="mono accent">77f0…e9b4</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Cloud Storage: file contents</div>
+        <div class="flow" style="grid-template-columns: auto 1fr 1fr 1fr auto; --col-gap: 56px; align-items: center">
+          <div class="note">Immutable, compressed<br />and deduplicated by hash</div>
+          <div class="box mono accent purple" id="blob1" style="text-align: center">9b07…5d18</div>
+          <div class="box mono accent purple" id="blob2" style="text-align: center">3e1f…a2c4</div>
+          <div class="box mono accent purple" id="blob3" style="text-align: center">c5d2…0e77</div>
+          <div class="text">…</div>
+        </div>
+      </div>
+    </div>
+    <script type="module">
+      import { connect } from '/skill/diagram.ts'
+      connect('changeset', 'parent')
+      connect('parent', 'more')
+      connect('changeset', 'root', { color: 'green', dashed: true, label: 'Derived by the server, not stored in the changeset' })
+      connect('root', 'tree', { color: 'green' })
+      connect('tree', 'blob3', { color: 'green', label: 'app.rs', labelClass: 'mono' })
+      connect('changeset', 'blob1', { color: 'accent' })
+      connect('changeset', 'blob2', { color: 'accent', fromAt: 0.62, toAt: 0.5 })
+    </script>
+  </body>
+</html>

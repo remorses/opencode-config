@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/skill/claude-style/style.css" />
+  </head>
+  <body>
+    <div class="canvas" id="diagram">
+      <div class="flow" style="justify-content: space-between">
+        <div class="box group green" id="clients" style="grid-area: 1 / 1 / 4">
+          <div>Clients</div>
+          <div class="stack">
+            <div class="box">Antique</div>
+            <div class="box" id="dev">Developer machines</div>
+            <div class="box" id="ci">CI and cluster jobs</div>
+          </div>
+        </div>
+
+        <div class="box blue node" id="daemon" style="grid-area: 3 / 2">
+          <div class="mono">scion-daemon</div>
+          <div class="sub">Per node</div>
+        </div>
+        <div class="box pink" id="snapshot" style="grid-area: 4 / 2; margin-top: 28px">Periodic snapshot</div>
+
+        <div class="box blue node" id="cache" style="grid-area: 2 / 3 / 4; align-self: stretch">
+          <div class="mono">scion-cache</div>
+          <div class="sub">Regional</div>
+        </div>
+
+        <div class="box blue" id="server" style="grid-area: 1 / 4"><span class="mono">scion-server</span></div>
+
+        <div class="box node purple" id="spanner" style="grid-area: 1 / 5">
+          <div>Spanner</div>
+          <div class="sub">Changesets,<br />branches, trees</div>
+        </div>
+        <div class="box node purple" id="storage" style="grid-area: 2 / 5">
+          <div>Cloud Storage</div>
+          <div class="sub">File contents</div>
+        </div>
+      </div>
+    </div>
+    <script type="module">
+      import { connect } from '/skill/diagram.ts'
+      connect('clients', 'server', { label: 'Branches, history, diffs: upload, commit, land', sub: 'Control plane · every client' })
+      connect('dev', 'cache', { color: 'accent', label: 'Trees and file contents', sub: 'Object plane' })
+      connect('ci', 'daemon', { color: 'accent' })
+      connect('daemon', 'cache', { color: 'accent', label: 'Misses' })
+      connect('cache', 'server', { from: 'right', to: 'bottom', color: 'accent', label: 'Misses' })
+      connect('server', 'spanner', { color: 'purple' })
+      connect('server', 'storage', { color: 'purple' })
+      connect('snapshot', 'daemon', { color: 'pink', dashed: true, label: 'Seeds new nodes', mask: true })
+    </script>
+  </body>
+</html>
