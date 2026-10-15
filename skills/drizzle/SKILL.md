@@ -697,6 +697,34 @@ Rules:
 - Only hand-write Zod objects for envelopes, computed fields, or shapes that do not map 1:1 to a table row
 - If an API shape mostly mirrors a table, derive it from the table first and then `.extend()` with the extra fields
 
+## Showing schema plans in chat: Prisma syntax
+
+When you **plan or explain** schema changes to the user in chat, write them in **Prisma schema syntax**, not drizzle TypeScript. Prisma is about 3× shorter and shows types, defaults, relations and indexes at a glance. The real code stays drizzle; this is only for the chat.
+
+For **changes** to existing tables, use a ` ```diff ` block with `+` / `-` lines, so additions and removals are colored. Show only the changed models, with a few unchanged lines for context.
+
+```diff
+ model Post {
+   postId        String     @id @default(ulid())
+   siteId        String
+-  kind          PostKind
++  targetQueries String[]   @default([])   // queries this post should win
++  brief         String     @default("")   // why it exists, with the numbers
+   status        PostStatus @default(planned)
+   site          Site       @relation(fields: [siteId], references: [siteId], onDelete: Cascade)
+ }
+
+-model Opportunity { ... }                  // dropped: the agent plans posts
+
+-enum PostStatus { planned writing scheduled live unpublished }
++enum PostStatus { planned writing review scheduled live unpublished }
+```
+
+- New tables: a plain ` ```prisma ` block.
+- Fold dropped tables to one line `-model X { ... }` with a short reason in a comment.
+- Add a short comment after each new column that is not obvious.
+- Keep enums on one line.
+
 ## Schema best practices
 
 Docs: https://orm.drizzle.team/docs/sql-schema-declaration | Indexes: https://orm.drizzle.team/docs/indexes-constraints
