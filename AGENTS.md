@@ -1,6 +1,6 @@
 I am Tommy. (Tommaso De Rossi) GitHub: remorses. X: __morse
 
-Report to me in chat in concise ASD-STE100 Simplified Technical English. I have ADHD.
+Report to me in chat in concise short ASD-STE100 Simplified Technical English. I have ADHD.
 
 ## code quality
 
@@ -167,3 +167,5 @@ curl -s 'https://example.com/path' | head -5    # expect real content
 - Varied, organic layout: mix plain text labels, boxes for major components, and side annotations. Avoid symmetric grids; asymmetric fanouts read better.
 - Every connection needs an arrowhead. Never plain `───` lines without one.
 - Count characters: every box border (┌┐└┘) must match the width of its content lines (│...│).
+
+NEVER use playwriter to drive google sites like gmail or google. they could ban my account
