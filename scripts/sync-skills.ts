@@ -11,8 +11,11 @@ import * as errore from 'errore'
 
 const execFile = util.promisify(childProcess.execFile)
 
-// `path` narrows the search to a folder inside the repo
-const SKILL_SOURCES: { repo: string; path?: string }[] = [
+// `path` narrows the search to a folder inside the repo.
+// `userOnly` adds `disable-model-invocation: true`, so only the user can load the skill.
+type SkillSource = { repo: string; path?: string; userOnly?: boolean }
+
+const SKILL_SOURCES: SkillSource[] = [
   { repo: 'remorses/kimaki', path: 'skills' },
   { repo: 'remorses/playwriter' },
   { repo: 'remorses/tuistory' },
@@ -25,7 +28,8 @@ const SKILL_SOURCES: { repo: string; path?: string }[] = [
   { repo: 'remorses/spiceflow' },
   { repo: 'remorses/holocron' },
   { repo: 'remorses/lintcn' },
-  { repo: 'remorses/usecomputer' },
+  // user only: models should prefer the cua-driver skill
+  { repo: 'remorses/usecomputer', userOnly: true },
   { repo: 'remorses/profano' },
   { repo: 'remorses/sigillo' },
   { repo: 'remorses/strada' },
@@ -73,7 +77,7 @@ async function fetchRepoSkills({
   tmpDir,
   signal,
 }: {
-  source: { repo: string; path?: string }
+  source: SkillSource
   tmpDir: string
   signal: AbortSignal
 }) {
@@ -96,7 +100,10 @@ async function fetchRepoSkills({
 
   const skills: Skill[] = []
   for (const file of files) {
-    const content = fs.readFileSync(path.join(cloneDir, file), 'utf-8')
+    const raw = fs.readFileSync(path.join(cloneDir, file), 'utf-8')
+    const content = source.userOnly && !/^disable-model-invocation:/m.test(raw)
+      ? raw.replace(/^---\n/, '---\ndisable-model-invocation: true\n')
+      : raw
     const name = content.match(/^---\n[\s\S]*?^name:\s*['"]?([\w.-]+)['"]?\s*$/m)?.[1]
     if (!name) return new MissingNameError({ repo: source.repo, file })
     skills.push({ name, repo: source.repo, content })
