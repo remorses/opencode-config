@@ -19,7 +19,9 @@
   "session": {
     "sidebar": "auto",
     "scrollbar": false,
-    "thinking": "show"
+    "thinking": "hide",
+    "grouping": "auto",
+    "verbosity": "low"
   },
   "animations": true
 }
