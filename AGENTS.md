@@ -126,7 +126,7 @@ Run `lintcn lint` at the end of an editing session, inside the edited package (n
 - Personal skills: `~/.config/opencode/skills` (this dir is a git repo; commit and run critique here).
 - Public skills: `~/.config/opencode/skills-repo/` (submodule of remorses/skills). Add `repo: remorses/skills` in frontmatter.
 - Private skills: `~/.config/opencode/private-skills/` (submodule of remorses/private-skills). Add `repo: remorses/private-skills`. Never publish.
-- Never read or edit `/Users/morse/Documents/GitHub/kimakivoice/cli/skills`; it is synced from other repos. Edit skills in their source repo (find it via `kimaki project list`).
+- Never edit `~/.config/opencode/synced-skills`; `bun scripts/sync-skills.ts` copies it from GitHub repos (list in `SKILL_SOURCES`) and replaces it on every run. Edit skills in their source repo (find it via `kimaki project list`), push, then run the script.
 - If a skill's instructions are wrong, tell me and propose a fix.
 - When I correct you on something a skill covers, ask: "should we incorporate X into Y skill?"
 
