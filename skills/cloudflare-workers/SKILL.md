@@ -894,6 +894,32 @@ The DO hibernates after 10s of inactivity, so each write only costs the few ms o
 
 For **approximate** usage tracking (dashboards, analytics), use Analytics Engine instead. It handles sampling and high cardinality but doesn't give exact counts.
 
+## Cache with the Cache API, not KV
+
+**Never use KV as a cache.** KV writes cost **$5/M** and reads $0.50/M. The Cache API (`caches.default` or `caches.open(name)`) has no per-operation cost.
+
+A short-TTL cache in KV writes once per key every time the TTL expires. A session cache with a 10 min TTL cost one MCP worker 5.5M writes/month (~$22). Putting the Cache API in front of KV cut reads 10x, but writes did not drop, and KV answered only ~10% of colo cache misses. Cache API only was the fix.
+
+| data | store |
+| --- | --- |
+| derived or re-fetchable values (session checks, lookups, API responses) | Cache API |
+| durable state that must exist in every datacenter (OAuth grants, config, long-lived tokens) | KV |
+| per-entity state, counters, read-after-write | Durable Object |
+
+```ts
+const key = new Request(new URL(`/_cache/session/${await sha256Hex(secret)}`, env.APP_URL))
+const cache = await caches.open('sessions')
+const hit = await cache.match(key)
+if (hit) return hit.json<Session>()
+const session = await validate(secret)
+ctx.waitUntil(cache.put(key, Response.json(session, { headers: { 'Cache-Control': 'max-age=600' } })))
+```
+
+- The cache is per datacenter. A user's requests usually stay in one colo, so the hit rate is high.
+- Hash secrets before you use them in a cache key or a KV key.
+- The Cache API needs a custom domain. On `*.workers.dev`, `put` does nothing, so every request misses.
+- If you write to KV on each miss, you pay per write and it does not make reads cheaper. Use KV only when the value must survive and be present across many datacenters.
+
 ## Memoizing slow operations with the Cache API
 
 Workers run globally on 300+ datacenters, but your database (D1, Postgres, etc.) lives in one region. Cross-region reads can be 50-200ms. Use the Cache API (`caches.default`) to memoize slow lookups at the edge so repeated reads from the same datacenter are ~1-5ms.
