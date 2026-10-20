@@ -7,7 +7,8 @@ description: >
   lockfile's package manager (never npm publish in pnpm/bun repos, workspace:^
   leaks), tag, push, create the GitHub release, and deploy the website/ folder via its deploy script.
   Covers monorepo order and prerelease --tag. ALWAYS load when asked to publish,
-  release, or bump a package version.
+  release, or bump a package version. This skill is also called changepub;
+  load it when the user says changepub.
 ---
 
 # Publishing npm Packages
