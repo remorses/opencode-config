@@ -103,6 +103,11 @@ Run `lintcn lint` at the end of an editing session, inside the edited package (n
 - Ask before creating PRs/issues only if the repo owner is not remorses. Never close a PR or issue without my confirmation.
 - Load the `github-prs` skill before creating or editing PRs, issues, comments, releases, or review replies.
 - PRs, issues, and comments must be super concise: a few short lines. No code refs, no file lists, no long explanations unless I ask.
+- Every issue, issue comment, PR, and PR comment you create must end with a hidden HTML comment holding the source Discord thread URL and session ID, so we can find the session that wrote it later:
+
+  ```md
+  <!-- Discord: https://discord.com/channels/<guild_id>/<thread_id> Session: ses_xxx -->
+  ```
 - Load the `gh-search` skill before guessing how an API or pattern is used.
 
 ## tools
