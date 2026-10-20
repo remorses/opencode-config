@@ -1,7 +1,7 @@
 ---
 description: Build agent using GPT 6.1 Sol
-mode: primary
-model: openai/gpt-6.1-sol#medium
+mode: all
+model: openai/gpt-6.1-sol
 permissions:
   - { action: "subagent", resource: "oracle", effect: deny }
 ---

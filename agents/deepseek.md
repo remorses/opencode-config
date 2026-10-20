@@ -1,6 +1,5 @@
 ---
 description: Build agent deepseek v4 flash (fast and super cheap)
-mode: primary
+mode: all
 model: opencode-go/deepseek-v4-flash
-# mode: all
 ---

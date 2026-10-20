@@ -1,5 +1,5 @@
 ---
 description: Build agent using GLM
-mode: primary
+mode: all
 model: opencode-go/glm-5.3-flash
 ---

@@ -1,5 +1,5 @@
 ---
 description: Build agent using Kimi
-mode: primary
+mode: all
 model: opencode-go/kimi-k3
 ---

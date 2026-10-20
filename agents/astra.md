@@ -1,7 +1,7 @@
 ---
 description: Build agent using GPT 6
-mode: primary
-model: openai/gpt-6-astra#medium
+mode: all
+model: openai/gpt-6-astra
 permissions:
   - { action: "subagent", resource: "oracle", effect: deny }
 ---
