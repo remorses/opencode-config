@@ -1,1 +1,0 @@
-/Users/morse/Documents/GitHub/iphone-usb-control/skills/ghosthand/SKILL.md

@@ -4,7 +4,8 @@
   "skills": [
     "/Users/morse/.config/opencode/synced-skills",
     "/Users/morse/.config/opencode/skills-repo/skills",
-    "/Users/morse/.config/opencode/private-skills/skills"
+    "/Users/morse/.config/opencode/private-skills/skills",
+    "/Users/morse/Documents/GitHub/iphone-usb-control/skills"
   ],
   "providers": {
     "xai": {
