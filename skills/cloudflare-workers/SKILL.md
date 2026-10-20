@@ -15,7 +15,9 @@ description: >
   Durable Objects, or deploys to Cloudflare. Load it before writing any
   wrangler config, worker code, deploy scripts, or Durable Object WebSocket clients.
   Load durable-object-memory.md when counting OOMs, splitting DO invocation
-  errors, taking heap snapshots, or reducing isolate RSS.
+  errors, taking heap snapshots, or reducing isolate RSS. Load
+  durable-object-usage.md when checking DO duration or spend per project, or
+  why WebSocket DOs never hibernate (keepalive pings waking them).
 ---
 
 # Cloudflare Workers
@@ -836,6 +838,28 @@ See ./websocket-close-codes.md
 See ./durable-object-memory.md
 
 The isolate heap limit is **128 MB**. The only production OOM signal is invocation status **`exceededMemory`**. Split other errors by status first: `scriptThrewException`, `clientDisconnected`, `responseStreamDisconnected`. Then group stored exceptions by `$metadata.errorTemplate`. Profano is for CPU profiles, not heap snapshots.
+
+## Durable Object duration: keepalives
+
+**Any message that reaches `webSocketMessage` wakes the DO.** With messages less than ~10s apart it never hibernates and is billed for 128 MB of wall-clock time, 24/7 (about $3.40/month per object). One JSON ping every 5s on a hibernatable socket cost one project ~$95/month.
+
+Keepalives must never reach your handler:
+
+- **Protocol ping frames** (Node `ws.ping()`, Go, Rust clients): Cloudflare answers them at the edge. They do not wake the DO and are not billed. Prefer these.
+- **Browsers cannot send protocol pings.** Send a fixed JSON string and answer it with `setWebSocketAutoResponse`. It accepts **one** pair per DO, so every client must use the same exact string (matched byte for byte, no `id` field).
+
+```ts
+constructor(ctx: DurableObjectState, env: Env) {
+  super(ctx, env)
+  this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"method":"ping"}', '{"method":"pong"}'))
+}
+```
+
+- Never relay keepalives through the DO to another socket (tunnels, proxies). Each hop wakes it.
+- `setTimeout`/`setInterval` pending in the DO also keep it awake. Use alarms.
+- MV3 extension service workers die after 30s without WebSocket traffic, so a browser extension client needs its own JSON ping under 30s (20s). Auto-response keeps that free.
+
+To find which project's DOs stay awake and estimate their spend, see ./durable-object-usage.md. For a full cost estimate per project (Workers, DO, KV, R2, D1), load the `cloudflare-costs` skill.
 
 ## Durable Objects with SQLite
 
