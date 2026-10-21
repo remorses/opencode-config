@@ -2,6 +2,8 @@
 
 Use this when a new Mac should join the Kimaki fleet. Do first-boot on the Mac. Then control it over SSH from Kimaki.
 
+`<name>` is the new Mac's Local hostname, `<user>` its admin user. After step 4 the Mac shows up in `bun list-hosts.ts` (see SKILL.md).
+
 ## 1. First boot
 
 On the new Mac:
@@ -18,16 +20,16 @@ On the new Mac:
 1. Open **System Settings → General → Sharing**.
 2. Turn on **Remote Login**.
 3. Allow the admin user.
-4. Set **Local hostname** to a short name. Example: `mintmacbook`.
-5. Confirm the name is `mintmacbook.local`.
+4. Set **Local hostname** to a short name. Example: `<name>`.
+5. Confirm the name is `<name>.local`.
 
 Do not install a tunnel for same-LAN setup. Bonjour already gives a host name.
 
 From the old Mac:
 
 ```bash
-ping -c 2 mintmacbook.local
-ssh tommy@mintmacbook.local
+ping -c 2 <name>.local
+ssh <user>@<name>.local
 ```
 
 If ping works but port 22 times out, Remote Login is off or the Mac slept. A locked Mac can still answer ping. It will not accept SSH until you enter the password.
@@ -49,29 +51,29 @@ Check it:
 
 ```bash
 scutil --get LocalHostName
-dns-sd -G v4 mintmacbook.local
+dns-sd -G v4 <name>.local
 ```
 
 Set it from the new Mac if needed:
 
 ```bash
-sudo scutil --set LocalHostName mintmacbook
-sudo scutil --set ComputerName mintmacbook
-sudo scutil --set HostName mintmacbook.local
+sudo scutil --set LocalHostName <name>
+sudo scutil --set ComputerName <name>
+sudo scutil --set HostName <name>.local
 ```
 
 Then SSH with:
 
 ```bash
-ssh tommy@mintmacbook.local
+ssh <user>@<name>.local
 ```
 
 Add a Host block on the old Mac so Kimaki does not need the IP:
 
 ```
-Host mintmacbook
-  HostName mintmacbook.local
-  User tommy
+Host <name>
+  HostName <name>.local
+  User <user>
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
 ```
@@ -82,11 +84,19 @@ A USB-C / Thunderbolt cable is faster and more stable than WiFi. After you plug 
 
 ### Optional: Tailscale
 
-Install Tailscale only if you need SSH off this LAN. Then use `mintmacbook.tailnet.ts.net`. Skip ngrok and Cloudflare Tunnel.
+Install Tailscale only if you need SSH off this LAN. Then use `<name>.tailnet.ts.net`. Skip ngrok and Cloudflare Tunnel.
 
 ## 4. Authorize this Mac
 
-Copy the old Mac public key into `~/.ssh/authorized_keys` on the new Mac. Then `ssh -o BatchMode=yes tommy@mintmacbook.local` works without a password.
+Copy the old Mac public key into `~/.ssh/authorized_keys` on the new Mac. Then `ssh -o BatchMode=yes <user>@<name>.local` works without a password.
+
+Store the new Mac's login password in this Mac's Keychain, for `sudo` over SSH. The user types it; `-w` as the last argument prompts, so the password never lands in shell history:
+
+```bash
+security add-generic-password -a <user> -s <name>.local -w
+```
+
+Service is `<name>.local`, account is the SSH user. `list-hosts.ts` looks it up this way.
 
 ## 5. Command Line Tools, then Homebrew
 
@@ -112,7 +122,7 @@ Non-interactive SSH has no TTY. Homebrew sudo needs `SUDO_ASKPASS` or a cached `
 
 ## 6. Apps and runtimes
 
-Verified on mintmacbook, 2026-09-15.
+Verified on a new Mac, 2026-09-15.
 
 ```bash
 eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -194,7 +204,7 @@ defaults write com.raycast.macos SUAutomaticallyUpdate -bool false
 open -a Raycast
 ```
 
-`Option-49` is Option-Space. Raycast 1.104.29 is running on mintmacbook.
+`Option-49` is Option-Space.
 
 ### Rectangle
 
@@ -230,7 +240,7 @@ SSH cannot finish that grant. The permission dialogs belong to the GUI session.
 ## 7. Verify
 
 ```bash
-ssh mintmacbook 'node -v; bun -v; pnpm -v; brew --version | head -1; cua-driver --version | head -1; defaults read /Applications/Raycast.app/Contents/Info CFBundleShortVersionString; defaults read com.raycast.macos raycastGlobalHotkey; defaults read /Applications/Zed.app/Contents/Info CFBundleShortVersionString; defaults read /Applications/Ghostty.app/Contents/Info CFBundleShortVersionString; defaults read /Applications/Rectangle.app/Contents/Info CFBundleShortVersionString; pmset -g | egrep "sleep|displaysleep"'
+ssh <name> 'node -v; bun -v; pnpm -v; brew --version | head -1; cua-driver --version | head -1; defaults read /Applications/Raycast.app/Contents/Info CFBundleShortVersionString; defaults read com.raycast.macos raycastGlobalHotkey; defaults read /Applications/Zed.app/Contents/Info CFBundleShortVersionString; defaults read /Applications/Ghostty.app/Contents/Info CFBundleShortVersionString; defaults read /Applications/Rectangle.app/Contents/Info CFBundleShortVersionString; pmset -g | egrep "sleep|displaysleep"'
 ```
 
 Expected:
@@ -276,14 +286,14 @@ SSH has no TTY. The process prints an SSE line `data: {"type":"install_url","url
 Keep the process running after authorize. A second SSH session can check:
 
 ```bash
-ssh mintmacbook 'tail -n 50 ~/.kimaki/kimaki.log'
+ssh <name> 'tail -n 50 ~/.kimaki/kimaki.log'
 ```
 
-The shared **Kimaki** category can already have 50 channels. `project add` then fails with `CHANNEL_PARENT_MAX_CHANNELS`. Create a new category such as **Kimaki mintmacbook**, put a `#kimaki` text channel in it, and map the clone:
+The shared **Kimaki** category can already have 50 channels. `project add` then fails with `CHANNEL_PARENT_MAX_CHANNELS`. Create a new category such as **Kimaki <name>**, put a `#kimaki` text channel in it, and map the clone:
 
 ```bash
 # after the bot is running, from ~/Documents/GitHub/kimaki/cli
 pnpm exec tsx src/bin.ts project list
 ```
 
-Expected log after authorize: `Discord bot logged in as Kimaki#4819` and `Kimaki Macbook`. Ping can work while SSH times out if the Mac is locked. Unlock it, then disable sleep.
+Expected log after authorize: `Discord bot logged in as Kimaki#4819`. Ping can work while SSH times out if the Mac is locked. Unlock it, then disable sleep.
