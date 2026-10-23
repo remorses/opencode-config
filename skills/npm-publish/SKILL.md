@@ -451,6 +451,7 @@ Changelog item entry here. with examples
 For packages that contain these `.md` files we should
 
 - read the .md files inside `.changeset` if any (also check in parent folders if this is a workspace. sometimes `.changeset` is at the repo root)
+- check for `<!-- depends-on: <package> ... -->` comments. Publish each named package before the package whose changeset has the comment. Never copy HTML comments into `CHANGELOG.md` or release notes
 - compare the entries with the final user-facing behavior since the last published version; merge related entries into one numbered changelog item per outcome, and omit entries for changes that were undone or never visible to users. If nothing remains, add no item for those entries
 - keep useful examples and details from related entries in the merged item, but verify that every example still matches the shipped code
 - if the final release adds a **new feature or capability**, use a **minor** bump

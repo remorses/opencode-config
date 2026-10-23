@@ -61,6 +61,24 @@ Add federation support for remote RSC components. The create-spiceflow
 template now includes a federation example.
 ```
 
+## Cross-package dependencies
+
+If a change only works with an unreleased change in another package (a workspace package, a fork, a submodule), add a `depends-on` HTML comment right after the frontmatter. It tells the publishing agent which package to release first. Put the dependency package name first, then what is needed.
+
+```md
+---
+'playwriter': patch
+---
+
+<!-- depends-on: @xmorse/playwright-core (needs browserType.runWithAbortSignal). Publish it first. -->
+
+Abort timed-out `execute` code so it cannot overlap the next call.
+```
+
+- Add one comment per dependency. Keep it on one line.
+- The comment is for agents only. HTML comments never go into `CHANGELOG.md` or release notes.
+- Add it in the dependent package's changeset, not in the dependency's one.
+
 ## Rules
 
 1. **Never use `major`.** Use `patch` for fixes and `minor` for new features. Releases are frequent enough that breaking changes don't warrant a major bump.
