@@ -1,5 +1,6 @@
 ---
 $schema: https://gist.githubusercontent.com/remorses/9f3737a6f516c01f4bdb612045c64072/raw/agent-skill.schema.json
+disable-model-invocation: true
 name: grok-imagine
 description: "Generate images and videos on grok.com/imagine with the signed-in Grok session (text to video, image to video, 480p drafts). Use when the user wants Grok Imagine, a landscape image, a Grok video, or to replay a recorded Imagine prompt. Prefer the in-page network API, not UI clicks."
 ---
