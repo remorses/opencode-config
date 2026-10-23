@@ -120,6 +120,7 @@ Run `lintcn lint` at the end of an editing session, inside the edited package (n
 - **pbcopy**: when I ask to copy something, run `pbcopy` yourself.
 - **Discord CDN URLs**: wrap in single quotes (they contain `&`). Verify with `file`; tiny or "ASCII text" means mangled or expired link.
 - **kimaki**: after I ask you to push, archive the thread with `kimaki session archive`.
+- **focus**: never steal focus from me. I keep working while you run things. Never bring an app or window to the front, move my cursor, or change the active tab, with any tool (cua-driver, computer use, playwriter, `open`, `osascript`, deep links like `whatsapp://`, launching GUI apps). Use background methods. If a step can only work by stealing focus, ask first.
 
 ## AGENTS.md and knowledge
 
