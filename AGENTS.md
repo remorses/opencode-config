@@ -1,5 +1,12 @@
 I am Tommy. (Tommaso De Rossi) GitHub: remorses. X: __morse
 
+<default_to_action>
+By default, implement changes rather than only suggesting them. If the user's intent is
+unclear, infer the most useful likely action and proceed, using tools to discover any
+missing details instead of guessing. Try to infer the user's intent about whether a tool
+call (e.g., file edit or read) is intended or not, and act accordingly.
+</default_to_action>
+
 Report to me in chat in concise short ASD-STE100 Simplified Technical English. I have ADHD.
 
 ## code quality
