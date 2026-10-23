@@ -883,6 +883,30 @@ See the `drizzle` skill for full schema and migration conventions. Key wrangler 
 
 The `rules` entry is required for drizzle DO migrations — imports `.sql` files as text.
 
+### Auto-delete short-lived DOs (one per task, chat, job)
+
+**SQLite DO storage is billed** (from Jan 2026) and an object never deletes itself. A DO per task or per chat keeps its rows forever unless you remove them. Set an alarm one day after the last activity and call `deleteAll()` in it. An object with no storage takes no space; the next request starts it empty.
+
+```ts
+const TTL_MS = 24 * 60 * 60 * 1000
+
+export class TaskDO extends DurableObject<Env> {
+  /** Call on every write (prompt, step, event): moves the deadline forward. */
+  private touch() {
+    void this.ctx.storage.setAlarm(Date.now() + TTL_MS)
+  }
+
+  async alarm() {
+    if (this.isRunning()) return this.touch() // never delete mid-task
+    await this.ctx.storage.deleteAll()
+  }
+}
+```
+
+- **Compatibility date `2026-02-24` or later:** `deleteAll()` also deletes the alarm. On older dates call `deleteAlarm()` too, or the alarm fires again on an empty object.
+- **One alarm per DO.** If the class also uses alarms for other work, keep one handler that checks the state and decides: run the work, or delete.
+- Callers must handle the "gone" state (empty storage = expired id), e.g. answer 404 `task expired`.
+
 ### Usage counter pattern (exact billing / rate limiting)
 
 For exact per-entity counters (API call tracking, usage-based billing, hard rate limits), use a Durable Object with SQLite storage. Each entity (project, user, org) gets its own DO instance via `idFromName()`, so counters are isolated and increments are atomic SQL statements with no read-modify-write races.
