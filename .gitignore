@@ -17,3 +17,6 @@ opensrc/
 service-local.json
 plugins/kimaki/
 service.json
+
+# local only, keep out of the public repo
+MEMORY.md
