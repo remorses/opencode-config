@@ -1,12 +1,14 @@
 {
   "$schema": "https://gist.githubusercontent.com/remorses/776ab3907d24c1fe9749232f0189588a/raw/opencode-v2-config.schema.json",
   "model": "anthropic/claude-opus-5-5",
+  "warming": { "duration": "30 minutes" },
   "skills": [
     "/Users/morse/.config/opencode/synced-skills",
     "/Users/morse/.config/opencode/skills-repo/skills",
     "/Users/morse/.config/opencode/private-skills/skills",
     "/Users/morse/Documents/GitHub/iphone-usb-control/skills"
   ],
+  "compaction": { "auto": true },
   "providers": {
     "xai": {
       "models": {
@@ -29,7 +31,9 @@
         }
       }
     },
+
     "openai": {
+      "settings": { "compaction": { "type": "native" } },
       "models": {
         "gpt-5.3-codex": {
           "limit": {
@@ -46,11 +50,17 @@
       }
     }
   },
-  "plugins": ["/Users/morse/Documents/GitHub/kimakivoice/kimaki/dist/plugin/anthropic"],
+  "plugins": [
+    "/Users/morse/Documents/GitHub/kimakivoice/kimaki/dist/plugin/anthropic"
+  ],
   "formatter": false,
   "permissions": [
     { "action": "external_directory", "resource": "*", "effect": "allow" },
-    { "action": "edit", "resource": "/Users/morse/.config/opencode/synced-skills/*", "effect": "deny" }
+    {
+      "action": "edit",
+      "resource": "/Users/morse/.config/opencode/synced-skills/*",
+      "effect": "deny"
+    }
   ],
   "websearch": { "provider": "random" }
 }
