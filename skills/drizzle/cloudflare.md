@@ -235,7 +235,7 @@ export function createDb(env: { HYPERDRIVE: Hyperdrive }) {
   const pool = new pg.Pool({
     connectionString: env.HYPERDRIVE.connectionString,
   })
-  return drizzle(pool, { relations: schema.relations })
+  return drizzle({ client: pool, relations: schema.relations })
 }
 ```
 
@@ -549,9 +549,25 @@ export function createDb(env: { HYPERDRIVE: Hyperdrive }) {
   const pool = new pg.Pool({
     connectionString: env.HYPERDRIVE.connectionString,
   })
-  return drizzle(pool, { relations: schema.relations })
+  return drizzle({ client: pool, relations: schema.relations })
 }
 ```
+
+**Workers: one pool per request, never `end()`.** Hyperdrive holds the real pool. A Worker cannot reuse a socket across requests, and sockets close when the request ends. Never create the pool in global scope.
+
+**Durable Objects: set a short `idleTimeoutMillis`.** A DO hibernates only with no open outbound socket and no pending `setTimeout` ([DO lifecycle](https://developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/)). Tested in workerd with a hibernating WebSocket hub: a `pg.Pool` with the default 10 s idle timer, or a `pg.Client` left open with no timers, both block hibernation (`evictDurableObject(..., { webSockets: 'hibernate' })` hangs). A pool with a short idle timeout closes its own sockets and the DO hibernates. Hyperdrive has no setting for this: its idle timeout is for its own pool to the origin. Its docs say Worker sockets are cleaned up "when a Durable Object hibernates", but an open socket prevents that hibernation in the first place.
+
+```ts
+/** An open socket keeps a Durable Object from hibernating. */
+const IDLE_SOCKET_CLOSE_MS = 1_000
+
+export function getDb() {
+  const pool = new pg.Pool({ connectionString: env.HYPERDRIVE.connectionString, max: 5, idleTimeoutMillis: IDLE_SOCKET_CLOSE_MS })
+  return drizzle({ client: pool, relations: schema.relations })
+}
+```
+
+One `getDb()` then works in Workers and DOs. Reconnecting to Hyperdrive after an idle second is cheap: the connection setup happens at the edge.
 
 **Disable Hyperdrive caching** when stale reads are unacceptable:
 
