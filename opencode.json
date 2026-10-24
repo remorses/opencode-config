@@ -2,6 +2,7 @@
   "$schema": "https://gist.githubusercontent.com/remorses/776ab3907d24c1fe9749232f0189588a/raw/opencode-v2-config.schema.json",
   "model": "anthropic/claude-opus-5-5",
   "warming": { "duration": "30 minutes" },
+  "instructions": ["OPENCODE_CONFIG_AGENTS.md"],
   "skills": [
     "/Users/morse/.config/opencode/synced-skills",
     "/Users/morse/.config/opencode/skills-repo/skills",
