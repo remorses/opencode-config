@@ -1367,6 +1367,33 @@ Older remorses apps used an `epochMs` customType so app JSON stayed numbers. Tha
 
 SQLite `string[]` / `json` Better Auth fields must be `text(name, { mode: 'json' })`. Copy OAuth FKs from https://github.com/better-auth/better-auth/blob/main/packages/oauth-provider/src/schema.ts. Missing `onDelete` is NO ACTION. Do not invent CASCADE on `oauthClient.userId` or on token `client_id`. A CIMD client is one shared row. CASCADE there deletes everyone’s tokens or fights NO ACTION child FKs. Full map is in `mcp.md`.
 
+## Postgres column types
+
+Better Auth field types map to `drizzle-orm/pg-core` like this:
+
+| Better Auth `type` | Postgres column |
+| --- | --- |
+| `string` | `p.text(name)` |
+| `number` | `p.integer(name)`; `p.bigint(name, { mode: 'number' })` when the field has `bigint: true` |
+| `boolean` | `p.boolean(name)` |
+| `date` | `p.timestamp(name, { withTimezone: true, mode: 'date' })` |
+| `string[]` | `p.text(name).array()` (SQL `text[]`) |
+| `json` | `p.jsonb(name)` |
+
+```ts
+scopes: p.text('scopes').array().notNull(),
+metadata: p.jsonb('metadata'),
+expiresAt: p.timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+```
+
+The drizzle adapter sets `supportsArrays` and `supportsJSON` for `pg`, so it passes arrays and objects straight to drizzle. Do not use JSON text columns on Postgres.
+
+**`notNull` only when the field has `required: true`.** The type docs say `required` defaults to `true`, but `auth generate` adds `.notNull()` only for an explicit `required: true`. Many OAuth fields (`oauthAccessToken.token`, `expiresAt`, `createdAt`) have no `required` key and must stay nullable.
+
+The adapter finds tables by **schema export key** (`oauthClient`) and columns by **JS property key** (`clientId`), not by SQL names. Pass the whole schema module: `drizzleAdapter(db, { provider: 'pg', schema })`.
+
+To check a schema against a config, compare `getAuthTables(options)` from `@better-auth/core/db` with `getColumns()` of each table. Better Auth's own check is `diffSchema(getExpectedSchema(options), tables)` from `@better-auth/core/db/internal`. It only finds missing tables, missing columns and extra required columns, so also compare the types and foreign keys.
+
 
 ## Cloudflare Workers
 
