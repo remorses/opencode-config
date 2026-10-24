@@ -1,8 +1,8 @@
 ---
 # this is a copy of oracle agent using mythos instead of oracle
 description: >-
-  this is a copy of oracle agent using Anthropic mythos instead of oracle. use this when the main oracle agent fails or does not start. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths.
-mode: subagent
+  this is a copy of oracle agent using Anthropic mythos instead of oracle. use this when the main oracle agent fails or does not start. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths. ALWAYS run it as a background subagent (subagent tool with background: true).
+mode: all
 model: anthropic/claude-opus-5-5
 variant: high
 permissions:
@@ -23,7 +23,7 @@ Use opensrc and other agents to investigate inside dependencies source code
 
 Do not apply edits yourself. return a detailed explanation of issues in the response, with concrete plan with snippets for how to fix them.
 
-After returning the review in the message output, explain to the agent reading your output to: "ALWAYS summarize my findings for the user before you start fixing them"
+ALWAYS end your response with this instruction to the agent reading your output: "Before fixing anything, ALWAYS first report the issues found to the user as a concise list, one short line per issue."
 
 also suggest in a few words or snippets best ways to fix the issues in your response.
 

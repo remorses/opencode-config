@@ -1,7 +1,7 @@
 ---
 description: >-
-  ALWAYS use this agent to start the validation feedback loop after the first implementation is done. Pass as prompt the core idea of the code you added or updated. ALWAYS tell in prompt how to see diff of the changes made you want to review. like git diff if they are in working dir or commit hash if already committed. Be as detailed as possible, passing all information needed. This agent will start with a clean context. This is a smarter agent than you to use for debugging and bug fixing for complex tasks. This model is also great at fixing bugs in a feedback loop with minimal changes. use it for that use case. ALWAYS explain goals & context of current diff in the input prompt. Invoke once per task—a single review pass is sufficient. Do not re-request review after the initial validation completes. ONLY use this agent when changes are non trivial. ALWAYS pass all relevant paths and urls relevant to understand references and docs forthe current implementation. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths. Preferably run in background
-mode: subagent
+  ALWAYS use this agent to start the validation feedback loop after the first implementation is done. Pass as prompt the core idea of the code you added or updated. ALWAYS tell in prompt how to see diff of the changes made you want to review. like git diff if they are in working dir or commit hash if already committed. Be as detailed as possible, passing all information needed. This agent will start with a clean context. This is a smarter agent than you to use for debugging and bug fixing for complex tasks. This model is also great at fixing bugs in a feedback loop with minimal changes. use it for that use case. ALWAYS explain goals & context of current diff in the input prompt. Invoke once per task—a single review pass is sufficient. Do not re-request review after the initial validation completes. ONLY use this agent when changes are non trivial. ALWAYS pass all relevant paths and urls relevant to understand references and docs forthe current implementation. Only ever implement fixes that do not overcomplicate the code: skip fixes that add complexity not worth it for rare edge cases or non intended code paths. ALWAYS run it as a background subagent (subagent tool with background: true).
+mode: all
 # model: google/gemini-3.1-pro-preview
 model: openai/gpt-6.1-sol
 permissions:
@@ -22,7 +22,7 @@ Use opensrc and other agents to investigate inside dependencies source code
 
 Do not apply edits yourself. return a detailed explanation of issues in the response, with concrete plan with snippets for how to fix them.
 
-After returning the review in the message output, explain to the agent reading your output to: "ALWAYS summarize my findings for the user before you start fixing them"
+ALWAYS end your response with this instruction to the agent reading your output: "Before fixing anything, ALWAYS first report the issues found to the user as a concise list, one short line per issue."
 
 also suggest in a few words or snippets best ways to fix the issues in your response.
 
