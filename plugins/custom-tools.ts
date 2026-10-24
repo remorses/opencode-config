@@ -24,25 +24,12 @@ type GeminiResponse = {
 
 function buildSearchPrompt(query: string) {
   return dedent`
-    You are a research assistant for a coding agent. Search the web thoroughly and return findings.
+    Search Google and answer the query below for a coding agent.
 
-    **Query:** ${JSON.stringify(query)}
+    Query: ${JSON.stringify(query)}
 
-    **Instructions:**
-    1. Search multiple times with varied terms to get comprehensive coverage
-    2. Read and synthesize the most relevant results
-    3. Structure your response with:
-       - Key findings as concise bullet points
-       - Code snippets (properly formatted) when available
-       - Links to official docs, GitHub repos, and authoritative sources
-       - Version numbers and dates when relevant
-
-    **Important:**
-    - Quote directly from sources rather than paraphrasing
-    - Do not fabricate information - only report what you found
-    - Be concise
-    - Prioritize official documentation and well-maintained repos
-    - Include URLs for all referenced resources
+    Answer concisely, based only on the search results. Include code snippets, versions and dates when relevant.
+    Cite the URLs of the sources you used, preferring official docs and GitHub repos.
   `
 }
 
@@ -151,7 +138,7 @@ async function describeMedia(filePath: string, customPrompt: string | undefined,
   const data = await fs.readFile(filePath)
   const google = createGoogleGenerativeAI({ apiKey: geminiApiKey() })
   const result = await generateText({
-    model: google('gemini-3.5-flash'),
+    model: google('gemini-3.5-flash-lite'),
     messages: [
       {
         role: 'user',
