@@ -21,7 +21,7 @@ is the reference implementation of everything below.
 
 | What | Where |
 |---|---|
-| **Global private key** (encrypted PEM) | iCloud Drive `ghosthand-signing/apple-signing-global-private-key-tommaso-de-rossi-92MF9DG2LR.key` |
+| **Global private key** (encrypted PEM) | iCloud Drive `apple-signing/apple-signing-global-private-key-tommaso-de-rossi-92MF9DG2LR.key` |
 | Developer ID Application cert + key (`.p12`) | same folder `developer-id-application.p12`, Sigillo `DEVELOPER_ID_APPLICATION_P12_BASE64` |
 | Developer ID Installer cert + key (`.p12`) | same folder `developer-id-installer.p12`, Sigillo `DEVELOPER_ID_INSTALLER_P12_BASE64` |
 | Password of the key and both `.p12` | **only** Sigillo `DEVELOPER_ID_P12_PASSWORD` |
@@ -29,7 +29,7 @@ is the reference implementation of everything below.
 | Team ID | Sigillo `APPLE_TEAM_ID` |
 
 Sigillo location: org **ghosthand**, project **macos-release** (`01M5WWCS9407MR455JC5AXSKX6`),
-env **prod**. Local copy: `~/Documents/ghosthand-signing` (no `.key` files there). Load the
+env **prod**. Local copy: `~/Documents/apple-signing` (no `.key` files there). Load the
 `sigillo` skill before touching secrets. Never print a secret value; pipe it.
 
 ## Rule: one global private key for everything
@@ -44,7 +44,7 @@ was made with its own key (`apple-developer-id-installer-2026-only-private-key-.
 is renewed, use the global key.
 
 ```bash
-KEY="$HOME/Library/Mobile Documents/com~apple~CloudDocs/ghosthand-signing/apple-signing-global-private-key-tommaso-de-rossi-92MF9DG2LR.key"
+KEY="$HOME/Library/Mobile Documents/com~apple~CloudDocs/apple-signing/apple-signing-global-private-key-tommaso-de-rossi-92MF9DG2LR.key"
 export PW=$(sigillo secrets get DEVELOPER_ID_P12_PASSWORD -p 01M5WWCS9407MR455JC5AXSKX6 -c prod --raw)
 openssl req -new -key "$KEY" -passin env:PW -out /tmp/request.csr \
   -subj "/emailAddress=atrox@outlook.it/CN=Tommaso De Rossi/C=IT"
@@ -79,7 +79,7 @@ Reading these `.p12` files back with OpenSSL needs `-legacy`. Check the cert mat
 compare `openssl x509 -noout -modulus` with `openssl rsa -noout -modulus`.
 
 Then store it: `base64 -i out.p12 | tr -d '\n' | sigillo secrets set NAME -p ... -c prod`, and copy
-the `.p12` and `.cer` to the iCloud folder and `~/Documents/ghosthand-signing`.
+the `.p12` and `.cer` to the iCloud folder and `~/Documents/apple-signing`.
 
 ## Sign in builds: temporary keychain, never the login keychain
 
@@ -198,7 +198,7 @@ type the Apple Account password or 2FA codes; ask the user.
   reload the page and check for the key row before clicking again, so you do not make two keys.
 - **Download the .p8:** the key row's **Download** opens a confirmation dialog with a second
   **Download**; the file lands in `~/Downloads/AuthKey_<KEY ID>.p8`. It **downloads only once**:
-  save it to iCloud `ghosthand-signing` and Sigillo right away, then delete it from Downloads.
+  save it to iCloud `apple-signing` and Sigillo right away, then delete it from Downloads.
   Key ID and Issuer ID stay visible on that page.
 - **Team ID** is on https://developer.apple.com/account (Membership details).
 
