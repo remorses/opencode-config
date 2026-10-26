@@ -114,7 +114,11 @@ codesign --verify --strict --verbose=2 Foo.app
 - **Never re-sign on the user's Mac.** Ship the signed bundle and copy it as is. Ad-hoc signing on
   the user's machine changes the identity, and macOS forgets the app's permissions (TCC).
 - A Developer ID signature's designated requirement is bundle id + team, so permissions survive
-  updates. Keep the bundle id fixed forever.
+  updates and different builds (tested: a separately signed build copied over the installed one
+  kept Camera access). Keep the bundle id fixed forever.
+- **Sign dev builds with the same Developer ID**, not ad-hoc. Then dev, npm and installer builds
+  share one identity and one set of permissions. Moving a Mac from an ad-hoc build to a Developer
+  ID build makes macOS ask for each permission once more.
 - Private frameworks (MobileDevice, CoreBluetooth private calls) work under hardened runtime:
   Ghosthand's signed build captured the iPhone screen, sent Bluetooth input and read USB info.
 
@@ -133,6 +137,7 @@ xcrun stapler staple Foo.app
 - Submit an app as a zip: `ditto -c -k --keepParent Foo.app Foo.zip`. Staple the `.app`, then
   zip it again for distribution.
 - Notarize and staple a signed `.pkg` too (`notarytool submit Foo.pkg`, `stapler staple Foo.pkg`).
+- The full Ghosthand release build, including both notarizations, took about 4 minutes.
 
 ## .pkg installer for the current user (no admin password)
 
@@ -165,7 +170,9 @@ codesign -dvv Foo.app               # Authority=Developer ID Application..., fla
 pkgutil --check-signature Foo.pkg
 ```
 
-`rejected, source=Unnotarized Developer ID` means signing worked but notarization or stapling is
+`curl` downloads are not quarantined either, so add the flag after `curl` too. A notarized,
+stapled build shows `accepted, source=Notarized Developer ID` for both the pkg and the installed
+app. `rejected, source=Unnotarized Developer ID` means signing worked but notarization or stapling is
 missing. Unsigned or unnotarized downloads show "Apple could not verify" with no Open button on
 macOS 15+; users would need System Settings > Privacy & Security > Open Anyway.
 
@@ -185,9 +192,14 @@ type the Apple Account password or 2FA codes; ask the user.
 - **App Store Connect API key:** https://appstoreconnect.apple.com/access/integrations/api. First
   the account holder must accept the App Store Connect Terms of Service in the browser (a legal
   agreement: ask the user to click Agree). Then **Request Access**, tick the checkbox, Submit (it
-  is approved at once), **Generate API Key**, name it, role **Developer** (enough for notarytool).
-  The `.p8` **downloads only once**: save it to iCloud and Sigillo right away. Key ID and Issuer ID
-  stay visible on that page.
+  is approved at once), **Generate API Key**. In the dialog: fill `[id="name"]`, click the
+  **Select Roles** textbox, pick `menuitem` **Developer** (enough for notarytool), press Escape to
+  close the menu, then the dialog's **Generate**. The first Generate click may not register;
+  reload the page and check for the key row before clicking again, so you do not make two keys.
+- **Download the .p8:** the key row's **Download** opens a confirmation dialog with a second
+  **Download**; the file lands in `~/Downloads/AuthKey_<KEY ID>.p8`. It **downloads only once**:
+  save it to iCloud `ghosthand-signing` and Sigillo right away, then delete it from Downloads.
+  Key ID and Issuer ID stay visible on that page.
 - **Team ID** is on https://developer.apple.com/account (Membership details).
 
 ## Enrollment and account gotchas
