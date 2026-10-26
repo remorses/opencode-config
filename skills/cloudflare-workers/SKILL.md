@@ -6,7 +6,7 @@ description: >
   Covers wrangler.jsonc configuration, type-safe env via `wrangler types` and
   `import { env } from 'cloudflare:workers'`, secrets.required for typed secrets,
   custom_domain for routing, preview/production environments, deploy scripts,
-  the `cf` CLI for actions wrangler cannot do (analytics, traces, DNS, domains),
+  the `cf` CLI for actions wrangler cannot do (analytics, traces, DNS, domains, email routing),
   Durable Objects with SQLite, Spiceflow as the web framework with Vite,
   WebSocket close codes on Durable Objects (1006 isolate kill, always reconnect),
   and Durable Object OOM detection (exceededMemory vs scriptThrewException,
@@ -18,6 +18,8 @@ description: >
   errors, taking heap snapshots, or reducing isolate RSS. Load
   durable-object-usage.md when checking DO duration or spend per project, or
   why WebSocket DOs never hibernate (keepalive pings waking them).
+  Load email-routing.md when setting up email forwarding, destination verification,
+  MX records, or catch-all rules with the cf CLI.
 ---
 
 # Cloudflare Workers
@@ -395,6 +397,9 @@ cf schema dns records create                    # raw API request and response d
 
 - Keep search queries anonymous: describe the action and resource type, with no domains, emails or IDs.
 - Do not explore with nested `--help` calls; one `cf cli search` is faster.
+
+For **email forwarding**, destination verification, managed MX/SPF/DKIM records,
+catch-all rules, and end-to-end tests with zele, read [email-routing.md](./email-routing.md).
 
 `cf` also replaces wrangler for projects with a typed `cloudflare.config.ts` (beta). See ./cf.md for the config format, bindings (D1, KV, R2, AI, Hyperdrive), modes instead of envs, `cf migrate`, and creating a PlanetScale Postgres database billed through Cloudflare. Never run `cf dev`/`cf build`/`cf deploy` in a project that only has `wrangler.jsonc`.
 
