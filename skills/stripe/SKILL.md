@@ -295,6 +295,15 @@ Existing subscriptions stay on the old price. New checkouts use the new price. N
 
 If Step 2 fails (for example because `transfer_lookup_key` isn't supported on that price type), the old price still owns the lookup key and nothing is broken — you can safely delete the dangling new price via `stripe prices update $NEW_PRICE -d active=false` and retry.
 
+### Promotion codes are secrets
+
+A promotion code string (`CRDH...`) is a password for free money when Checkout has `allow_promotion_codes: true`. Treat it like an API key:
+
+- **Never write the code string** in source, docs, commits, tests, issues, PRs or chat. Refer to it by its id (`promo_...`) or its Sigillo secret name.
+- Store it in Sigillo with stdin, so it is never printed: `stripe promotion_codes create ... | jq -r .code | sigillo secrets set PROMO_CODE_<NAME>`.
+- Limit every code: `max_redemptions`, `expires_at`, or `restrictions` (e.g. one `customer`). Never make an unlimited 100%-off-forever code; on a Stripe account shared by several products, restrict the coupon with `applies_to[products][]`.
+- **If a code leaked**, deactivate it (`stripe promotion_codes update promo_... -d active=false`) and create a new one. Do not delete the coupon: subscriptions that already redeemed it keep their discount.
+
 ## Single customer per Org
 
 **Rule: create a Stripe Customer once per `Org`, store its id in `Org.stripeCustomerId`, reuse it forever.** This is the single biggest lever for preventing duplicate customers, duplicate subscriptions, and broken portal sessions.
