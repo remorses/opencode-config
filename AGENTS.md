@@ -75,6 +75,10 @@ When asked to plan: read all relevant files first (files to modify, their import
 - Never weaken, skip, or special-case tests to make them pass (e.g. skipping on Linux). Leave them failing and report the problem, or ask the oracle agent.
 - If existing tests fail at session start, check recent commits for regressions.
 
+## database
+
+Always tell me about DB schema or migration changes, with a separate critique URL for them. Show the changed tables in Prisma syntax, whatever the ORM.
+
 ## linting
 
 Run `lintcn lint` at the end of an editing session, inside the edited package (not monorepo root). Fix issues in files you changed. Never add a local lintcn config; a global one exists. If a rule looks buggy or noisy, suggest a session in `/Users/morse/Documents/GitHub/lintcn/`.
