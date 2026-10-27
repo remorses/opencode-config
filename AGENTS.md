@@ -74,6 +74,7 @@ When asked to plan: read all relevant files first (files to modify, their import
 - No mocks, no module mocking. Test the real end-to-end flow (e.g. real native side of a NAPI package, not fake functions).
 - Never weaken, skip, or special-case tests to make them pass (e.g. skipping on Linux). Leave them failing and report the problem, or ask the oracle agent.
 - If existing tests fail at session start, check recent commits for regressions.
+- To test user-facing apps people install (Mac apps, installers), use them as a new user with the `cua-driver` skill.
 
 ## database
 
