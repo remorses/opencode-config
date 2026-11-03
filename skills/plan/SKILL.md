@@ -1,8 +1,8 @@
 ---
 name: plan
 description: >
-  Plan work that spans several tasks or sessions as a checklist file where every box names
-  its evidence, then execute it task by task with clean pickup between sessions. Adapted
+  Plan work that spans several tasks or sessions as a short checklist file that says what
+  to change and why, not how, where every box names its evidence, then execute it task by task with clean pickup between sessions. Adapted
   from the pstack multi-phase plan playbook. Records user corrections and design calls as
   decision files in plans/decisions/ (adapted from tRPC vNext), so later agents keep the
   same choices. Use when asked to plan, write a plan, break work into tasks or phases, or
@@ -57,6 +57,14 @@ Decisions: `plans/decisions/`. Search them before designing or refactoring.
 The `Decisions:` line is permanent. Add it with the first decision file and keep it after
 the plan is done.
 
+**Be as concise as possible.** A plan says **what** changes and **why**, never **how**. The
+executing agent reads the code and picks the implementation. Rules:
+
+- No code, no function signatures, no step-by-step edits, no file-by-file lists.
+- One or two lines per task. If a task needs a paragraph, split it or cut it.
+- Name a file or symbol only when it fixes scope (what to delete, which surface changes).
+- Write down only what the agent cannot find in the code: goal, constraints, decisions.
+
 One task is one session-sized unit that ends in a state you can check. Order tasks so the
 sequence proves itself:
 
@@ -68,56 +76,28 @@ sequence proves itself:
 ````markdown
 # <Goal> plan
 
-<Under 10 lines: what changes, for whom, the done check for the whole plan, task ids in order.>
+<1 to 3 lines: what changes, for whom, and why.>
 
-## How to read this
+Check a box only when its evidence exists (command output, screenshot, log line, commit
+SHA). Write the evidence next to the box. Verify on the real artifact, not tests alone.
 
-One box is one unit of work. Check a box only when its evidence exists: a command output,
-a file, a screenshot, a log line, a commit SHA. Write the evidence next to the box.
-Tests alone are not verification. Each task is verified on the real artifact.
+## Task 1: <what changes>
 
-## Task 1: <verb phrase>
+- [ ] <the outcome, one line>. Pass when <observable predicate>.
 
-**Depends on.** None.
+## Task 2: <what changes> (after Task 1)
 
-**Files.**
-- [ ] Edit `<path>`
-- [ ] Delete `<path>`
-
-**Build.**
-- [ ] <one change, naming the symbol and file>
-
-**You see.**
-- [ ] <one observable result: exact output, screen state or log line>
-
-**Verify.**
-- [ ] Run `<command>`. Pass when <predicate>.
-- [ ] <drive the real surface: CLI command, playwriter, tuistory, HTTP call>. Pass when <predicate>.
-
-**Progress.** <empty until a session stops mid-task>
-
-## Task 2: <verb phrase>
-
-**Depends on.** Task 1.
-...
+- [ ] ...
 
 ## Done
 
-- [ ] Every box above is checked with evidence.
 - [ ] <whole-goal check on the real artifact>
 
-## Appendix A. Prototype evidence
-<each open question a prototype settled, with the scratch path and what it showed>
-
-## Appendix B. Decisions
-<a link to each `plans/decisions/<topic>.md` this plan made or depends on>
-
-## Appendix C. Risks
-<each risk, the task it lands in, what to watch>
+Decisions: <links to `plans/decisions/<topic>.md` this plan made or depends on>
 ````
 
-Every placeholder gets filled. A box you cannot write a pass predicate for is not scoped
-yet.
+Add a `Progress:` line under a task only when a session stops mid-task. A box you cannot
+write a pass predicate for is not scoped yet. Omit empty sections.
 
 ## Record decisions
 
@@ -167,7 +147,7 @@ edit the decision file.
 
 Each session starts with pickup:
 
-1. Read the plan file, the decision files its Appendix B links, `git log` since the plan
+1. Read the plan file, the decision files its `Decisions:` line links, `git log` since the plan
    was written, and `git status`.
 2. Name the resume point: the first task with unchecked boxes whose dependencies are done.
    Do not redo checked boxes. The plan is authoritative.
@@ -201,8 +181,7 @@ On pause, user going offline, or a context window close to full:
 
 1. Finish or back out of the current box. Start nothing new.
 2. Commit as one `wip:` commit. If the tree is broken, say so in the commit body.
-3. Fill the task's **Progress** field: what is done, what is verified, the next step, key
-   files, gotchas.
+3. Add a short `Progress:` line under the task: what is done, the next step, gotchas.
 
 The next session resumes from the plan, not from chat history. In Kimaki, read the old
 session only if the plan is missing context: `kimaki session read <id> > ./tmp/s.md`.
