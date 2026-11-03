@@ -1,6 +1,6 @@
 ---
-description: The default build agent using GPT 6.1 Sol.
+description: The default build agent
 mode: all
-model: openai/gpt-6.1-sol
+model: anthropic/claude-opus-5-5
 variant: high
 ---

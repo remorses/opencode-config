@@ -1,13 +1,15 @@
 {
   "$schema": "https://gist.githubusercontent.com/remorses/776ab3907d24c1fe9749232f0189588a/raw/opencode-v2-config.schema.json",
   "model": "anthropic/claude-opus-5-5",
-  "warming": { "duration": "30 minutes" },
+  "warming": { "duration": "10 minutes" },
   "instructions": ["OPENCODE_CONFIG_AGENTS.md"],
   "skills": [
     "/Users/morse/.config/opencode/synced-skills",
+    "/Users/morse/.config/opencode/hyperframes-skills",
     "/Users/morse/.config/opencode/skills-repo/skills",
     "/Users/morse/.config/opencode/private-skills/skills",
-    "/Users/morse/Documents/GitHub/iphone-usb-control/skills"
+    "/Users/morse/Documents/GitHub/iphone-usb-control/skills",
+    "/Users/morse/Documents/GitHub/iphone-usb-control/daemon/skills"
   ],
   "compaction": { "auto": true },
   "providers": {
@@ -52,7 +54,8 @@
     }
   },
   "plugins": [
-    "/Users/morse/Documents/GitHub/kimakivoice/kimaki/dist/plugin/anthropic"
+    "/Users/morse/Documents/GitHub/kimakivoice/kimaki/dist/plugin/anthropic",
+    "/Users/morse/Documents/GitHub/kimakivoice/opencode-fallback/dist"
   ],
   "formatter": false,
   "permissions": [
@@ -60,6 +63,11 @@
     {
       "action": "edit",
       "resource": "/Users/morse/.config/opencode/synced-skills/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "/Users/morse/.config/opencode/hyperframes-skills/*",
       "effect": "deny"
     }
   ],

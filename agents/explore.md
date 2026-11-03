@@ -19,6 +19,7 @@ permissions:
   - { action: "read", resource: "*.env.example", effect: allow }
   - { action: "webfetch", resource: "*", effect: allow }
   - { action: "websearch", resource: "*", effect: allow }
+  - { action: "external_directory", resource: "*", effect: allow }
 ---
 
 You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
