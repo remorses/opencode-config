@@ -6,14 +6,14 @@ description: >
   reference video (the gemini subagent reads the media file and lists its effects and search
   terms), the openverse.ts CLI (search, get with credits, audition reel), picking by ear with the
   gemini subagent, trimming and normalizing with ffmpeg, syncing cues to visible actions, and
-  Tommy's taste rules (few cues, no repeated pops, a different whoosh for each scene). Use when
+  Tommy's taste rules (a soft sound for every movement, no pops or high bells, a different whoosh for each scene). Use when
   the user asks for sound effects, sfx, sound design, whooshes, pops or clicks in a video.
 ---
 
 # sound-effects
 
 **Whenever you need sound effects, search Openverse to find the best options and use them for
-tasteful sound design within the video.** Few cues, each on a visible action, quiet under the music.
+tasteful sound design within the video.** A soft sound on every movement, quiet under the music.
 
 ```bash
 SFX=~/.config/opencode/skills/sound-effects/openverse.ts
@@ -21,7 +21,13 @@ ov() { sigillo run -p 01M6KWJ82P6XSS7M4YWTK5HSWW -c dev -- bun $SFX "$@"; }   # 
 ov search "airy whoosh" --max-ms 2000           # id, length, license, title, tags
 ov get <id> assets/sfx/whoosh-soft.mp3 --credits assets/sfx/CREDITS.md
 bun $SFX reel /tmp/reel.mp4 a.mp3 b.mp3 c.mp3   # audition video + start time of each
+bun ~/.config/opencode/skills/sound-effects/analyze.ts assets/sfx/*.mp3 [--json]
 ```
+
+`analyze.ts` measures every file without an agent: duration, perceived loudness (`lufs`, EBU R128),
+peak, `onset` (leading silence), `hit` (loudest 10 ms, the point to sync), spectral `centroid`, the
+3 main frequencies, the share of energy above 4 kHz, and a `character` (low, mid, bright, very
+bright). Run it on every candidate and every pick before you set a volume or a start time.
 
 Use a shell function, not a `RUN='sigillo run ...'` variable: zsh runs `$RUN` as one command name.
 
@@ -29,9 +35,15 @@ Use a shell function, not a `RUN='sigillo run ...'` variable: zsh runs `$RUN` as
 
 Tommy's rules, learned from feedback. Follow them before anything else.
 
-- **Less is more.** Do not put a sound on every element. Pick the key moments: a landing, a sent
-  message, a cut, the logo. Groups of things that appear together (icons, words of a title) get
-  one sound or none, never one each.
+- **Every movement gets a sound.** In a motion graphics video each thing that moves, appears or
+  lands has a fitting sound: titles, icons growing, cards landing, a phone sliding in, a check
+  turning green, a message arriving. Go through every tween of every scene and list the ones
+  without a cue. Things that move together get one sound: a staggered row (icons, checks) gets
+  a cascade, one copy per item pitched up a step (see step 5). Continuous motion (a scrolling
+  feed, floating hearts) needs no sound per item.
+- **Keep the sounds soft** so many cues still feel calm: low or mid, quiet under the music.
+- **One family per kind of movement:** titles share a soft tap, cards a sub bloop, checks a micro
+  tick. Pitch the title tap up or down a few semitones per scene so scenes do not sound the same.
 - **No pops and bubble bops.** Bright bubble pops get annoying fast. For chat bubbles use a soft,
   low tap (low-passed around 5 kHz, volume ~0.35), and only on the important messages.
 - **Never repeat the same sound across scenes.** Every scene cut and scene entry gets a
@@ -39,17 +51,19 @@ Tommy's rules, learned from feedback. Follow them before anything else.
   scene when the repeats are close in time, like 3 camera moves or a row of taps.
 - **No doubled cues.** If two sounds land within ~0.4 s of each other (a cut whoosh and a "phone
   rises" whoosh, a tap and an "app opens" whoosh), keep one.
-- **Copy the reference's density,** not more. If the original has 9 effects in 20 s, do not
-  place 60 in 35 s.
 - **Not cheesy:** no 8-bit, cartoon boings, kung-fu stick swishes, vocal or breathy sounds.
+- **No high bells.** Avoid high-pitched bell, chime and ding sounds: they cut through the music and
+  rarely sound good in a video. Prefer low, soft and airy sounds.
+- **High sounds much quieter.** The ear hears high pitches as louder, so bright sounds must sit well
+  below low ones. Set volumes from measured loudness, never by peak (see step 5).
 
 ## Workflow
 
 1. **Copy the reference.** When there is an original or reference video, start a `gemini`
    subagent and tell it to read the media file itself (its `read-video-or-audio` tool, absolute
    path) and list every sound effect: timestamp, what happens on screen, a description, and 2-3
-   search queries. Do not use `describe-media` for this. Use its queries and its density, not
-   your own guesses. Check its timestamps against the composition's real timings: they are
+   search queries. Do not use `describe-media` for this. Use its queries and its sound families,
+   not your own guesses. Check its timestamps against the composition's real timings: they are
    often 0.5-1 s off.
 2. **Search** each family (whoosh, tap, thud, typing, chime, sparkle, impact). Default is
    `--license cc0`. Keep `--max-ms` short: UI sounds under 1 s, whooshes under 2 s. Queries of 1-2
@@ -62,16 +76,33 @@ Tommy's rules, learned from feedback. Follow them before anything else.
    cheesy, noisy or vocal sounds. Its scores vary between calls: use them to reject bad sounds,
    not to rank close ones. Measure brightness and length yourself (librosa spectral centroid,
    RMS peak time) to tell candidates apart.
-4. **Trim and normalize** the picks into the project (`assets/sfx/<role>.mp3`): cut leading silence,
-   fade long tails, peak at -1 dB, so volumes are set only in the cue sheet.
+4. **Trim** the picks into the project (`assets/sfx/<role>.mp3`): cut leading silence and fade long
+   tails. Peak-normalizing to -1 dB is fine for storage, but it says nothing about how loud a sound
+   feels: a bright click at -1 dB is far louder than a sub whoosh at -1 dB.
 
    ```bash
    ffmpeg -i in.mp3 -af "silenceremove=start_periods=1:start_threshold=-50dB,afade=t=out:st=0.9:d=0.5,volume=6dB" -ar 48000 -ac 2 out.mp3
    ```
 
-5. **Place cues on visible actions**, read from the composition's timing constants, not by eye.
-   Start each sound so its **loudest point** (RMS peak) lands on the event: `start = event - peak`.
-   A whoosh peaks at the cut, a thud when the object lands. Volumes 0.2-0.45 under music at ~0.8.
+5. **Place cues on every movement**, read from the composition's timing constants, not by eye.
+   Start each sound so its `hit` lands on the event: `start = event - hit`. A whoosh peaks at the
+   cut, a thud when the object lands. For a staggered group build one cascade file with ffmpeg:
+   copies of the sound delayed to each item's time and pitched up (`asetrate=48000*2^(n/12)`,
+   `aresample=48000`, `adelay`, `amix=normalize=0`). Pitch variants for another scene use the
+   same `asetrate` trick.
+6. **Set volumes from loudness.** Measure the music and every sound with `analyze.ts`, then pick
+   each cue's volume so it hits a target below the music, lower for brighter sounds:
+
+   | character | cue loudness (music at about -15 LUFS) |
+   |---|---|
+   | low | -26 LUFS |
+   | mid | -28 LUFS |
+   | bright | -32 LUFS |
+   | very bright | -36 LUFS |
+   | logo accent (impact) | -21 LUFS |
+
+   `volume = 10 ** ((target - lufs) / 20)`. Only lower volumes with this rule, never raise a cue the
+   user already accepted.
 
 ## Gotchas
 
@@ -80,6 +111,8 @@ Tommy's rules, learned from feedback. Follow them before anything else.
   credentials in Sigillo) and `sleep 2` between searches in loops.
 - **Gemini timing is coarse.** It cannot tell sounds less than ~1 s apart. Keep reel gaps at 0.6 s
   and pass the exact start times; for close calls send one file per reel.
+- **The gemini subagent sometimes starts without its media tool.** If it says it cannot read the
+  file, call `describe-media` yourself for auditions instead of retrying.
 - **You cannot hear.** Always tell the user to check the mix by ear.
 - Openverse `category=sound_effect` filters out almost everything; leave it off. Many "whoosh"
   results are martial-arts stick swings (qubodup, Nightflame, Joao_Janz); skip them.
