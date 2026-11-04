@@ -24,9 +24,20 @@ The README ends with an **Agent notes** section (asset workflow and gotchas). Fo
 
 If `cosmos` is not on PATH, install it from the README Setup section (https://github.com/remorses/cosmos-cli).
 
+## Folders
+
+Always download into a folder named after the search query, in kebab-case, never into a shared `./assets` folder:
+
+```bash
+cosmos search "paper texture" --type image --limit 100 --download ./assets/paper-texture
+cosmos search "ocean waves" --type video --download ./assets/ocean-waves --concurrency 8
+cosmos collection maratorresg/paper-texture --limit 1000 --download ./assets/maratorresg-paper-texture
+cosmos element https://www.cosmos.so/e/457818511 --download ./assets/brand-identity
+```
+
 ## Rules
 
 - Show the user the element URLs (`https://www.cosmos.so/e/<id>`) and, for images, upload a few downloaded files with `kimaki upload-to-discord` so they can pick.
-- Downloads go to a folder the user named, or the project folder. Never `~/Downloads` unless asked.
+- Downloads go under a folder the user named, or `./assets` in the project folder, always in a `<query-slug>` subfolder. Never `~/Downloads` unless asked.
 - Mention `source.url` when the user plans to publish an asset: most cosmos images come from Pinterest, Behance and other sites.
 - If a command fails with a playwriter error, ask the user to click the playwriter extension icon in Chrome, or retry with `--anonymous`.
