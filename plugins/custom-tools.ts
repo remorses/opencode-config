@@ -174,6 +174,9 @@ async function describeMedia(filePath: string, customPrompt: string | undefined,
 const DESCRIBE_MEDIA_DESCRIPTION = dedent`
   Describe an image, video or audio file (mp3, wav, m4a, ...) with Gemini.
 
+  This tool costs money (gemini-4-argon, paid per call). Use it only when necessary: read images
+  directly with the read tool, and measure what you can with ffprobe or ffmpeg first.
+
   Audio timing is coarse: Gemini cannot place or tell apart sounds less than ~1 s apart, so a reel
   of many short sounds gets mixed-up, made-up answers. To compare short sounds, send one file per
   call with ~1 s of silence around it (ffmpeg -af "adelay=1000|1000,apad=pad_dur=1"), and measure
