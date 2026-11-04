@@ -113,10 +113,29 @@ const MIME_TYPES: Record<string, string> = {
   '.wmv': 'video/x-ms-wmv',
   '.3gp': 'video/3gpp',
   '.ogv': 'video/ogg',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.ogg': 'audio/ogg',
+  '.flac': 'audio/flac',
 }
 
-function buildDescribePrompt(isVideo: boolean, customPrompt?: string) {
-  const base = isVideo
+// flash-lite heard a 0.12 s click as "water" or a 2.5 s shimmer and made up timestamps;
+// gemini-4-argon describes short sounds correctly. Costs cents per call.
+const DESCRIBE_MODEL = 'gemini-4-argon'
+
+// A custom prompt replaces the default one: the default asks for MM:SS timestamps, which made
+// Gemini round sub-second events to whole seconds even when the custom prompt asked for 0.1 s.
+function buildDescribePrompt(kind: 'image' | 'video' | 'audio', customPrompt?: string) {
+  if (customPrompt) return customPrompt
+  if (kind === 'audio') {
+    return dedent`
+      Describe this audio: speech, music and sound effects, in time order.
+      Include timestamps for salient moments in MM:SS format.
+    `
+  }
+  return kind === 'video'
     ? dedent`
       Describe the key events in this video, providing both audio and visual details.
       Include timestamps for salient moments in MM:SS format (e.g. 00:05, 01:15, 12:30).
@@ -126,25 +145,24 @@ function buildDescribePrompt(isVideo: boolean, customPrompt?: string) {
       Explain in detail the contents of this image file.
       Describe visual elements, text, colors, layout, objects, people, and any notable details.
     `
-  return customPrompt ? `${base}\n\nAdditional instructions: ${customPrompt}` : base
 }
 
 async function describeMedia(filePath: string, customPrompt: string | undefined, signal: AbortSignal) {
   const ext = path.extname(filePath).toLowerCase()
   const mediaType = MIME_TYPES[ext]
   if (!mediaType) throw new Error(`Unsupported file extension "${ext}". Supported: ${Object.keys(MIME_TYPES).join(', ')}`)
-  const isVideo = mediaType.startsWith('video/')
+  const kind = mediaType.startsWith('video/') ? 'video' : mediaType.startsWith('audio/') ? 'audio' : 'image'
 
   const data = await fs.readFile(filePath)
   const google = createGoogleGenerativeAI({ apiKey: geminiApiKey() })
   const result = await generateText({
-    model: google('gemini-3.5-flash-lite'),
+    model: google(DESCRIBE_MODEL),
     messages: [
       {
         role: 'user',
         content: [
-          isVideo ? { type: 'file', data, mediaType } : { type: 'image', image: data, mediaType },
-          { type: 'text', text: buildDescribePrompt(isVideo, customPrompt) },
+          kind === 'image' ? { type: 'image', image: data, mediaType } : { type: 'file', data, mediaType },
+          { type: 'text', text: buildDescribePrompt(kind, customPrompt) },
         ],
       },
     ],
@@ -154,7 +172,12 @@ async function describeMedia(filePath: string, customPrompt: string | undefined,
 }
 
 const DESCRIBE_MEDIA_DESCRIPTION = dedent`
-  Describe an image or video file using Gemini vision.
+  Describe an image, video or audio file (mp3, wav, m4a, ...) with Gemini.
+
+  Audio timing is coarse: Gemini cannot place or tell apart sounds less than ~1 s apart, so a reel
+  of many short sounds gets mixed-up, made-up answers. To compare short sounds, send one file per
+  call with ~1 s of silence around it (ffmpeg -af "adelay=1000|1000,apad=pad_dur=1"), and measure
+  duration and loudness with ffprobe, not Gemini.
 
   Video files must be under ~15 MB (base64 overhead pushes the 20 MB request limit).
   For larger or longer videos, split them first with ffmpeg before calling this tool:
@@ -237,7 +260,7 @@ export default Plugin.define({
             prompt: {
               type: 'string',
               description:
-                'Optional custom prompt to guide the description. Added on top of the default detailed description prompt.',
+                'Optional prompt. Replaces the default description prompt, so say everything you want answered.',
             },
           },
           required: ['path'],
