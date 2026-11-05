@@ -141,6 +141,7 @@ Run `lintcn lint` at the end of an editing session, inside the edited package (n
 
 ## skills
 
+- Skill secrets (API keys a skill script needs) go in the Sigillo org `skills`, one project per skill, env `dev`. Scripts read env vars and run via `sigillo run -p <project-id> -c dev -- ...`. Never the macOS Keychain or `.env` files.
 - Personal skills: `~/.config/opencode/skills` (this dir is a git repo; commit and run critique here).
 - Public skills: `~/.config/opencode/skills-repo/` (submodule of remorses/skills). Add `repo: remorses/skills` in frontmatter.
 - Private skills: `~/.config/opencode/private-skills/` (submodule of remorses/private-skills). Add `repo: remorses/private-skills`. Never publish.
