@@ -55,7 +55,8 @@
   },
   "plugins": [
     "/Users/morse/Documents/GitHub/kimakivoice/kimaki/dist/plugin/anthropic",
-    "/Users/morse/Documents/GitHub/kimakivoice/opencode-fallback/dist"
+    "/Users/morse/Documents/GitHub/kimakivoice/opencode-fallback/dist",
+    "/Users/morse/Documents/GitHub/kimakivoice/opencode-muse-code/dist"
   ],
   "formatter": false,
   "permissions": [
