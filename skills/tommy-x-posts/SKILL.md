@@ -17,7 +17,7 @@ description: >
    in code. Never use numbers from memory or from the user's rough notes
    without verifying against the source. If a note is wrong, use the real
    number and tell the user you corrected it.
-2. **Study his recent tweets** with the `searching-x` skill
+2. **Study his recent tweets** with the `grok-bot` skill
    (`from:__morse -filter:replies`) to calibrate the voice against what he
    actually posts, not against these rules alone.
 3. **Draft in chat, never post immediately.** Show a long post draft + a short
@@ -79,7 +79,7 @@ description: >
 
 ## Inspiration accounts
 
-Before drafting, read recent posts from these accounts with the `searching-x`
+Before drafting, read recent posts from these accounts with the `grok-bot`
 skill and borrow what fits:
 
 - **@emilkowalski** (`from:emilkowalski -filter:replies`, no trailing
