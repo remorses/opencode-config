@@ -1,4 +1,4 @@
-// Custom tools: googlesearch, describe-media, read-video.
+// Custom tools: googlesearch, describe-media, read-video-or-audio.
 // Auto-discovered by OpenCode V2 from ~/.config/opencode/plugins/.
 // codemode: false exposes each tool directly to the model, not only inside `execute`.
 
@@ -121,9 +121,9 @@ const MIME_TYPES: Record<string, string> = {
   '.flac': 'audio/flac',
 }
 
-// flash-lite heard a 0.12 s click as "water" or a 2.5 s shimmer and made up timestamps;
-// gemini-4-argon describes short sounds correctly. Costs cents per call.
-const DESCRIBE_MODEL = 'gemini-4-argon'
+// flash-lite heard a 0.12 s click as "water" or a 2.5 s shimmer and made up timestamps.
+// gemini-3.8-flash leads AudioMC (60.4%, Argon 58.4%) at about a third of Argon's price.
+const DESCRIBE_MODEL = 'gemini-3.8-flash'
 
 // A custom prompt replaces the default one: the default asks for MM:SS timestamps, which made
 // Gemini round sub-second events to whole seconds even when the custom prompt asked for 0.1 s.
@@ -174,7 +174,7 @@ async function describeMedia(filePath: string, customPrompt: string | undefined,
 const DESCRIBE_MEDIA_DESCRIPTION = dedent`
   Describe an image, video or audio file (mp3, wav, m4a, ...) with Gemini.
 
-  This tool costs money (gemini-4-argon, paid per call). Use it only when necessary: read images
+  This tool costs money (gemini-3.8-flash, paid per call). Use it only when necessary: read images
   directly with the read tool, and measure what you can with ffprobe or ffmpeg first.
 
   Audio timing is coarse: Gemini cannot place or tell apart sounds less than ~1 s apart, so a reel
@@ -188,21 +188,33 @@ const DESCRIBE_MEDIA_DESCRIPTION = dedent`
     ffmpeg -i input.mp4 -ss 300 -t 300 -c copy part2.mp4
 `
 
-// read-video
+// read-video-or-audio
 
-const VIDEO_MIME_TYPES: Record<string, string> = {
+const MEDIA_MIME_TYPES: Record<string, string> = {
   '.mp4': 'video/mp4',
   '.m4v': 'video/mp4',
   '.webm': 'video/webm',
   '.mov': 'video/quicktime',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.ogg': 'audio/ogg',
+  '.flac': 'audio/flac',
 }
 
-const MAX_VIDEO_BYTES = 20 * 1024 * 1024
+const MAX_MEDIA_BYTES = 20 * 1024 * 1024
 
-async function loadVideo(filePath: string, signal: AbortSignal) {
+// Models whose capabilities (models.dev) include audio or video input read media themselves with
+// read-video-or-audio and do not get describe-media. Other models get only describe-media.
+// OpenCode Go today: gemini-4-argon, mimo-v2.5 / v2.6 and muse-spark take audio + video; kimi,
+// qwen, minimax, glm-5.3-flash and step-5 take video only.
+type MediaSupport = { audio: boolean; video: boolean }
+
+async function loadMedia(filePath: string, signal: AbortSignal) {
   if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
     const res = await fetch(filePath, { signal })
-    if (!res.ok) throw new Error(`Failed to fetch video: ${res.status} ${res.statusText}`)
+    if (!res.ok) throw new Error(`Failed to fetch media: ${res.status} ${res.statusText}`)
     return {
       bytes: Buffer.from(await res.arrayBuffer()),
       name: new URL(filePath).pathname.split('/').pop() || 'video.mp4',
@@ -210,12 +222,12 @@ async function loadVideo(filePath: string, signal: AbortSignal) {
     }
   }
   const resolved = path.resolve(filePath)
-  const mime = VIDEO_MIME_TYPES[path.extname(resolved).toLowerCase()]
+  const mime = MEDIA_MIME_TYPES[path.extname(resolved).toLowerCase()]
   if (!mime) {
-    throw new Error(`Unsupported video format: ${path.extname(resolved)}. Supported: ${Object.keys(VIDEO_MIME_TYPES).join(', ')}`)
+    throw new Error(`Unsupported format: ${path.extname(resolved)}. Supported: ${Object.keys(MEDIA_MIME_TYPES).join(', ')}`)
   }
   const bytes = await fs.readFile(resolved).catch(() => {
-    throw new Error(`Video file not found: ${resolved}`)
+    throw new Error(`File not found: ${resolved}`)
   })
   return { bytes, name: path.basename(resolved), mime }
 }
@@ -223,6 +235,31 @@ async function loadVideo(filePath: string, signal: AbortSignal) {
 export default Plugin.define({
   id: 'morse.custom-tools',
   async setup(ctx) {
+    let models: Promise<Map<string, MediaSupport>> | undefined
+    const loadModels = async () => {
+      const { data } = await ctx.model.list()
+      return new Map(
+        data.map((m) => [`${m.providerID}/${m.id}`, { audio: m.capabilities.input.includes('audio'), video: m.capabilities.input.includes('video') }]),
+      )
+    }
+    async function readsMedia(model: { providerID: string; id: string }) {
+      const key = `${model.providerID}/${model.id}`
+      const support = (await (models ??= loadModels())).get(key) ?? (await (models = loadModels())).get(key)
+      return Boolean(support?.audio || support?.video) || /gemini/i.test(model.id)
+    }
+    // describe-media also checks at call time: hiding the tool in the context hook is not enough,
+    // models still called it. A media-capable model gets an error telling it to read the file itself.
+    async function sessionReadsMedia(sessionID: string) {
+      const session = await ctx.session.get({ sessionID: sessionID as never }).catch(() => undefined)
+      const model = session?.model as { providerID: string; id: string } | undefined
+      return model ? readsMedia(model) : false
+    }
+
+    await ctx.session.hook('context', async (input) => {
+      if (await readsMedia(input.model)) delete input.tools['describe-media']
+      else delete input.tools['read-video-or-audio']
+    })
+
     await ctx.tool.transform((editor) => {
       editor.add({
         name: 'googlesearch',
@@ -272,31 +309,36 @@ export default Plugin.define({
         options: { codemode: false },
         execute: async (input, context) => {
           const args = input as { path: string; prompt?: string }
+          if (context.agent === 'gemini' || (await sessionReadsMedia(context.sessionID))) {
+            throw new Error(
+              'describe-media is disabled for models that read audio and video natively. Call read-video-or-audio with this file instead, then answer from your own context.',
+            )
+          }
           return { content: await describeMedia(args.path, args.prompt, context.signal) }
         },
       })
 
       editor.add({
-        name: 'read-video',
+        name: 'read-video-or-audio',
         description:
-          'Read a video or audio file (mp4, webm, mov, mp3, wav) from a local path or URL and add it directly into model context window for analysis. Only works with Google Gemini models; non-Gemini models will get an error from the provider. If you are not using a Gemini model, use a Gemini subagent or the describe-media tool instead.',
+          'Read a video or audio file (mp4, webm, mov, mp3, wav, m4a, aac, ogg, flac) from a local path or URL and add it directly into model context window for analysis. Only offered to models that take audio or video input (Gemini, MiMo, Muse Spark; video only: Kimi, Qwen, MiniMax, GLM-5.3-Flash, Step 5). A video-only model cannot hear audio: use a Gemini subagent for sound.',
         input: {
           type: 'object',
-          properties: { filePath: { type: 'string', description: 'Absolute file path or URL to the video' } },
+          properties: { filePath: { type: 'string', description: 'Absolute file path or URL to the video or audio file' } },
           required: ['filePath'],
           additionalProperties: false,
         },
         options: { codemode: false },
         execute: async (input, context) => {
-          const { bytes, name, mime } = await loadVideo((input as { filePath: string }).filePath, context.signal)
-          if (bytes.length > MAX_VIDEO_BYTES) {
+          const { bytes, name, mime } = await loadMedia((input as { filePath: string }).filePath, context.signal)
+          if (bytes.length > MAX_MEDIA_BYTES) {
             throw new Error(
-              `Video exceeds 20 MB limit (${(bytes.length / 1024 / 1024).toFixed(1)} MB). Trim it with: ffmpeg -i input.mp4 -t 30 -c copy trimmed.mp4`,
+              `File exceeds 20 MB limit (${(bytes.length / 1024 / 1024).toFixed(1)} MB). Trim it with: ffmpeg -i input.mp4 -t 30 -c copy trimmed.mp4`,
             )
           }
           return {
             content: [
-              { type: 'text', text: `Video read successfully: ${name} (${(bytes.length / 1024).toFixed(0)} KB, ${mime})` },
+              { type: 'text', text: `Read successfully: ${name} (${(bytes.length / 1024).toFixed(0)} KB, ${mime})` },
               { type: 'file', uri: `data:${mime};base64,${bytes.toString('base64')}`, mime, name },
             ],
           }
