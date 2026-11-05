@@ -602,6 +602,91 @@ If the repo has Prisma schemas, add generate steps before tests:
   working-directory: cli
 ```
 
+## Publishing multi-platform packages from CI
+
+A package that ships **native binaries** for many platforms (napi-rs `.node`
+files, Rust or Zig CLIs) must publish from GitHub Actions. A local publish only
+has the host binary, so every other platform breaks. Build each target in a
+matrix job, upload artifacts, then publish from one job that downloads them all.
+
+Keep **`NPM_TOKEN` in Sigillo**, not in GitHub Actions secrets. GitHub stores
+only `SIGILLO_TOKEN` (secret) and `SIGILLO_PROJECT` (variable). npm write tokens
+expire; Sigillo tokens do not. When the npm token expires, update it once in
+Sigillo and every repo gets it on the next run.
+
+```
+build matrix (one job per target)
+  darwin-arm64 ──┐
+  linux-x64 ─────┼──► upload-artifact ──► publish job ──► download-artifact
+  win32-x64 ─────┘                             │
+                                               ▼
+  GitHub secret SIGILLO_TOKEN ──► sigillo run ──► injects NPM_TOKEN ──► publish ──► npm
+  (never expires)                   (prod env: rotate the npm token here only)
+```
+
+Publish step with **bun**:
+
+```yaml
+publish:
+  needs: [build, test]
+  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  runs-on: ubuntu-latest
+  steps:
+    # ... checkout, install, download-artifact
+    # NPM_TOKEN lives in Sigillo. CI only stores SIGILLO_TOKEN.
+    - name: Publish my-pkg
+      env:
+        SIGILLO_TOKEN: ${{ secrets.SIGILLO_TOKEN }}
+        SIGILLO_PROJECT: ${{ vars.SIGILLO_PROJECT }}
+        SIGILLO_ENVIRONMENT: prod
+      working-directory: my-pkg
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        if npm view "my-pkg@${VERSION}" version 2>/dev/null; then
+          echo "my-pkg@${VERSION} already published, skipping"
+          exit 0
+        fi
+        bunx sigillo run --command 'printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_TOKEN" > "$HOME/.npmrc" && bun publish --access public'
+```
+
+With **npm**, let `actions/setup-node` write the `.npmrc` and map the token to
+`NODE_AUTH_TOKEN`:
+
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: 24
+    registry-url: https://registry.npmjs.org
+- name: Publish
+  env:
+    SIGILLO_TOKEN: ${{ secrets.SIGILLO_TOKEN }}
+    SIGILLO_PROJECT: ${{ vars.SIGILLO_PROJECT }}
+    SIGILLO_ENVIRONMENT: prod
+  run: npx sigillo run --command 'NODE_AUTH_TOKEN=$NPM_TOKEN npm publish --access public'
+```
+
+Rules:
+
+- **Single quotes** around `--command`, so `$NPM_TOKEN` expands in the child
+  shell after Sigillo injects it, not in the runner shell where it is empty
+- **Version check** before publish. Every push to `main` runs the job; only a
+  new `package.json` version publishes. Re-runs after a failure are safe
+- **Publish order** matters in monorepos: platform packages first, then the
+  main package, then packages that depend on it
+- **Block local publish** with a `prepublishOnly` CI guard (see package.json
+  rules above)
+- One-time repo setup: `gh secret set SIGILLO_TOKEN` (reads stdin, never pass
+  the value as an argument) and `gh variable set SIGILLO_PROJECT --body <id>`
+
+Real examples:
+
+- [gpuix `ci.yml`](https://github.com/remorses/gpuix/blob/2e31b47ff6432ceebe70e7fc7b0f51a76d7d30cf/.github/workflows/ci.yml#L372-L493):
+  napi-rs, four native targets, then `@gpuix/native`, `@gpuix/react` and
+  `@gpuix/solid` published with `bun publish` in order
+- [sigillo `cli-ci.yml`](https://github.com/remorses/sigillo/blob/14e799984410a1d8b4800fb1930a3ecff18c61df/.github/workflows/cli-ci.yml#L132-L146):
+  Zig CLI cross-compiled for every platform, published with `npm publish`. It
+  runs the just-built linux binary as `sigillo` instead of `npx sigillo`
+
 ## README
 
 for the first section of readme use markup like this
