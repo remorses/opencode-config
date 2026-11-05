@@ -6,8 +6,10 @@ description: >
   reference video (the gemini subagent reads the media file and lists its effects and search
   terms), the openverse.ts CLI (search, get with credits, audition reel), picking by ear with the
   gemini subagent, trimming and normalizing with ffmpeg, syncing cues to visible actions, and
-  Tommy's taste rules (a soft sound for every movement, no pops or high bells, a different whoosh for each scene). Use when
-  the user asks for sound effects, sfx, sound design, whooshes, pops or clicks in a video.
+  Tommy's taste rules (a soft sound for every movement, no pops or high bells, a different whoosh for each scene),
+  and mix levels for launch videos (-14 LUFS master for YouTube and X, voiceover pace and chain, music
+  ducking, loudnorm and ebur128 commands). Use when the user asks for sound effects, sfx, sound design,
+  whooshes, pops or clicks, a voiceover, or audio levels and loudness in a video.
 ---
 
 # sound-effects
@@ -103,6 +105,67 @@ Tommy's rules, learned from feedback. Follow them before anything else.
 
    `volume = 10 ** ((target - lufs) / 20)`. Only lower volumes with this rule, never raise a cue the
    user already accepted.
+7. **Master the final render** to the delivery target in [Mix levels](#mix-levels).
+
+## Mix levels
+
+Deliver every video at **-14 LUFS integrated, -1 dBTP true peak**, 48 kHz stereo. YouTube turns
+louder videos down to -14 LUFS and never turns quieter ones up, so a -18 LUFS mix just plays quiet
+([Production Advice](https://productionadvice.co.uk/youtube-loudness/),
+[details](https://productionadvice.co.uk/youtube-loudness-normalisation-details/)). Spotify uses
+the same target and keeps peaks under -1 dBTP because lossy encoders add peaks
+([Spotify](https://support.spotify.com/us/artists/article/loudness-normalization/)). YouTube, X and
+Instagram all re-encode. X publishes no target; -14 LUFS works there too.
+
+| element (measure each stem alone) | level |
+|---|---|
+| full mix | -14 LUFS integrated, -1 dBTP |
+| voiceover | -16 LUFS, LRA under 7 LU ([Apple Podcasts](https://podcasters.apple.com/support/893-audio-requirements) speech target) |
+| music, no voice | about -15 LUFS |
+| music under voice | 12-18 dB below the voice, about -30 LUFS. [Auphonic](https://auphonic.com/help/web/multitrack.html) ducks 18 dB with 500 ms fades by default |
+| sound effects | step 6 table. A cue that lands on a key spoken word (name, price, CTA) goes 6 dB lower, not away |
+
+Real launch videos measured with `ebur128`: [Intro to Linear](https://www.youtube.com/watch?v=9Q5BoiIFBiY)
+-18.6 LUFS (plays 4.6 dB quiet), [New Raycast](https://www.youtube.com/watch?v=Mi173xGb0ZA) -13.2,
+[Meet Notion Calendar](https://www.youtube.com/watch?v=C4Q2ezioTUM) -11.6,
+[Arc on Windows](https://www.youtube.com/watch?v=LJQsAOon6og) -9.7 (turned down 4.3 dB).
+
+```bash
+# measure integrated loudness (I), range (LRA) and true peak: read the Summary block
+ffmpeg -nostats -i final.mp4 -af ebur128=peak=true -f null - 2>&1 | grep -A12 Summary
+
+# duck music under the voice (about 15 dB with music near -14 LUFS)
+ffmpeg -i music.wav -i vo.wav -filter_complex "[1:a]asplit=2[sc][vox];[0:a][sc]sidechaincompress=threshold=0.02:ratio=10:attack=20:release=400[duck];[duck][vox]amix=inputs=2:normalize=0:duration=first[a]" -map "[a]" mix.wav
+
+# master to -14 LUFS / -1 dBTP: pass 1 measures, pass 2 applies one linear gain
+m=$(ffmpeg -hide_banner -i render.mp4 -af loudnorm=I=-14:TP=-1:LRA=11:print_format=json -f null - 2>&1 | sed -n '/^{/,/^}/p')
+ffmpeg -i render.mp4 -af "loudnorm=I=-14:TP=-1:LRA=11:linear=true:measured_I=$(jq -r .input_i <<<$m):measured_TP=$(jq -r .input_tp <<<$m):measured_LRA=$(jq -r .input_lra <<<$m):measured_thresh=$(jq -r .input_thresh <<<$m):offset=$(jq -r .target_offset <<<$m)" -ar 48000 -c:v copy -c:a aac -b:a 192k final.mp4
+```
+
+`loudnorm` works at 192 kHz inside, so always pass `-ar 48000`. When the peaks leave no room for one
+linear gain it falls back to dynamic mode ([ffmpeg docs](https://ffmpeg.org/ffmpeg-filters.html#loudnorm),
+[author's notes](http://k.ylo.ph/2016/04/04/loudnorm.html)). Check `final.mp4` with `ebur128` after.
+In a timeline that knows the voice line times, prefer a music volume ramp to sidechain: down to
+`0.18` (-15 dB) 0.3 s before each line, back up 0.5 s after it.
+
+### Voiceover
+
+- **Pace:** about 150 words per minute, so 30 s holds about 75 words
+  ([VirtualSpeech](https://virtualspeech.com/blog/average-speaking-rate-words-per-minute)). Read
+  the script aloud with a timer. Leave a beat of silence after each thing the viewer must see.
+- **Lock the voice before the cues.** Time scenes to the voice lines, then place cues on the
+  movements.
+- **Clean chain** for recorded or TTS voice: rumble cut, de-ess, gentle compression, level to -16 LUFS.
+
+  ```bash
+  ffmpeg -i vo-raw.wav -af "highpass=f=80,deesser,acompressor=threshold=-20dB:ratio=3:attack=5:release=100:makeup=2,loudnorm=I=-16:TP=-1.5:LRA=7" -ar 48000 -ac 2 vo.wav
+  ```
+
+- **Works muted.** Feeds autoplay without sound: 85% of Facebook video was watched muted
+  ([Digiday](https://digiday.com/media/silent-world-facebook-video/)). Burn in captions so the
+  story works without the voice; sound adds polish.
+- **Check small speakers.** Tell the user to check on a phone speaker: sub cues vanish there and
+  loud music hides the voice.
 
 ## Gotchas
 
