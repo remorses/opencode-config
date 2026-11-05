@@ -62,14 +62,30 @@ Start from the closest example in `examples/` (they link claude-style):
    ```
 
 Run `render.ts render --help` for options (`--id`, `--scale`, `--width`, `--dark`). Output type
-comes from the extension: `.png` / `.jpg` (default scale 2: 2120px wide) or `.svg`.
+comes from the extension: `.png` / `.jpg` (default scale 2: 2120px wide).
 
-**SVG for websites and READMEs.** `-o fig.svg --dark nextjs-style` writes one self-contained
-svg (css and latin fonts embedded, ~80 to 160 KB) whose colors follow the viewer's light or dark
-mode: the page's style in light mode, the colors of `--dark <style>` in dark mode (fonts stay).
-Embed it as a plain markdown image `![alt](/assets/fig.svg)`: no `<picture>`, works on GitHub
-and in Holocron. Write a full alt text that describes the flow, agents read it instead of
-the image.
+**Light and dark copies for websites and READMEs.** Render the figure twice; `--dark <style>`
+keeps the layout and fonts and swaps in that style's colors:
+
+```bash
+bun ~/.config/opencode/skills/diagrams-and-charts/render.ts render fig.html -o fig.png
+bun ~/.config/opencode/skills/diagrams-and-charts/render.ts render fig.html -o fig-dark.png --dark nextjs-style
+```
+
+On GitHub use `<picture>`. In Holocron MDX wrap each `<img>` in a `div`: Holocron's image
+wrapper sets an inline `display`, so a `className` on the `<img>` cannot hide it.
+
+```html
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/fig-dark.png" />
+  <img alt="Full description of the flow" src="assets/fig.png" />
+</picture>
+
+<div className="dark:hidden"><img src="/assets/fig.png" alt="..." /></div>
+<div className="hidden dark:block"><img src="/assets/fig-dark.png" alt="..." /></div>
+```
+
+Write a full alt text that describes the flow, agents read it instead of the image.
 
 ## Writing figures
 
@@ -111,8 +127,7 @@ the image.
   than the label. Shorten the label or put it in `sub` (second line) when a gap is narrow.
 - Two arrows leaving the same side of one box overlap. Spread them with `fromAt: 0.3` and
   `fromAt: 0.7`, or start one from the enclosing group.
-- The svg is the rendered html inside a `<foreignObject>`. Browsers render it (also in `<img>`);
-  design tools (Figma, Inkscape) and some image converters do not. Use png there.
+- `--dark` must change only colors: the arrows keep the light render's positions.
 - Code that draws asynchronously must register its promise with `track()` from `diagram.ts`,
   otherwise the screenshot can happen before it finishes.
 - Use `.box.dashed` (svg outline), not css `border-style: dashed`. Import `diagram.ts` on pages
