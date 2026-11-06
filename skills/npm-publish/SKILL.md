@@ -284,11 +284,36 @@ cd vite && pnpm publish --access public --no-git-checks
 bun publish --access public
 ```
 
-After publishing, immediately verify no `workspace:` references leaked:
+### Verify the version is live on the registry
+
+A `+ packagename@x.y.z` line from the publish command does **not** mean the version is live. npm can hold a new version in a hidden **staged** state for a few minutes. During that time:
+
+- `registry.npmjs.org/<pkg>/<version>` returns `"version not found"` and `latest` still points to the old version
+- publishing again fails with `409 Conflict: Cannot publish over previously staged version "x.y.z"`
+- `npm stage list <pkg>` can be empty, so there is nothing to approve
+
+The version then goes live on its own. Seen on zele@0.11.0 (Nov 2026): `bun publish` printed success, the version was invisible for about 2 minutes, then appeared with no action. The 409 means the upload worked. **Never bump the version** because of it, and never publish the same version again in a loop.
+
+Check the registry directly, and retry for up to about 10 minutes:
 
 ```bash
-npm view packagename@x.y.z dependencies --json | grep workspace
-# must return empty — if it returns anything, the publish is broken
+for i in $(seq 1 20); do
+  v=$(curl -s "https://registry.npmjs.org/packagename/x.y.z?t=$(date +%s)" | jq -r '.version? // empty')
+  [ "$v" = "x.y.z" ] && echo "live: $v" && break
+  echo "not visible yet ($i/20)"; sleep 30
+done
+curl -s https://registry.npmjs.org/packagename | jq '."dist-tags"'
+```
+
+Only report the publish as done after this prints `live`. If it never does, run `npm stage list packagename` and check the **Staged Packages** tab on npmjs.com. A real staged version needs `npm stage approve <stage-id>` with 2FA, which only the user can do.
+
+This is separate from npm **staged publishing** (`npm stage publish`, npm CLI 11.15.0+), where a maintainer must approve every version with 2FA. npm plans to remove direct publishing with 2FA-bypass tokens in January 2027; after that, publishing with such a token will need `npm stage publish` plus approval, or trusted publishing (OIDC). See the [staged publishing docs](https://docs.npmjs.com/staged-publishing), the [GA changelog](https://github.blog/changelog/2026-05-22-staged-publishing-and-new-install-time-controls-for-npm/) and [stage-only tokens](https://github.blog/changelog/2026-09-18-stage-only-npm-tokens-for-safer-automation/).
+
+Then verify no `workspace:` references leaked. Read the dependencies from the registry, so an empty result cannot hide a missing version:
+
+```bash
+curl -s https://registry.npmjs.org/packagename/x.y.z | jq '[.dependencies // {} | to_entries[] | select(.value | startswith("workspace"))]'
+# must print []. Anything else means the publish is broken
 ```
 
 If a broken version was published, bump patch, republish correctly, and deprecate the broken version:
