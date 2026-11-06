@@ -175,6 +175,41 @@ for span in readingSpans: span.duration += extra * span.weight / totalWeight
 - **Land on the word.** Visual moments hit the spoken word or the beat: a circle drawn as the
   word is said, a stamp on the downbeat.
 
+## Textures
+
+Flat CSS colour looks like a web page. A light paper texture and an animated grain make it look
+printed and filmed. Ready files live in `textures/` next to this skill; copy them into the
+project's `assets/`.
+
+| File | Use | Source |
+| --- | --- | --- |
+| `paper-fine-offwhite.jpg` | the ground: neutral off-white, fine tooth, 2160 px | [cosmos](https://www.cosmos.so/e/1105763690) |
+| `paper-fine-grey.jpg` | a cooler, darker ground or a card back | [cosmos](https://www.cosmos.so/e/576531001) |
+| `paper-cold-press.jpg` | paper objects with relief (notes, tickets, cards) | [pinterest](https://www.pinterest.com/pin/1093811828237448272/) |
+| `grain-mono.jpg` | grain overlay, even, no vignette | [pinterest](https://www.pinterest.com/pin/1057079343802453490/) |
+| `grain-rgb.jpg` | colour grain overlay, for a filmed look | [cosmos](https://www.cosmos.so/e/951654745), by Louis Vogler |
+
+- **Much weaker than you think.** The ground of a polished explainer measured a pixel standard
+  deviation of about 1.4; these papers are about 4 to 5. Shift the texture to the ground colour,
+  then show its detail at about 30% (`opacity` over a flat fill, or `soft-light`).
+- **Grain moves, paper does not.** Paper is fixed to the world and moves with the camera. Grain is
+  fixed to the screen and changes every two frames: offset the grain tile by a seeded hash of
+  `floor(frame / 2)`, never `Math.random()`. A still grain looks like a dirty screen.
+- **Texture the objects too.** Cards, notes and tickets get the paper at the same low strength, so
+  the objects look as physical as the ground.
+- **Measure it against the reference.** When copying a video, compare the pixel spread of a flat
+  patch of ground and of one card in both, and tune the strength until they match.
+- **Credit before publishing.** These come from Pinterest and cosmos uploads, not stock sites.
+  `grain-rgb.jpg` is an artist's Instagram post: replace it before a public release.
+- **Skip vintage overlays.** The video overlays found on Pinterest and cosmos ("film grain
+  overlay") are all heavy light leaks, scratches and dust. They do not fit a clean explainer.
+
+```
+grainOffset(frame):
+  step = floor(frame / 2)
+  return (hash(step) % TILE_W, hash(step + 1) % TILE_H)   # seeded, so any frame renders alone
+```
+
 ## Process
 
 1. **Beat table first.** Before building, write one row per beat and show it to the user; ask
