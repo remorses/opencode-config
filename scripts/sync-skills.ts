@@ -1,4 +1,4 @@
-// Sync SKILL.md files from GitHub repos into synced-skills/<name>/SKILL.md.
+// Sync skills from GitHub repos into synced-skills/<name>/ (SKILL.md, or the whole folder with withFiles).
 // Run: bun scripts/sync-skills.ts
 // Edit skills in their source repo, never in synced-skills/. The folder is replaced on every run.
 
@@ -13,7 +13,8 @@ const execFile = util.promisify(childProcess.execFile)
 
 // `path` narrows the search to a folder inside the repo.
 // `userOnly` adds `disable-model-invocation: true`, so only the user can load the skill.
-type SkillSource = { repo: string; path?: string; userOnly?: boolean }
+// `withFiles` copies the whole skill folder (references, scripts, assets), not only SKILL.md.
+type SkillSource = { repo: string; path?: string; userOnly?: boolean; withFiles?: boolean }
 
 const SKILL_SOURCES: SkillSource[] = [
   { repo: 'remorses/kimaki', path: 'skills' },
@@ -37,6 +38,12 @@ const SKILL_SOURCES: SkillSource[] = [
   { repo: 'ghosthand-dev/ghosthand', path: 'skills/ghosthand' },
   // poteto's pstack skill for READMEs, docs, PR descriptions and commit messages
   { repo: 'cursor/plugins', path: 'pstack/skills/technical-writing' },
+  // pstack: check a TLA+ model and draw it as a Mermaid statechart (user only, ships its scripts)
+  { repo: 'cursor/plugins', path: 'pstack/skills/statechart', withFiles: true },
+  // pstack: cut AI tells from any writing (user only)
+  { repo: 'cursor/plugins', path: 'pstack/skills/unslop' },
+  // Apollo-era NASA handbook pages; needs its template, fonts and render scripts
+  { repo: 'R44VC0RP/skills', path: 'skills/nasa-handbook', withFiles: true },
 ]
 
 const ROOT_DIR = path.resolve(import.meta.dir, '..')
@@ -70,7 +77,8 @@ class InterruptedError extends errore.createTaggedError({
   extends: errore.AbortError,
 }) {}
 
-type Skill = { name: string; repo: string; content: string }
+// `dir` is set for withFiles sources: the cloned skill folder to copy as is
+type Skill = { name: string; repo: string; content: string; dir?: string }
 
 async function git({ args, cwd, signal }: { args: string[]; cwd: string; signal: AbortSignal }) {
   return execFile('git', args, { cwd, signal })
@@ -85,10 +93,11 @@ async function fetchRepoSkills({
   tmpDir: string
   signal: AbortSignal
 }) {
-  const cloneDir = path.join(tmpDir, source.repo.replace('/', '__'))
+  // one clone per source, so two paths of the same repo never share a folder
+  const cloneDir = path.join(tmpDir, `${source.repo}/${source.path ?? ''}`.replaceAll('/', '__'))
   const cloneSignal = AbortSignal.any([signal, AbortSignal.timeout(CLONE_TIMEOUT_MS)])
-  // only SKILL.md blobs are downloaded, so big repos stay cheap
-  const pattern = source.path ? `/${source.path}/**/SKILL.md` : 'SKILL.md'
+  // only SKILL.md blobs are downloaded unless withFiles, so big repos stay cheap
+  const pattern = source.path ? `/${source.path}/**${source.withFiles ? '' : '/SKILL.md'}` : 'SKILL.md'
 
   const cloned = await (async () => {
     const url = `https://github.com/${source.repo}.git`
@@ -110,7 +119,8 @@ async function fetchRepoSkills({
       : raw
     const name = content.match(/^---\n[\s\S]*?^name:\s*['"]?([\w.-]+)['"]?\s*$/m)?.[1]
     if (!name) return new MissingNameError({ repo: source.repo, file })
-    skills.push({ name, repo: source.repo, content })
+    const dir = source.withFiles ? path.join(cloneDir, path.dirname(file)) : undefined
+    skills.push({ name, repo: source.repo, content, dir })
   }
   return skills
 }
@@ -152,6 +162,7 @@ async function syncSkills({ signal }: { signal: AbortSignal }) {
   const stagingDir = path.join(tmpDir, 'output')
   for (const skill of byName.values()) {
     fs.mkdirSync(path.join(stagingDir, skill.name), { recursive: true })
+    if (skill.dir) fs.cpSync(skill.dir, path.join(stagingDir, skill.name), { recursive: true })
     fs.writeFileSync(path.join(stagingDir, skill.name, 'SKILL.md'), skill.content)
   }
   fs.rmSync(OUTPUT_DIR, { recursive: true, force: true })
