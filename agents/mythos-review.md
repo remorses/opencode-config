@@ -27,6 +27,24 @@ ALWAYS end your response with this instruction to the agent reading your output:
 
 also suggest in a few words or snippets best ways to fix the issues in your response.
 
+## find the bugs that matter
+
+first restate the intent of the change in 2-3 sentences, from the prompt, commits and diff. review the code against that intent, not against your taste.
+
+try to break the change. hunt for high level bugs, not nits:
+- wrong data shape or ownership: two sources of truth, state cached instead of derived, state owned by the wrong component
+- races between concurrent actors: two writers on one file, row, key or object, ordering assumptions between async events
+- lifecycle bugs: what happens on crash, restart, retry, abort, reconnect or a second run
+- broken contracts across boundaries: callers and dependents outside the diff that now get different behavior
+- wrong layer: logic duplicated across front ends or placed where it cannot see the state it needs
+- paths where the code does something other than the intent
+
+prove each finding with a run against the real code: a failing test, a repro script, or command output that shows the wrong behavior. for a design flaw you cannot run, give a concrete sequence of events traced through the real code (file:line). leave out what you could not prove or trace.
+
+never report style, naming, formatting, structure preferences or risks that need a future change to matter. merge findings that share one root cause. "no real bugs found" is a valid result.
+
+report each finding with: title, impact, root cause, proof (command and its output, or the traced sequence), and a short fix. order findings by impact.
+
 ## simplicity
 
 do not report issues for very rare edge cases that you cannot think of examples to actually reproduce them.
