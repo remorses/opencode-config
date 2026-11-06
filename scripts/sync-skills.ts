@@ -12,9 +12,11 @@ import * as errore from 'errore'
 const execFile = util.promisify(childProcess.execFile)
 
 // `path` narrows the search to a folder inside the repo.
-// `userOnly` adds `disable-model-invocation: true`, so only the user can load the skill.
+// `userOnly: true` adds `disable-model-invocation: true`, so only the user can load the skill.
+// `userOnly: false` removes it, so the model can load a skill upstream marks user only.
+// `description` replaces the upstream description.
 // `withFiles` copies the whole skill folder (references, scripts, assets), not only SKILL.md.
-type SkillSource = { repo: string; path?: string; userOnly?: boolean; withFiles?: boolean }
+type SkillSource = { repo: string; path?: string; userOnly?: boolean; description?: string; withFiles?: boolean }
 
 const SKILL_SOURCES: SkillSource[] = [
   { repo: 'remorses/kimaki', path: 'skills' },
@@ -38,8 +40,16 @@ const SKILL_SOURCES: SkillSource[] = [
   { repo: 'ghosthand-dev/ghosthand', path: 'skills/ghosthand' },
   // poteto's pstack skill for READMEs, docs, PR descriptions and commit messages
   { repo: 'cursor/plugins', path: 'pstack/skills/technical-writing' },
-  // pstack: check a TLA+ model and draw it as a Mermaid statechart (user only, ships its scripts)
-  { repo: 'cursor/plugins', path: 'pstack/skills/statechart', withFiles: true },
+  // pstack: check a TLA+ model and draw it as a Mermaid statechart (ships its scripts)
+  // model can load it, but only when the user asks for a statechart
+  {
+    repo: 'cursor/plugins',
+    path: 'pstack/skills/statechart',
+    withFiles: true,
+    userOnly: false,
+    description:
+      'Check a TLA+ model of a system that moves between states, such as a product flow, a protocol, or a service, and draw it as a Mermaid statechart. The report gives the shortest path to each state that breaks a rule. Use for /statechart, or to show a bug as a path through states. When user asks for a statechart only.',
+  },
   // pstack: cut AI tells from any writing (user only)
   { repo: 'cursor/plugins', path: 'pstack/skills/unslop' },
   // Apollo-era NASA handbook pages; needs its template, fonts and render scripts
@@ -84,6 +94,19 @@ async function git({ args, cwd, signal }: { args: string[]; cwd: string; signal:
   return execFile('git', args, { cwd, signal })
 }
 
+// edits only the frontmatter block, so the skill body is never touched
+function applyOverrides({ raw, source }: { raw: string; source: SkillSource }) {
+  const match = raw.match(/^---\n([\s\S]*?\n)---\n/)
+  if (!match) return raw
+  let frontmatter = match[1].replace(/^disable-model-invocation:.*\n/m, '')
+  const upstreamUserOnly = frontmatter.length !== match[1].length
+  if (source.userOnly ?? upstreamUserOnly) frontmatter += 'disable-model-invocation: true\n'
+  if (source.description) {
+    frontmatter = frontmatter.replace(/^description:.*\n(?:[ \t]+.*\n)*/m, `description: ${JSON.stringify(source.description)}\n`)
+  }
+  return `---\n${frontmatter}---\n${raw.slice(match[0].length)}`
+}
+
 async function fetchRepoSkills({
   source,
   tmpDir,
@@ -113,10 +136,7 @@ async function fetchRepoSkills({
 
   const skills: Skill[] = []
   for (const file of files) {
-    const raw = fs.readFileSync(path.join(cloneDir, file), 'utf-8')
-    const content = source.userOnly && !/^disable-model-invocation:/m.test(raw)
-      ? raw.replace(/^---\n/, '---\ndisable-model-invocation: true\n')
-      : raw
+    const content = applyOverrides({ raw: fs.readFileSync(path.join(cloneDir, file), 'utf-8'), source })
     const name = content.match(/^---\n[\s\S]*?^name:\s*['"]?([\w.-]+)['"]?\s*$/m)?.[1]
     if (!name) return new MissingNameError({ repo: source.repo, file })
     const dir = source.withFiles ? path.join(cloneDir, path.dirname(file)) : undefined

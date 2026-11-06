@@ -1,5 +1,4 @@
 ---
-disable-model-invocation: true
 name: usecomputer
 description: >
   Desktop automation CLI for AI agents (macOS, Linux, Windows). Screenshot,
@@ -7,6 +6,7 @@ description: >
   automating desktop apps with computer use models (GPT-5.4, Claude). Covers
   the screenshot-action feedback loop, coord-map workflow, window-scoped
   screenshots, and system prompts for accurate clicking.
+disable-model-invocation: true
 ---
 
 # usecomputer
