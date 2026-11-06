@@ -4,7 +4,8 @@ description: >
   Tommy's taste for motion graphics videos (launch videos, promo videos, product demos, explainers):
   something always moves, long animations with fast easing so a soft tail keeps moving, a camera that
   never stops, eased slide transitions between scenes (out with ease in, in with ease out), pacing
-  that is fast but leaves time to read, cuts on the music beat, and showing the real product working.
+  that is fast but leaves time to read, cuts on the music beat, showing the real product working,
+  one hero per beat with big readable type, a beat table before building, and example styles.
   Independent of the renderer (HyperFrames, Remotion, three.js, headless Chrome). ALWAYS load this
   skill before you design, animate, edit or review a motion graphics video, a scene transition, a
   camera move or video pacing.
@@ -42,9 +43,12 @@ else, also where a renderer skill says otherwise.
 - **Long durations, fast easing.** Use a strong ease-out (expo, quart) over a long duration,
   about 0.8 to 1.2 s for arrivals. The element is readable almost at once, then settles slowly.
   Short tweens with a mild ease feel stiff and stop dead.
-- **The camera is never still.** It eases between framings without stopping at any of them,
-  and a slow drift (a few px, a fraction of a degree, a slow push in) runs on top all the time.
-- **Slide transitions between scenes.** What leaves slides out and speeds up (ease in, short).
+- **Every start and stop eases.** Nothing jerks into motion or stops abruptly, not even the
+  camera at the end of a long move.
+- **The camera is never still.** It eases between framings without stopping at any of them.
+  During a hold it keeps drifting slowly in the direction of its next move, with subtle
+  handheld movement on top.
+- **Slide transitions between scenes.** When the video has scenes, what leaves slides out and speeds up (ease in, short).
   What enters slides in and slows down (ease out, longer). Never slide an element that stays or
   morphs into the next scene: it keeps moving or morphs instead.
 - **Fast pacing.** Each text stays only long enough to read it, then the video moves on. Do not
@@ -89,8 +93,14 @@ pop(el, at):     from {scale 0.4, opacity 0} to rest, duration 0.3, backOut(2)
 - **Keys, not stops.** Write the camera as a list of keys `(time, focus x, focus y, zoom)` or,
   in 3D, `(time, target, distance, azimuth, elevation)`. Join them with a smooth curve (a monotone
   spline, or ease-in-out per segment) so the camera passes through each key without stopping.
-- **Drift on top.** Add a slow sine wobble on position and a tiny rotation, plus a slow push in.
+- **Drift toward the next move.** In a hold the camera creeps in the direction it is about to
+  go, so the next move grows out of the hold instead of starting from zero.
+- **Handheld on top.** A slow sine wobble on position and a tiny rotation, plus a slow push in.
   This is what keeps a held shot alive.
+- **Feel filmed.** Motion blur on fast moves, light film grain, a soft glow and a vignette make
+  code look shot by a camera. Keep each one subtle.
+- **Travel pattern.** Glide to the place, push in on the detail, pull back to travel, dive in
+  again. The pull back shows where the next detail is before the camera goes there.
 - **Frame what matters.** Push in on the detail the viewer must read (a caption being typed, a
   request arriving). Pull back to show how two things relate (the phone next to the chat). When
   content grows (a bento grid), frame the bounding box of everything shown so far.
@@ -102,9 +112,10 @@ pop(el, at):     from {scale 0.4, opacity 0} to rest, duration 0.3, backOut(2)
 ```
 camera(t):
   key   = splineThrough(CAM_KEYS, t)          # never stops at a key
+  lean  = key.velocityToNextKey * 0.05        # in a hold, creep toward the next move
   drift = (sin(t*0.9)*8, cos(t*0.7)*6), rot = sin(t*0.6)*0.5°
   zoom  = key.zoom * (1 + 0.004*t)            # slow push in
-  return key.focus + drift, zoom, rot
+  return key.focus + lean + drift, zoom, rot
 ```
 
 ## Scene transitions
@@ -150,16 +161,59 @@ for span in readingSpans: span.duration += extra * span.weight / totalWeight
 - **Loops have no sound per item.** A scrolling feed or floating hearts is continuous motion. See
   the `sound-effects` skill for which movements get sounds.
 
+## Readability
+
+- **One idea per beat, one hero.** The hero is sharp and bright, everything else dims back.
+- **Say each phrase once.** If the voiceover says it, show it on a real object or type it on
+  screen, never both, and never repeat it later.
+- **No filler text.** Body copy that is not meant to be read (paper, documents, list rows) is soft
+  grey lines, not words people try to read.
+- **Big type.** Hero words very large, labels never tiny. If it cannot be read on a phone in one
+  second, it is too small or there is too much.
+- **Less is more.** Leave out decorative clutter (stickers, stamps, extra labels, random shapes)
+  that is not part of the story. Prefer design, smooth movement and clarity over more stuff.
+- **Land on the word.** Visual moments hit the spoken word or the beat: a circle drawn as the
+  word is said, a stamp on the downbeat.
+
+## Process
+
+1. **Beat table first.** Before building, write one row per beat and show it to the user; ask
+   about anything unclear.
+
+   | Time | Narration or caption | The one hero | On-screen text |
+   | --- | --- | --- | --- |
+   | 0.0 | "Agents can't use phones" | iPhone, dimmed world | none |
+
+2. **Build, then check your own work** (see [Review](#review)) before the final render.
+3. **Match the format exactly:** aspect, resolution, fps, and a length that matches the voiceover
+   or music.
+
 ## Review
 
 Look at the real render, not the code:
 
+- **A still from every beat:** fix anything cluttered, hard to read or overlapping.
+- **Frame sequences of every camera move:** fix any jerk, jump or abrupt stop.
 - **Frames at every seam:** just before, at and after each cut. No jumps, no element that pops.
 - **Frames inside holds:** two frames 0.5 s apart in a held shot must differ. A frame diff of zero
   means something stopped.
 - **Watch it at full speed once** with the music. Check each text is readable and nothing feels slow.
 - **Pure function of time.** Every frame is computed from `t` alone, with a seeded random. No clock
   time, no real-time transitions, no randomness, so any frame renders on its own.
+
+## Example styles
+
+Styles used in real videos. Pick one per video; the rules above apply to all of them.
+
+- **Scenes with slide transitions** (ghosthand Grok Bot launch): a mascot intro, a phone mockup
+  next to a chat, a bento grid that grows tile by tile, a logo outro. Each scene slides out and the
+  next slides in on the beat, with the camera moving inside every scene.
+- **One continuous world** (cinematic explainer): the whole video is one camera move over one big
+  world (a map, a desk, a board). No cuts and no slide changes; the camera glides, pushes in on
+  details, pulls back to travel and dives in again. Real photos and documents drop onto the world
+  as physical objects (prints, papers, clippings) where the story happens.
+- **3D setup walkthrough** (ghosthand launch, `promo-video/`): toon-shaded models, one ease-out fly
+  between objects, orbits and 360° turns, text in a left column.
 
 ## Related skills
 
