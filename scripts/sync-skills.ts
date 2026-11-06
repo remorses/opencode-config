@@ -34,6 +34,7 @@ const SKILL_SOURCES: SkillSource[] = [
   { repo: 'remorses/sigillo' },
   { repo: 'remorses/strada' },
   { repo: 'remorses/subito-cli', path: 'skills/subito-cli' },
+  { repo: 'ghosthand-dev/ghosthand', path: 'skills/ghosthand' },
 ]
 
 const ROOT_DIR = path.resolve(import.meta.dir, '..')

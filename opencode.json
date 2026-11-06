@@ -8,7 +8,6 @@
     "/Users/morse/.config/opencode/hyperframes-skills",
     "/Users/morse/.config/opencode/skills-repo/skills",
     "/Users/morse/.config/opencode/private-skills/skills",
-    "/Users/morse/Documents/GitHub/iphone-usb-control/skills",
     "/Users/morse/Documents/GitHub/iphone-usb-control/daemon/skills"
   ],
   "compaction": { "auto": true },
