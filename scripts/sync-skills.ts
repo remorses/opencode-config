@@ -26,6 +26,7 @@ const SKILL_SOURCES: SkillSource[] = [
   { repo: 'remorses/critique' },
   { repo: 'remorses/errore' },
   { repo: 'remorses/egaki', path: 'cli/skills/egaki' },
+  { repo: 'remorses/egaki', path: 'angled-screen/skills/angled-screen' },
   { repo: 'remorses/termcast' },
   { repo: 'remorses/goke' },
   { repo: 'remorses/spiceflow' },
