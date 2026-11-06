@@ -35,6 +35,8 @@ const SKILL_SOURCES: SkillSource[] = [
   { repo: 'remorses/strada' },
   { repo: 'remorses/subito-cli', path: 'skills/subito-cli' },
   { repo: 'ghosthand-dev/ghosthand', path: 'skills/ghosthand' },
+  // poteto's pstack skill for READMEs, docs, PR descriptions and commit messages
+  { repo: 'cursor/plugins', path: 'pstack/skills/technical-writing' },
 ]
 
 const ROOT_DIR = path.resolve(import.meta.dir, '..')
